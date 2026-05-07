@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 const brands = [
   "Shoprite Nigeria", "Jumia Foods", "Konga Mart", "PayStack Stores",
