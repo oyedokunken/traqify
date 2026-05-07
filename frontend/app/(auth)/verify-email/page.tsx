@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { RefreshCw, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ErrorModal } from "@/components/shared/error-modal";
+import { Logo } from "@/components/shared/logo";
 import api, { setAuthTokens } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 
@@ -117,17 +118,16 @@ function VerifyEmailForm() {
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-      <div className="text-center mb-8">
-        <Link href="/" className="text-2xl font-bold tracking-tight text-[#0a0a0a]">
-          Traq<span className="text-[#DE1010]">ify</span>
-        </Link>
-        <h1 className="text-2xl font-bold text-[#0a0a0a] mt-6 mb-1">Check your email</h1>
-        <p className="text-gray-500 text-sm">
-          We sent a 6-digit code to <span className="font-medium text-[#0a0a0a]">{email}</span>
-        </p>
-      </div>
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="px-8 pt-8 pb-4">
+          <Logo href="/" size="md" className="mb-6" />
+          <h1 className="text-xl font-bold text-[#0a0a0a] mb-1">Check your email</h1>
+          <p className="text-gray-500 text-sm">
+            We sent a 6-digit code to <span className="font-medium text-[#0a0a0a]">{email}</span>
+          </p>
+        </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-8 shadow-sm">
+        <div className="px-8 pb-8">
         <div className="flex justify-center gap-3 mb-6">
           {otp.map((digit, i) => (
             <input
@@ -158,6 +158,7 @@ function VerifyEmailForm() {
             <RefreshCw size={13} className={isResending ? "animate-spin" : ""} />
             {resendCountdown > 0 ? `Resend code in ${resendCountdown}s` : "Resend code"}
           </button>
+        </div>
         </div>
       </div>
 

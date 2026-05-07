@@ -1,98 +1,357 @@
-﻿# Traqify
+﻿<div align="center">
 
-> Multi-tenant store management platform for retail businesses.
+# Traqify
 
-![Next.js](https://img.shields.io/badge/Next.js-14-black?logo=next.js&logoColor=white)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
-![Express](https://img.shields.io/badge/Express.js-4-000000?logo=express&logoColor=white)
-![Prisma](https://img.shields.io/badge/Prisma-ORM-2D3748?logo=prisma&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supabase-336791?logo=postgresql&logoColor=white)
-![Tailwind CSS](https://img.shields.io/badge/TailwindCSS-3-38BDF8?logo=tailwindcss&logoColor=white)
-![Framer Motion](https://img.shields.io/badge/Framer_Motion-Animation-EE4B96?logo=framer&logoColor=white)
-![Recharts](https://img.shields.io/badge/Recharts-Charts-22B5BF?logoColor=white)
-![JWT](https://img.shields.io/badge/JWT-Auth-F7C948?logo=jsonwebtokens&logoColor=black)
-![Google OAuth](https://img.shields.io/badge/Google_OAuth-2.0-4285F4?logo=google&logoColor=white)
+**Multi-tenant store management platform for retail businesses.**
 
-Traqify gives store owners, managers, cashiers, and auditors each the exact tools they need. Built as a full-stack TypeScript application, it covers product and inventory management, orders, staff, analytics, and a public-facing store catalog.
+[![Next.js](https://img.shields.io/badge/Next.js_14-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript_5-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Express.js](https://img.shields.io/badge/Express.js_4-000000?style=for-the-badge&logo=express&logoColor=white)](https://expressjs.com)
+[![Prisma](https://img.shields.io/badge/Prisma_ORM-2D3748?style=for-the-badge&logo=prisma&logoColor=white)](https://www.prisma.io)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supabase-336791?style=for-the-badge&logo=postgresql&logoColor=white)](https://supabase.com)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS_3-38BDF8?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
+[![Framer Motion](https://img.shields.io/badge/Framer_Motion-EE4B96?style=for-the-badge&logo=framer&logoColor=white)](https://www.framer.com/motion)
+[![Recharts](https://img.shields.io/badge/Recharts-22B5BF?style=for-the-badge&logoColor=white)](https://recharts.org)
+[![JWT](https://img.shields.io/badge/JWT_Auth-F7C948?style=for-the-badge&logo=jsonwebtokens&logoColor=black)](https://jwt.io)
+[![Google OAuth](https://img.shields.io/badge/Google_OAuth_2.0-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://developers.google.com/identity)
+[![Supabase](https://img.shields.io/badge/Supabase_Storage-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com)
+[![Vercel](https://img.shields.io/badge/Deployed_on_Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com)
+
+</div>
+
+---
+
+## What is Traqify?
+
+Traqify is a production-grade, multi-tenant store management platform designed for retail businesses that need structure and clarity across their operations. Built as a full-stack TypeScript monorepo, it handles everything from product management and order processing to staff permissions, customer records, public-facing storefronts, and real-time analytics.
+
+The system follows a clean **separation of concerns** between a Next.js 14 App Router frontend and a RESTful Express.js backend, connected via a JWT-authenticated Axios client with automatic token refresh.
+
+---
+
+## Table of Contents
+
+1. [Architecture](#architecture)
+2. [Tech Stack](#tech-stack)
+3. [Features](#features)
+4. [Database Schema](#database-schema)
+5. [API Reference](#api-reference)
+6. [Folder Structure](#folder-structure)
+7. [Running Locally](#running-locally)
+8. [Environment Variables](#environment-variables)
+9. [Google OAuth Setup](#google-oauth-setup)
+10. [Deployment](#deployment)
+11. [License](#license)
+
+---
+
+## Architecture
+
+```
+                              CLIENT
+              +--------------------------------------+
+              |    Next.js 14 (App Router)  :3000    |
+              |  TypeScript + Tailwind + Framer      |
+              |  Axios client (JWT + auto-refresh)   |
+              +------------------+-------------------+
+                                 |
+                    HTTP/HTTPS   |   REST JSON API
+                                 |
+              +------------------v-------------------+
+              |    Express.js API Server  :5000       |
+              |  TypeScript + Prisma ORM              |
+              |  JWT middleware + RBAC middleware      |
+              +------+----------+--------------------+
+                     |          |
+         +-----------+          +-----------+
+         |                                  |
++--------v-----------+          +-----------v-----------+
+|  PostgreSQL (via   |          |  Supabase Storage      |
+|  Supabase)         |          |  (product images,      |
+|                    |          |   avatars)             |
+|  Prisma ORM        |          +-----------------------+
++--------------------+
+         |
++--------v-----------+
+|  Nodemailer        |
+|  Gmail SMTP        |
+|  HTML email        |
+|  templates         |
++--------------------+
+
+  AUTHENTICATION FLOWS
+  ----------------------
+  Email/Password:
+    POST /register -> OTP email -> POST /verify-email -> JWT issued
+    POST /login -> compare bcrypt -> JWT + refresh token
+
+  Google OAuth 2.0:
+    GET /google-redirect -> accounts.google.com
+    -> GET /google-callback?code= -> exchange code -> userinfo
+    -> upsert user -> JWT + redirect to /auth-callback
+
+  Token Refresh:
+    Axios 401 interceptor -> POST /auth/refresh -> new access token
+    Automatic, transparent to all callers
+```
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Frontend Framework | Next.js 14 (App Router) |
-| UI Language | TypeScript |
-| Styling | Tailwind CSS |
-| UI Components | Radix UI / shadcn/ui |
-| Animations | Framer Motion |
-| Charts | Recharts |
-| Backend Framework | Express.js 4 |
-| ORM | Prisma |
-| Database | PostgreSQL via Supabase |
-| Auth | JWT + bcrypt + Google OAuth 2.0 |
-| File Storage | Supabase Storage |
-| Email | Nodemailer + Gmail SMTP |
-| Deployment | Vercel (frontend + backend) |
+| Concern | Technology | Notes |
+|---|---|---|
+| Frontend framework | Next.js 14 | App Router, SSR + Client Components |
+| Language | TypeScript 5 | Strict mode, full type coverage |
+| Styling | Tailwind CSS 3 | JIT, custom config |
+| UI primitives | Radix UI / shadcn/ui | Accessible, unstyled components |
+| Animations | Framer Motion | Page transitions, scroll animations, charts |
+| Charts | Recharts | AreaChart, BarChart, PieChart |
+| HTTP client | Axios | Interceptors for JWT + token refresh |
+| Backend framework | Express.js 4 | TypeScript, modular routes |
+| ORM | Prisma | Type-safe queries, migrations via `db push` |
+| Database | PostgreSQL | Hosted on Supabase |
+| Auth | JWT + bcrypt | Access + refresh token pair |
+| OAuth | Google OAuth 2.0 | Redirect-based (no popup) |
+| File storage | Supabase Storage | Product images, avatars |
+| Email | Nodemailer | Gmail SMTP, HTML templates |
+| Security | Helmet, rate-limit | Per-route rate limiting on auth endpoints |
+| Font | Jost | Google Fonts |
 
 ---
 
 ## Features
 
-- **Multi-tenant organizations** with isolated data per business
-- **Role-based access control**: Owner, Manager, Cashier, Auditor
-- **JWT authentication** with refresh tokens and OTP email verification
-- **Google OAuth 2.0** redirect-based sign-in
-- **Product management** with image upload (JPG/PNG/WebP, max 2MB)
-- **Inventory tracking** with low-stock alerts
-- **POS-style order creation** with automatic inventory decrement
-- **Customer records** with full purchase history
-- **Staff invitations** via email with role assignment
-- **Public store page** per organization with cart and guest checkout
-- **Role-based analytics dashboard** (Area, Bar, Pie charts via Recharts)
-- **PDF-printable sales reports** with date range filters
-- **Audit logs** for every team action
-- **HTML email templates** for OTP, password reset, invites, order confirmation
-- **Newsletter subscription** with confirmation email
-- **Fully responsive** landing page and dashboard
+### Multi-tenancy
+Each organization is completely isolated. Users belong to one organization (or none), and all data queries are scoped by `organizationId`. The system supports creating separate organizations per branch.
+
+### Role-Based Access Control (RBAC)
+Four roles with granular middleware enforcement:
+
+| Role | Capabilities |
+|------|--------------|
+| **OWNER** | Full access: all modules, staff management, org settings, audit logs |
+| **MANAGER** | Products, inventory, orders, customers, staff invitations |
+| **CASHIER** | Create orders, view own transactions, browse product catalog |
+| **AUDITOR** | Read-only access to all data, audit logs, financial reports |
+
+### Authentication
+- Email + password with OTP email verification (6-digit, 10-minute expiry)
+- Google OAuth 2.0 via redirect flow (no third-party popups)
+- JWT access token (7-day default) + refresh token pair
+- Axios interceptor catches 401 and silently refreshes the token
+- Account lock by admin with notification email
+
+### Products and Inventory
+- Create products with name, SKU, category, price, compare-at price, description
+- Image upload (JPG / PNG / WebP, max 2 MB) to Supabase Storage
+- Per-product inventory with configurable low-stock alert threshold
+- Inventory adjustment log
+- Low-stock dashboard badge
+
+### Orders
+- POS-style order creation: search products, set quantities, attach customers
+- Order status machine: `PENDING` > `PROCESSING` > `COMPLETED` / `CANCELLED` / `REFUNDED`
+- Inventory auto-decremented on order creation
+- Order detail modal with full item and customer breakdown
+- Email confirmation to customer
+
+### Customers
+- Full customer records (name, email, phone, address)
+- Purchase history per customer
+- Search by name or email
+
+### Staff Management
+- Email invitation with 48-hour secure token
+- Role assignment on invite (MANAGER, CASHIER, AUDITOR)
+- Account restriction / unrestriction by Owner
+- Admin-initiated password reset
+
+### Public Store
+- Each org gets `/store/[slug]` as a public product catalog
+- Filters: keyword search, category, sort (newest / price / name), in-stock toggle
+- Cart with quantity controls
+- Guest checkout: name, email, phone, address, payment method, notes
+- Confirmation email to customer on order placement
+
+### Analytics Dashboard
+- Role-aware overview page with Recharts:
+  - **OWNER / MANAGER**: revenue KPIs, 30-day area chart, top-10 products bar chart
+  - **AUDITOR**: revenue KPIs, order-status pie chart
+  - **CASHIER**: order count and product count only
+- All charts have proper empty states
+
+### Reports
+- Date-range sales report with total revenue, order count, item list
+- PDF print from browser with org name and branding
+
+### Audit Logs
+- Every create / update / delete / login event logged with user, entity, and timestamp
+- Searchable and paginated
+- Visible to OWNER and AUDITOR only
+
+### Email System
+Branded HTML templates for:
+- OTP email verification
+- Password reset
+- Staff invitation
+- Welcome email after verification
+- Order confirmation (to customer)
+- Account restriction notice
+- Admin-initiated password reset
 
 ---
 
-## System Architecture
+## Database Schema
 
 ```
-                          +------------------+
-     Browser / Mobile --> |   Next.js 14     |  :3000
-                          |  (App Router)    |
-                          +--------+---------+
-                                   |
-                          HTTP (Axios + JWT)
-                                   |
-                          +--------v---------+
-                          |   Express.js     |  :5000
-                          |   REST API       |
-                          +----+--------+----+
-                               |        |
-               +---------------+        +-------------------+
-               |                                            |
-     +---------v----------+                    +-----------v----------+
-     |  Prisma ORM        |                    |  Supabase Storage    |
-     |  PostgreSQL        |                    |  (Product Images)    |
-     |  (Supabase)        |                    +----------------------+
-     +--------------------+
-               |
-     +---------v----------+
-     |  Nodemailer        |
-     |  Gmail SMTP        |
-     |  (Emails)          |
-     +--------------------+
+User
+  id, email, name, password (bcrypt), avatarUrl
+  emailVerified, signInMethod (EMAIL|GOOGLE)
+  role (OWNER|MANAGER|CASHIER|AUDITOR)
+  organizationId (FK -> Organization)
+  lastLoginAt, isRestricted
 
-  Auth Flow:
-  - Email/Password: Register -> OTP Email -> Verify -> JWT
-  - Google OAuth: /google-redirect -> Google -> /google-callback -> JWT
-  - All protected routes: Bearer token in Authorization header
-  - Token refresh: Axios interceptor catches 401, calls /api/auth/refresh
+Organization
+  id, name, slug (unique), email, phone, address
+  industry, size, logoUrl
+  ownerId (FK -> User)
+
+Product
+  id, name, sku (unique per org), category
+  price, comparePrice, description, imageUrl
+  isActive, organizationId
+
+Inventory
+  id, quantity, lowStockAlert
+  productId (1:1 -> Product)
+
+Order
+  id, status, totalAmount, paymentMethod, notes
+  customerId, organizationId, createdByUserId
+
+OrderItem
+  id, productId, quantity, unitPrice, subtotal
+  orderId
+
+Customer
+  id, name, email, phone, address
+  organizationId
+
+StaffInvite
+  id, email, role, token (unique), accepted
+  expiresAt, organizationId, invitedByUserId
+
+OTPCode
+  id, email, code, expiresAt, used
+
+PasswordResetToken
+  id, email, token, expiresAt, used
+
+AuditLog
+  id, userId, organizationId
+  action (CREATE|UPDATE|DELETE|LOGIN)
+  entity, entityId, description
+  createdAt
+
+NewsletterSubscriber
+  id, email, subscribedAt
 ```
+
+---
+
+## API Reference
+
+All protected endpoints require `Authorization: Bearer <token>`.
+
+### Auth (`/api/auth`)
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/register` | Public | Register with name, email, password |
+| POST | `/verify-email` | Public | Verify OTP code |
+| POST | `/send-otp` | Public | Resend OTP |
+| POST | `/login` | Public | Email + password login |
+| POST | `/refresh` | Public | Refresh access token |
+| POST | `/logout` | Auth | Invalidate refresh token |
+| POST | `/forgot-password` | Public | Send reset link (returns 404 if email not found) |
+| POST | `/reset-password` | Public | Set new password via token |
+| GET  | `/google-redirect` | Public | Redirect to Google consent screen |
+| GET  | `/google-callback` | Public | Handle OAuth callback, issue JWT |
+| GET  | `/me` | Auth | Get current user profile |
+| PATCH | `/me` | Auth | Update name / avatarUrl |
+| POST | `/change-password` | Auth | Change password (requires current password) |
+
+### Organizations (`/api/org` or `/api/organizations`)
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/` | Auth | Create organization |
+| GET  | `/:slug` | Auth + OrgMember | Get organization details |
+| PATCH | `/:slug` | OWNER only | Update org settings |
+
+### Products (`/api/products`)
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/` | Auth + OrgMember | List products |
+| POST | `/` | MANAGER+ | Create product |
+| PATCH | `/:id` | MANAGER+ | Update product |
+| DELETE | `/:id` | MANAGER+ | Soft-delete product |
+| POST | `/upload-image` | MANAGER+ | Upload product image to Supabase |
+
+### Inventory (`/api/inventory`)
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/` | Auth | List inventory items |
+| PATCH | `/:productId` | MANAGER+ | Adjust stock / alert threshold |
+
+### Orders (`/api/orders`)
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/` | Auth | List orders (paginated, filterable) |
+| POST | `/` | CASHIER+ | Create order |
+| GET | `/:id` | Auth | Get order detail |
+| PATCH | `/:id/status` | MANAGER+ | Update order status |
+
+### Customers (`/api/customers`)
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/` | Auth | List customers |
+| POST | `/` | CASHIER+ | Create customer |
+| GET | `/:id` | Auth | Get customer + order history |
+| PATCH | `/:id` | MANAGER+ | Update customer |
+
+### Staff (`/api/staff`)
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/` | Auth | List staff members |
+| POST | `/invite` | MANAGER+ | Send staff invitation |
+| POST | `/accept-invite` | Public | Accept invitation via token |
+| PATCH | `/:id/restrict` | OWNER only | Restrict / unrestrict account |
+| POST | `/:id/reset-password` | OWNER only | Admin password reset |
+
+### Reports (`/api/reports`)
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/overview` | Auth | KPI summary (revenue, orders, products) |
+| GET | `/revenue-chart` | Auth | Daily revenue for last N days |
+| GET | `/top-products` | Auth | Top products by revenue |
+| GET | `/order-status` | Auth | Order count by status |
+| GET | `/sales` | AUDITOR+ | Date-range sales report |
+
+### Audit Logs (`/api/audit`)
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/` | OWNER / AUDITOR | Paginated audit log with search |
+
+### Public Store (`/api/store`)
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/:slug` | Public | Store info + product catalog |
+| POST | `/:slug/checkout` | Public | Place guest order |
+
+### Newsletter (`/api/newsletter`)
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/subscribe` | Public | Subscribe to newsletter |
 
 ---
 
@@ -113,30 +372,38 @@ traqify/
 |   +-- package.json
 |   +-- tsconfig.json
 |   +-- prisma/
-|   |   +-- schema.prisma          # All models: User, Organization, Product, Inventory,
-|   |                              #   Order, OrderItem, Customer, StaffInvite, AuditLog,
-|   |                              #   PasswordResetToken, OTPCode, NewsletterSubscriber
+|   |   +-- schema.prisma         # All 11 models
 |   +-- src/
-|       +-- index.ts               # Express server, CORS, routes mount
+|       +-- index.ts              # Express app bootstrap, CORS, rate-limit, route mounts
 |       +-- config/
-|       |   +-- database.ts        # Prisma client
-|       |   +-- email.ts           # Nodemailer transporter
-|       |   +-- supabase.ts        # Supabase client (storage)
+|       |   +-- database.ts       # Prisma client singleton
+|       |   +-- email.ts          # Nodemailer transporter
+|       |   +-- supabase.ts       # Supabase client (storage access)
 |       +-- middleware/
-|       |   +-- auth.middleware.ts # JWT verification
-|       |   +-- rbac.middleware.ts # Role-based access guard
-|       |   +-- error.middleware.ts
-|       +-- routes/                # auth, org, product, inventory, order,
-|       |                          #   customer, staff, report, audit, store, newsletter
-|       +-- controllers/           # Handler for each route module
+|       |   +-- auth.middleware.ts     # JWT verify, attach user to req
+|       |   +-- rbac.middleware.ts     # Role-based access guards
+|       |   +-- error.middleware.ts    # Global error handler
+|       +-- routes/
+|       |   +-- auth.routes.ts
+|       |   +-- org.routes.ts
+|       |   +-- product.routes.ts
+|       |   +-- inventory.routes.ts
+|       |   +-- order.routes.ts
+|       |   +-- customer.routes.ts
+|       |   +-- staff.routes.ts
+|       |   +-- report.routes.ts
+|       |   +-- audit.routes.ts
+|       |   +-- store.routes.ts
+|       |   +-- newsletter.routes.ts
+|       +-- controllers/          # One controller per route module
 |       +-- emails/
-|       |   +-- templates.ts       # HTML email templates (branded)
+|       |   +-- templates.ts      # Branded HTML email templates
 |       +-- utils/
-|           +-- jwt.ts             # sign/verify tokens
-|           +-- otp.ts             # OTP create/verify, password reset tokens
-|           +-- slug.ts            # Unique org slug generator
-|           +-- audit.ts           # Audit log helper
-|           +-- validators.ts      # Zod schemas
+|           +-- jwt.ts            # sign / verify / refresh
+|           +-- otp.ts            # OTP create/verify, password-reset tokens
+|           +-- slug.ts           # Unique org slug generator
+|           +-- audit.ts          # createAuditLog() helper
+|           +-- validators.ts     # All Zod schemas
 |
 +-- frontend/
     +-- DEPLOY.md
@@ -150,57 +417,84 @@ traqify/
     |   +-- google-logo.png
     |   +-- payments.png
     +-- app/
-    |   +-- layout.tsx             # Root layout (AuthProvider, Toaster, ScrollToTop)
-    |   +-- page.tsx               # Landing page
-    |   +-- globals.css            # Tailwind + Jost font + scroll keyframes
+    |   +-- layout.tsx            # Root layout: AuthProvider, Toaster, ScrollToTop
+    |   +-- page.tsx              # Landing page (assembly of all sections)
+    |   +-- globals.css           # Tailwind base + Jost font + CSS keyframes
     |   +-- not-found.tsx
-    |   +-- (auth)/                # login, register, verify-email, forgot-password,
-    |   |                          #   reset-password, auth-callback
-    |   +-- (public)/              # privacy, terms
-    |   +-- create-organization/
-    |   +-- invite/[token]/
-    |   +-- store/[slug]/          # Public product catalog + cart + checkout
+    |   +-- (auth)/
+    |   |   +-- layout.tsx
+    |   |   +-- login/page.tsx
+    |   |   +-- register/page.tsx      # 3-step registration with password strength
+    |   |   +-- verify-email/page.tsx  # 6-digit OTP input
+    |   |   +-- forgot-password/page.tsx
+    |   |   +-- reset-password/page.tsx
+    |   |   +-- auth-callback/page.tsx # Google OAuth landing
+    |   +-- (public)/
+    |   |   +-- privacy/page.tsx
+    |   |   +-- terms/page.tsx
+    |   +-- create-organization/page.tsx  # Post-registration org setup
+    |   +-- invite/[token]/page.tsx       # Accept staff invitation
+    |   +-- store/[slug]/page.tsx         # Public catalog + cart + checkout
     |   +-- dashboard/[slug]/
-    |       +-- layout.tsx         # Auth guard (redirects if not logged in)
-    |       +-- overview/          # Role-based Recharts dashboard
-    |       +-- products/
-    |       +-- inventory/
-    |       +-- orders/
-    |       +-- customers/
-    |       +-- staff/
-    |       +-- reports/
-    |       +-- audit-logs/
-    |       +-- settings/
+    |       +-- layout.tsx               # Auth guard + sidebar layout
+    |       +-- overview/page.tsx        # Role-based Recharts dashboard
+    |       +-- products/page.tsx
+    |       +-- inventory/page.tsx
+    |       +-- orders/page.tsx
+    |       +-- customers/page.tsx
+    |       +-- staff/page.tsx
+    |       +-- reports/page.tsx
+    |       +-- audit-logs/page.tsx
+    |       +-- settings/page.tsx
     +-- components/
-    |   +-- landing/               # hero, about, logo-scroller, features, stats,
-    |   |                          #   how-it-works, testimonials, everything, faq, cta
-    |   +-- shared/                # Navbar, Footer, Logo, ScrollToTop, ErrorModal
-    |   +-- dashboard/             # Sidebar, Topbar, ProductModal,
-    |   |                          #   CreateOrderModal, OrderDetailModal
-    |   +-- ui/                    # Button, Input, Label, Card, Badge, Toast
+    |   +-- landing/
+    |   |   +-- hero.tsx          # 2-col hero, image first on mobile
+    |   |   +-- logo-scroller.tsx # Infinite scroll on black bg
+    |   |   +-- about.tsx         # 2-col with animated dashboard mockup
+    |   |   +-- features.tsx      # 8-card feature grid
+    |   |   +-- stats.tsx         # Animated counters on dark bg
+    |   |   +-- how-it-works.tsx  # Framer Motion timeline
+    |   |   +-- testimonials.tsx  # Dual scrolling rows
+    |   |   +-- everything.tsx    # Role comparison cards
+    |   |   +-- faq.tsx           # 2-column accordion
+    |   |   +-- cta.tsx           # Red CTA with gradient glow
+    |   +-- shared/
+    |   |   +-- navbar.tsx        # Scroll spy + animated red underline
+    |   |   +-- footer.tsx        # Newsletter, socials, legal links
+    |   |   +-- logo.tsx
+    |   |   +-- scroll-to-top.tsx
+    |   |   +-- error-modal.tsx
+    |   +-- dashboard/
+    |   |   +-- sidebar.tsx
+    |   |   +-- topbar.tsx
+    |   |   +-- product-modal.tsx     # Create/edit with image upload
+    |   |   +-- create-order-modal.tsx
+    |   |   +-- order-detail-modal.tsx
+    |   +-- ui/                   # Button, Input, Label, Card, Badge, Toast
     +-- lib/
-    |   +-- api.ts                 # Axios instance with JWT + refresh interceptor
-    |   +-- auth-context.tsx       # AuthProvider (user state, login/logout)
-    |   +-- supabase.ts            # Supabase client (browser)
-    |   +-- utils.ts               # cn(), formatCurrency(), INDUSTRY_OPTIONS
+    |   +-- api.ts                # Axios instance with JWT + silent token refresh
+    |   +-- auth-context.tsx      # AuthProvider, useAuth() hook
+    |   +-- supabase.ts           # Supabase browser client
+    |   +-- utils.ts              # cn(), formatCurrency(), INDUSTRY_OPTIONS
     +-- hooks/
         +-- use-toast.ts
 ```
 
 ---
 
-## Running the App Locally
+## Running Locally
 
-### Requirements
+### Prerequisites
 
 - Node.js 18 or higher
-- A PostgreSQL database (free Supabase project works)
+- npm 9 or higher
+- A free [Supabase](https://supabase.com) project (PostgreSQL + Storage)
 - A Gmail account with [App Password](https://support.google.com/accounts/answer/185833) enabled
-- A Google Cloud project with OAuth 2.0 credentials
+- A Google Cloud project with OAuth 2.0 Web Client credentials
 
 ---
 
-### 1. Clone the repository
+### Step 1: Clone the repository
 
 ```bash
 git clone https://github.com/oyedokunken/traqify.git
@@ -209,57 +503,54 @@ cd traqify
 
 ---
 
-### 2. Set up the backend
+### Step 2: Set up the backend
 
 ```bash
 cd backend
 npm install
-```
-
-Create a `.env` file (copy from `.env.example` and fill in your values):
-
-```bash
 cp .env.example .env
 ```
 
-Key values to set:
-- `DATABASE_URL` and `DIRECT_URL` from your Supabase project settings under **Database > Connection string**
-- `SMTP_USER` and `SMTP_PASS` (Gmail address + App Password)
-- `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` from Google Cloud Console
-- `JWT_SECRET` and `JWT_REFRESH_SECRET` (any long random strings)
+Open `.env` and fill in the following (see [Environment Variables](#environment-variables) for the full list):
 
-Push the database schema:
+- `DATABASE_URL` and `DIRECT_URL` from Supabase > Project Settings > Database > Connection string
+- `SMTP_USER` and `SMTP_PASS` (your Gmail address and 16-char App Password)
+- `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` from Google Cloud Console
+- `JWT_SECRET` and `JWT_REFRESH_SECRET` (any two long random strings, keep them secret)
+
+Push the schema to your database:
 
 ```bash
 npx prisma db push
 ```
 
-Start the backend:
+Start the backend dev server:
 
 ```bash
 npm run dev
 ```
 
-Backend runs at **http://localhost:5000**
+The API will be available at **http://localhost:5000**. You can verify it is running:
+
+```bash
+curl http://localhost:5000/health
+# { "status": "ok", ... }
+```
 
 ---
 
-### 3. Set up the frontend
+### Step 3: Set up the frontend
 
 Open a new terminal:
 
 ```bash
 cd frontend
 npm install
-```
-
-Create a `.env.local` file:
-
-```bash
 cp .env.local.example .env.local
 ```
 
 Fill in:
+
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:5000
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
@@ -272,43 +563,107 @@ Start the frontend:
 npm run dev
 ```
 
-Frontend runs at **http://localhost:3000**
+The app will be available at **http://localhost:3000**.
 
 ---
 
-### 4. Google OAuth setup (for "Continue with Google")
+### Step 4: Create your first account
 
-In [Google Cloud Console](https://console.cloud.google.com):
-
-1. Go to **APIs & Services > Credentials**
-2. Open your OAuth 2.0 Web client
-3. Under **Authorized redirect URIs**, add:
-   ```
-   http://localhost:5000/api/auth/google-callback
-   ```
-4. Under **Authorized JavaScript origins**, add:
-   ```
-   http://localhost:3000
-   ```
-5. Save and wait up to 5 minutes for changes to propagate
+1. Open http://localhost:3000/register
+2. Fill in your name, email, and password
+3. Enter your organization details
+4. Check your email for the OTP code
+5. Verify your email
+6. Sign in at http://localhost:3000/login
+7. You will be redirected to set up your organization at http://localhost:3000/create-organization
 
 ---
 
-### 5. Open the app
+### Step 5: Explore
 
-| URL | Page |
-|-----|------|
+| URL | Description |
+|-----|-------------|
 | http://localhost:3000 | Landing page |
 | http://localhost:3000/register | Create an account |
 | http://localhost:3000/login | Sign in |
-| http://localhost:3000/dashboard/[slug]/overview | Dashboard |
-| http://localhost:3000/store/[slug] | Public store |
+| http://localhost:3000/create-organization | Org setup (post-registration) |
+| http://localhost:3000/dashboard/[slug]/overview | Dashboard home |
+| http://localhost:3000/dashboard/[slug]/products | Products |
+| http://localhost:3000/dashboard/[slug]/orders | Orders |
+| http://localhost:3000/dashboard/[slug]/staff | Staff management |
+| http://localhost:3000/store/[slug] | Public store page |
+
+---
+
+## Environment Variables
+
+### `backend/.env`
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DATABASE_URL` | Yes | Supabase pooled connection string |
+| `DIRECT_URL` | Yes | Supabase direct connection string (for migrations) |
+| `PORT` | No | API port (default: 5000) |
+| `NODE_ENV` | Yes | `development` or `production` |
+| `API_URL` | Yes | Full base URL of this API server |
+| `FRONTEND_URL` | Yes | Full base URL of the frontend (for CORS + email links) |
+| `JWT_SECRET` | Yes | Long random string for signing access tokens |
+| `JWT_REFRESH_SECRET` | Yes | Different long random string for refresh tokens |
+| `JWT_EXPIRES_IN` | No | Access token lifetime (default: `7d`) |
+| `SUPABASE_URL` | Yes | Your Supabase project URL |
+| `SUPABASE_ANON_KEY` | Yes | Supabase anonymous/public key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | Supabase service role key (for storage writes) |
+| `SMTP_HOST` | Yes | SMTP host (e.g. `smtp.gmail.com`) |
+| `SMTP_PORT` | Yes | SMTP port (e.g. `587`) |
+| `SMTP_USER` | Yes | SMTP username (your Gmail address) |
+| `SMTP_PASS` | Yes | Gmail App Password (16 characters) |
+| `SMTP_FROM` | Yes | From header, e.g. `"Traqify <you@gmail.com>"` |
+| `GOOGLE_CLIENT_ID` | Yes | OAuth 2.0 client ID from Google Console |
+| `GOOGLE_CLIENT_SECRET` | Yes | OAuth 2.0 client secret |
+
+### `frontend/.env.local`
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `NEXT_PUBLIC_API_URL` | Yes | Backend API base URL |
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anon key |
+
+---
+
+## Google OAuth Setup
+
+This step is required to enable "Continue with Google" on the login and register pages.
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com) and select your project
+2. Navigate to **APIs & Services > Credentials**
+3. Click **Create Credentials > OAuth 2.0 Client IDs > Web application**
+4. Under **Authorized JavaScript Origins**, add:
+
+```
+http://localhost:3000
+```
+
+5. Under **Authorized Redirect URIs**, add:
+
+```
+http://localhost:5000/api/auth/google-callback
+```
+
+6. Save and copy the **Client ID** and **Client Secret** into `backend/.env`
+7. Wait up to 5 minutes for changes to propagate
+
+For production, also add:
+- `https://your-frontend.vercel.app` to JavaScript Origins
+- `https://your-backend.vercel.app/api/auth/google-callback` to Redirect URIs
 
 ---
 
 ## Deployment
 
-See [frontend/DEPLOY.md](frontend/DEPLOY.md) and [backend/DEPLOY.md](backend/DEPLOY.md) for step-by-step Vercel deployment guides.
+See the step-by-step guides:
+- [frontend/DEPLOY.md](frontend/DEPLOY.md) for deploying the Next.js app to Vercel
+- [backend/DEPLOY.md](backend/DEPLOY.md) for deploying the Express API to Vercel
 
 ---
 

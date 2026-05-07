@@ -59,7 +59,7 @@ export function Footer() {
             </div>
           </div>
 
-          <div className="lg:col-span-3 grid grid-cols-2 sm:grid-cols-3 gap-8">
+          <div className="lg:col-span-3 grid grid-cols-2 gap-8">
             <div>
               <h4 className="text-sm font-semibold mb-5 text-gray-200">Product</h4>
               <ul className="space-y-3">
@@ -85,21 +85,6 @@ export function Footer() {
                   { label: "Sign in", href: "/login" },
                   { label: "Dashboard", href: "/login" },
                   { label: "Public store", href: "/store" },
-                ].map((link) => (
-                  <li key={link.href}>
-                    <Link href={link.href} className="text-sm text-gray-400 hover:text-white transition-colors">{link.label}</Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="text-sm font-semibold mb-5 text-gray-200">Legal</h4>
-              <ul className="space-y-3">
-                {[
-                  { label: "Privacy Policy", href: "/privacy" },
-                  { label: "Terms of Service", href: "/terms" },
-                  { label: "GitHub", href: "https://github.com/oyedokunken/traqify" },
                 ].map((link) => (
                   <li key={link.href}>
                     <Link href={link.href} className="text-sm text-gray-400 hover:text-white transition-colors">{link.label}</Link>
@@ -138,10 +123,21 @@ export function Footer() {
 
         <div className="border-t border-white/5 pt-8">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-xs text-gray-600">
-              &copy; {new Date().getFullYear()} Traqify. All rights reserved. Built by{" "}
-              <a href="https://wa.link/nv875h" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">@oyedokunken</a>
-            </p>
+            <div className="flex flex-col sm:flex-row items-center gap-3 text-xs text-gray-600 text-center sm:text-left">
+              <span>
+                &copy; {new Date().getFullYear()} Traqify. All rights reserved. Built with{" "}
+                <span className="text-white">&#10084;&#65039;</span>{" "}by{" "}
+                <a href="https://wa.link/nv875h" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">@oyedokunken</a>
+              </span>
+              <span className="hidden sm:inline text-white/20">|</span>
+              <div className="flex items-center gap-3">
+                <Link href="/privacy" className="text-gray-500 hover:text-white transition-colors">Privacy Policy</Link>
+                <span className="text-white/20">·</span>
+                <Link href="/terms" className="text-gray-500 hover:text-white transition-colors">Terms of Service</Link>
+                <span className="text-white/20">·</span>
+                <a href="https://github.com/oyedokunken/traqify" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-white transition-colors">GitHub</a>
+              </div>
+            </div>
             <div className="flex items-center gap-3">
               <Image src="/payments.png" alt="Payment methods" width={180} height={28} className="h-7 w-auto object-contain" />
             </div>
