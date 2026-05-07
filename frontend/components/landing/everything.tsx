@@ -1,8 +1,7 @@
-"use client";
+ï»¿"use client";
 
 import { motion } from "framer-motion";
-import { Crown, Layers, Receipt, Search } from "lucide-react";
-import { CheckCircle2 } from "lucide-react";
+import { Crown, Layers, Receipt, Search, CheckCircle2 } from "lucide-react";
 
 const categories = [
   {
@@ -10,7 +9,7 @@ const categories = [
     pill: "Owner role",
     pillColor: "bg-[#DE1010]/10 text-[#DE1010]",
     title: "For Store Owners",
-    subtext: "Full control of your business. See every number, every team action, every report — nothing is hidden from you.",
+    subtext: "Full control of your business. See every number, every team action, every report.",
     borderColor: "border-t-[#DE1010]",
     items: [
       "Full organizational control",
@@ -25,7 +24,7 @@ const categories = [
     pill: "Manager role",
     pillColor: "bg-blue-50 text-blue-600",
     title: "For Managers",
-    subtext: "Keep products, stock, and orders moving. Manage the team and coordinate day-to-day store operations.",
+    subtext: "Keep products, stock, and orders moving. Coordinate day-to-day store operations.",
     borderColor: "border-t-blue-500",
     items: [
       "Product creation and editing",
@@ -40,7 +39,7 @@ const categories = [
     pill: "Cashier role",
     pillColor: "bg-green-50 text-green-600",
     title: "For Cashiers",
-    subtext: "Focus on what matters most — serving customers. Create orders quickly and keep the queue moving.",
+    subtext: "Focus on what matters most: serving customers. Create orders quickly and keep the queue moving.",
     borderColor: "border-t-green-500",
     items: [
       "Fast order creation",
@@ -55,7 +54,7 @@ const categories = [
     pill: "Auditor role",
     pillColor: "bg-purple-50 text-purple-600",
     title: "For Auditors",
-    subtext: "Read everything, change nothing. Full visibility across inventory, orders, and team activity for accurate reviews.",
+    subtext: "Read everything, change nothing. Full visibility across inventory, orders, and team activity.",
     borderColor: "border-t-purple-500",
     items: [
       "Read-only data access",

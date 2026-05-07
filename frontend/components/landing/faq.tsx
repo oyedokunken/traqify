@@ -1,4 +1,4 @@
-"use client";
+ï»¿"use client";
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -11,7 +11,7 @@ const faqs = [
   },
   {
     q: "How many staff members can I invite?",
-    a: "You can invite as many staff members as you need. Each gets a role — Manager, Cashier, or Auditor — with access scoped to what they actually need.",
+    a: "You can invite as many staff members as you need. Each gets a role ï¿½ Manager, Cashier, or Auditor ï¿½ with access scoped to what they actually need.",
   },
   {
     q: "Can I manage multiple store locations?",
