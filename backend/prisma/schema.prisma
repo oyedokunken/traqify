@@ -1,0 +1,272 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  OWNER
+  MANAGER
+  CASHIER
+  AUDITOR
+}
+
+enum SignInMethod {
+  EMAIL
+  GOOGLE
+}
+
+enum OrderStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+}
+
+model User {
+  id             String       @id @default(cuid())
+  name           String?
+  email          String       @unique
+  emailVerified  Boolean      @default(false)
+  password       String?
+  phone          String?
+  avatarUrl      String?
+  signInMethod   SignInMethod  @default(EMAIL)
+  isActive       Boolean      @default(true)
+  lastLoginAt    DateTime?
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  role           UserRole      @default(CASHIER)
+
+  invitedById    String?
+  invitedBy      User?         @relation("InvitedUsers", fields: [invitedById], references: [id])
+  invitedUsers   User[]        @relation("InvitedUsers")
+
+  orders         Order[]
+  auditLogs      AuditLog[]
+
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@map("users")
+}
+
+model Organization {
+  id          String      @id @default(cuid())
+  name        String
+  slug        String      @unique
+  email       String?
+  phone       String?
+  address     String?
+  industry    String?
+  size        String?
+  logoUrl     String?
+  website     String?
+
+  users       User[]
+  products    Product[]
+  orders      Order[]
+  customers   Customer[]
+  auditLogs   AuditLog[]
+  invites     StaffInvite[]
+
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@map("organizations")
+}
+
+model OTPVerification {
+  id        String   @id @default(cuid())
+  email     String
+  otp       String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@map("otp_verifications")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@map("password_reset_tokens")
+}
+
+model StaffInvite {
+  id             String       @id @default(cuid())
+  email          String
+  role           UserRole
+  token          String       @unique
+  status         InviteStatus @default(PENDING)
+  expiresAt      DateTime
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  invitedById    String
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@map("staff_invites")
+}
+
+model Product {
+  id             String           @id @default(cuid())
+  name           String
+  sku            String
+  description    String?
+  price          Float
+  comparePrice   Float?
+  category       String?
+  imageUrl       String?
+  isActive       Boolean          @default(true)
+
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  inventory      Inventory?
+  orderItems     OrderItem[]
+  variants       ProductVariant[]
+
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@unique([sku, organizationId])
+  @@map("products")
+}
+
+model ProductVariant {
+  id         String   @id @default(cuid())
+  name       String
+  value      String
+  price      Float?
+  sku        String?
+
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime @default(now())
+
+  @@map("product_variants")
+}
+
+model Inventory {
+  id             String   @id @default(cuid())
+  quantity       Int      @default(0)
+  lowStockAlert  Int      @default(10)
+  reorderPoint   Int      @default(5)
+
+  productId      String   @unique
+  product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  updatedAt      DateTime @updatedAt
+
+  @@map("inventory")
+}
+
+model Customer {
+  id             String       @id @default(cuid())
+  name           String
+  email          String?
+  phone          String?
+  address        String?
+  notes          String?
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  orders         Order[]
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@map("customers")
+}
+
+model Order {
+  id             String      @id @default(cuid())
+  orderNumber    String      @unique
+  status         OrderStatus @default(PENDING)
+  totalAmount    Float
+  notes          String?
+  paymentMethod  String?
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  customerId     String?
+  customer       Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  createdById    String
+  createdBy      User         @relation(fields: [createdById], references: [id])
+
+  orderItems     OrderItem[]
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  quantity  Int
+  unitPrice Float
+  subtotal  Float
+
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+model NewsletterSubscriber {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+
+  @@map("newsletter_subscribers")
+}
+
+model AuditLog {
+  id             String       @id @default(cuid())
+  action         String
+  entity         String
+  entityId       String?
+  details        String?
+  ipAddress      String?
+  userAgent      String?
+
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime     @default(now())
+
+  @@map("audit_logs")
+}
