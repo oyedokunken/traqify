@@ -19,7 +19,7 @@ function DashboardMockup() {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ duration: 0.6, delay: 0.2 }}
-      className="w-full rounded-2xl overflow-hidden shadow-2xl border border-gray-200 bg-white"
+      className="w-full rounded-2xl overflow-hidden shadow-2xl border border-gray-200 bg-white order-first lg:order-last"
     >
       <div className="bg-[#0a0a0a] px-4 py-3 flex items-center gap-2">
         <div className="flex gap-1.5">
@@ -119,6 +119,7 @@ export function About() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
+            className="order-last lg:order-first"
           >
             <span className="text-xs font-semibold text-[#DE1010] uppercase tracking-widest">What is Traqify</span>
             <h2 className="text-3xl sm:text-4xl font-bold text-[#0a0a0a] mt-3 mb-5 leading-tight">

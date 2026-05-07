@@ -91,7 +91,7 @@ export function Features() {
             transition={{ delay: 0.2 }}
             className="text-gray-500 mt-3 max-w-xl mx-auto"
           >
-            A complete operations suite — not a collection of disconnected tools.
+            A complete operations suite, not a collection of disconnected tools.
           </motion.p>
         </div>
 

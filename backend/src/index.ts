@@ -61,6 +61,7 @@ app.get("/health", (_req, res) => {
 
 app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/org", orgRoutes);
+app.use("/api/organizations", orgRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/orders", orderRoutes);

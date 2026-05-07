@@ -52,8 +52,32 @@ export default function RegisterPage() {
 
   const form1 = useForm<Step1Data>({ resolver: zodResolver(step1Schema) });
   const form2 = useForm<Step2Data>({ resolver: zodResolver(step2Schema) });
+  const watchedPassword = form1.watch("password", "");
+
+  function getPasswordStrength(pw: string): { score: number; label: string; color: string } {
+    const checks = [
+      pw.length >= 8,
+      /[A-Z]/.test(pw),
+      /[a-z]/.test(pw),
+      /[0-9]/.test(pw),
+      /[^A-Za-z0-9]/.test(pw),
+    ];
+    const score = checks.filter(Boolean).length;
+    if (score <= 2) return { score, label: "Weak", color: "bg-[#DE1010]" };
+    if (score <= 4) return { score, label: "Medium", color: "bg-yellow-400" };
+    return { score, label: "Strong", color: "bg-green-500" };
+  }
 
   const handleStep1 = async (data: Step1Data) => {
+    const nameParts = data.name.toLowerCase().split(" ").filter(Boolean);
+    const emailLocal = data.email.split("@")[0].toLowerCase();
+    const pw = data.password.toLowerCase();
+    const containsName = nameParts.some((part) => part.length > 2 && pw.includes(part));
+    const containsEmail = emailLocal.length > 2 && pw.includes(emailLocal);
+    if (containsName || containsEmail) {
+      setError("Your password cannot contain your name or email address. Please choose a stronger password.");
+      return;
+    }
     try {
       await api.post("/api/auth/register", data);
       setStep1Data(data);
@@ -124,6 +148,23 @@ export default function RegisterPage() {
                         {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                       </button>
                     </div>
+                    {watchedPassword.length > 0 && (() => {
+                      const { score, label, color } = getPasswordStrength(watchedPassword);
+                      return (
+                        <div className="mt-2">
+                          <div className="flex gap-1 mb-1">
+                            {[1,2,3,4,5].map((i) => (
+                              <div key={i} className={`flex-1 h-1 rounded-full transition-all duration-300 ${
+                                i <= score ? color : "bg-gray-200"
+                              }`} />
+                            ))}
+                          </div>
+                          <p className={`text-[10px] font-medium ${
+                            score <= 2 ? "text-[#DE1010]" : score <= 4 ? "text-yellow-500" : "text-green-600"
+                          }`}>{label} password</p>
+                        </div>
+                      );
+                    })()}
                     {form1.formState.errors.password && <p className="text-xs text-[#DE1010] mt-1">{form1.formState.errors.password.message}</p>}
                   </div>
 
