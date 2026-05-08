@@ -1,6 +1,7 @@
 import { Response } from "express";
 import prisma from "../config/database";
 import { AuthRequest } from "../middleware/auth.middleware";
+import { createAuditLog } from "../utils/audit";
 import PDFDocument from "pdfkit";
 import { sendEmail } from "../config/email";
 import { reportEmailTemplate } from "../emails/templates";
@@ -324,6 +325,7 @@ export const downloadReport = async (req: AuthRequest, res: Response): Promise<v
 
     const pdf = await buildPDF(type, label, org, from || "", to || "", rows as any[]);
     res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${type}-report.pdf"` });
+    createAuditLog(req.user!.id, orgId, "EXPORT", "Report", undefined, `Downloaded ${label}`, req).catch(() => {});
     res.send(pdf);
   } catch {
     res.status(500).json({ error: "Failed to generate PDF." });
@@ -353,6 +355,7 @@ export const emailReport = async (req: AuthRequest, res: Response): Promise<void
     const html = reportEmailTemplate(org?.name || "", label, from || fmt(fromDate), to_date || fmt(toDate), `${frontendUrl}/dashboard/${org?.slug || ""}/reports`);
 
     await sendEmail(to, `${label} - ${org?.name}`, html, [{ filename: `${type}-report.pdf`, content: pdf, contentType: "application/pdf" }]);
+    createAuditLog(req.user!.id, orgId, "EXPORT", "Report", undefined, `Emailed ${label} to ${to}`, req).catch(() => {});
     res.json({ message: `Report sent to ${to}.` });
   } catch {
     res.status(500).json({ error: "Failed to send report email." });

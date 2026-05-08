@@ -100,7 +100,11 @@ export const updateOrganization = async (req: AuthRequest, res: Response): Promi
       }
     }
 
-    await createAuditLog(req.user!.id, org.id, "UPDATE", "Organization", org.id, "Updated organization details", req);
+    const storeToggled = parsed.data.storePublished !== undefined && parsed.data.storePublished !== wasPublished;
+    const details = storeToggled
+      ? `Store ${parsed.data.storePublished ? "published (went live)" : "unpublished (taken offline)"}`
+      : "Updated organization settings";
+    await createAuditLog(req.user!.id, org.id, storeToggled ? "UPDATE" : "UPDATE", "Organization", org.id, details, req);
     res.json(updated);
   } catch {
     res.status(500).json({ error: "Failed to update organization." });
