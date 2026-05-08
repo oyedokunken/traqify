@@ -159,10 +159,12 @@ Four roles with granular middleware enforcement:
 ### Orders
 - POS-style order creation: search products, set quantities, attach customers
 - Order status flow: `PENDING` → `APPROVED` → `COMPLETED` / `CANCELLED`
-- Quick-approve button on orders table; Approve button in detail modal
+- **Clickable rows** — click anywhere on a row to open the order detail modal
+- Approve confirmation modal before status change; delete confirmation modal
 - Inventory auto-decremented on order creation
 - Order detail modal with full item and customer breakdown
-- Email confirmation to customer with org contact details
+- Email confirmation to customer with org branding (logo, org name)
+- **Admin email notification** to the org owner when any new order is placed (dashboard or store)
 
 ### Logistics
 - `/dashboard/[slug]/logistics` — OWNER/MANAGER only
@@ -176,16 +178,18 @@ Four roles with granular middleware enforcement:
 
 ### Staff Management
 - Email invitation with 48-hour secure token
-- Role assignment on invite (MANAGER, CASHIER, AUDITOR)
-- Account restriction / unrestriction by Owner
-- Admin-initiated password reset
+- Role assignment on invite (MANAGER, CASHIER, AUDITOR); OWNER role cannot be assigned via invite
+- Account restriction / unrestriction with email notification; OWNER account cannot be restricted
+- Admin-initiated password reset; OWNER password cannot be reset via staff tools
+- Staff invite accept: redirect to dashboard uses `orgSlug` from API response (bug fix)
 
 ### Public Store
 - Each org gets `/store/[slug]` as a public product catalog
 - **Responsive**: mobile off-canvas drawer menu with category nav, cart/wishlist counts
 - **Store navbar**: full-width logo (or text fallback), cart badge, wishlist badge, category tabs (desktop)
-- **Store info section** below products: org contact details linkable via `#store-info`
+- **Store info section** below products: org name, description, and contact details linkable via `#store-info`
 - Filters: keyword search, category (left sidebar), **dual price range slider** (min/max derived from actual product prices)
+- **Sort bar**: Newest first, Oldest, Price (low→high / high→low), Name (A–Z)
 - **Product cards**: hover image cycling, wishlist heart overlay, discount % badge; separate View / Add-to-cart / Wishlist actions; `object-contain` images
 - **Product detail drawer**: image gallery with thumbnail strip, wishlist toggle, Add to cart
 - **Wishlist**: localStorage + backend sync; email capture; reminder emails at 30min/2hr/1day/3days
@@ -195,11 +199,18 @@ Four roles with granular middleware enforcement:
 - Confirmation email to customer on order placement
 
 ### Analytics Dashboard
-- Role-aware overview page with Recharts:
-  - **OWNER / MANAGER**: revenue KPIs, 30-day area chart, top-10 products bar chart
-  - **AUDITOR**: revenue KPIs, order-status pie chart
-  - **CASHIER**: order count and product count only
-- All charts have proper empty states
+- Live 12h clock + greeting on overview
+- **Period filter** on charts: 7 / 30 / 90 days (applies to revenue, orders, and customer growth charts)
+- **Open Storefront** button — opens the public store in a new tab; shows an error modal if the store is unpublished
+- Revenue area chart, order growth area chart, customer growth line chart — all powered by live API data
+- Low-stock alert banner when any product is at or below alert threshold
+
+### Newsletter
+- `/dashboard/[slug]/newsletter` — OWNER/MANAGER only
+- Summary stats: total subscribers, last 7 days, this month
+- Searchable subscriber table with status badges
+- **CSV export** of all subscriber records
+- Refresh button for live updates
 
 ### Reports
 - 6 report types: Revenue, Products, Orders, Customers, Inventory, Staff
@@ -240,7 +251,8 @@ User
 
 Organization
   id, name, slug (unique), email, phone, address, website
-  industry, size, logoUrl
+  industry, size, description String?
+  logoUrl
   storePublished Boolean
   ownerId (FK -> User)
 
@@ -420,6 +432,7 @@ All protected endpoints require `Authorization: Bearer <token>`.
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | POST | `/subscribe` | Public | Subscribe to newsletter |
+| GET | `/subscribers` | OWNER/MANAGER | List all newsletter subscribers |
 
 ---
 
@@ -516,7 +529,8 @@ traqify/
     |       +-- staff/page.tsx
     |       +-- reports/page.tsx
     |       +-- audit-logs/page.tsx
-    |       +-- settings/page.tsx
+    |       +-- settings/page.tsx        # Org tab: industry/size/description/phone/address/website
+    |       +-- newsletter/page.tsx      # Subscriber stats + searchable table + CSV export
     +-- components/
     |   +-- landing/
     |   |   +-- hero.tsx          # 2-col hero, image first on mobile

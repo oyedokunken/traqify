@@ -3,10 +3,11 @@
 ## Supported Versions
 
 | Version | Supported |
-|---------|-----------|
+|---------|----------|
+| 1.4.x   | ✅ Yes    |
+| 1.3.x   | ✅ Yes    |
 | 1.2.x   | ✅ Yes    |
-| 1.1.x   | ✅ Yes    |
-| < 1.1   | ❌ No     |
+| < 1.2   | ❌ No     |
 
 ---
 
@@ -43,6 +44,8 @@ Four roles with descending privilege: `OWNER > MANAGER > CASHIER > AUDITOR`
 - Route-level enforcement via `authenticate` and `isOwnerOnly` / `isOwnerOrManager` Express middleware
 - All authenticated routes require a valid JWT; expired tokens are rejected with `401`
 - Organisation scope is enforced on every query — users can only access their own organisation's data
+- **OWNER protection**: the OWNER account cannot be restricted, removed, or have their password reset by any other staff member — enforced at the controller level on `toggleStaffAccess`, `removeStaff`, and `resetStaffPassword`
+- **Invite role cap**: `inviteStaffSchema` only allows MANAGER / CASHIER / AUDITOR — the OWNER role can never be assigned via invitation
 
 ### CORS
 
@@ -99,4 +102,5 @@ Sensitive values are never committed to the repository. See `.env.example` for r
 ## Known Limitations
 
 - Refresh tokens are stored in `localStorage` (not `httpOnly` cookies). This is a pragmatic trade-off for a SPA. Production deployments should consider migrating to `httpOnly` cookie refresh tokens.
-- Rate limiting is not yet implemented on authentication endpoints. Consider adding `express-rate-limit` before exposing to high traffic.
+- Per-route rate limiting is applied on auth endpoints via `express-rate-limit`; consider stricter limits under high traffic.
+- Paystack payment verification is performed server-side before order creation; client-side reference values are never trusted without verification.
