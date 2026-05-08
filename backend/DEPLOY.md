@@ -1,112 +1,52 @@
-# Deploying the Backend to Vercel
+ï»¿# Backend Deployment Guide
 
-This guide covers deploying the Traqify Express/TypeScript backend to Vercel using the Vercel web dashboard.
+## Required Environment Variables
 
----
+Copy .env.example to .env and fill in the values.
+**Never commit .env to version control.**
 
-## Prerequisites
+### Database
+DATABASE_URL=postgresql://user:password@host:5432/dbname?pgbouncer=true
+DIRECT_URL=postgresql://user:password@host:5432/dbname
 
-- A [Vercel account](https://vercel.com/signup)
-- Your code pushed to a GitHub repository
-- A PostgreSQL database (Supabase) already set up
+### Server
+PORT=5000
+NODE_ENV=production
+API_URL=https://api.yourdomain.com
+FRONTEND_URL=https://yourdomain.com
+BACKEND_URL=https://api.yourdomain.com
 
----
+### JWT
+JWT_SECRET=<generate: openssl rand -base64 64>
+JWT_REFRESH_SECRET=<generate: openssl rand -base64 64>
+JWT_EXPIRES_IN=7d
+
+### Supabase Storage
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+Buckets required (Public): products (5MB), avatars (2MB)
+
+### SMTP
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your@gmail.com
+SMTP_PASS=your-gmail-app-password
+SMTP_FROM=Traqify <your@gmail.com>
+
+### Google OAuth
+GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-client-secret
+Callback URL: https://api.yourdomain.com/api/auth/google-callback
+
+### Paystack
+PAYSTACK_SECRET_KEY=sk_live_your_paystack_secret_key
+PAYSTACK_PUBLIC_KEY=pk_live_your_paystack_public_key
 
 ## Steps
-
-### 1. Add a `vercel.json` to the backend root
-
-Create `backend/vercel.json` with the following content:
-
-```json
-{
-  "version": 2,
-  "builds": [
-    {
-      "src": "src/index.ts",
-      "use": "@vercel/node"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "src/index.ts"
-    }
-  ]
-}
-```
-
-### 2. Push your code to GitHub
-
-```bash
-git add .
-git commit -m "add vercel.json for backend deployment"
-git push origin main
-```
-
-### 3. Import your project on Vercel
-
-1. Go to [vercel.com/new](https://vercel.com/new)
-2. Click **"Import Git Repository"**
-3. Select your `traqify` repository
-4. Under **"Root Directory"**, set it to `backend`
-5. Vercel will detect Node.js automatically
-
-### 4. Add environment variables
-
-In the Vercel project settings under **Environment Variables**, add all values from your `backend/.env`:
-
-| Key | Notes |
-|-----|-------|
-| `DATABASE_URL` | Supabase connection string (pooled) |
-| `DIRECT_URL` | Supabase direct connection string |
-| `PORT` | `3000` (Vercel uses 3000 internally) |
-| `NODE_ENV` | `production` |
-| `API_URL` | `https://your-backend.vercel.app` |
-| `FRONTEND_URL` | `https://your-frontend.vercel.app` |
-| `JWT_SECRET` | A strong random string |
-| `JWT_REFRESH_SECRET` | A different strong random string |
-| `JWT_EXPIRES_IN` | `7d` |
-| `SUPABASE_URL` | Your Supabase project URL |
-| `SUPABASE_ANON_KEY` | Supabase anon key |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key |
-| `SMTP_HOST` | `smtp.gmail.com` |
-| `SMTP_PORT` | `587` |
-| `SMTP_USER` | Your Gmail address |
-| `SMTP_PASS` | Your Gmail app password |
-| `SMTP_FROM` | `"Traqify <your@gmail.com>"` |
-| `GOOGLE_CLIENT_ID` | From Google Cloud Console |
-| `GOOGLE_CLIENT_SECRET` | From Google Cloud Console |
-
-### 5. Deploy
-
-Click **"Deploy"**. Vercel will build and start your server.
-
-Your backend will be live at `https://your-backend-name.vercel.app`.
-
----
-
-## Post-Deployment
-
-### Update Google Console redirect URI
-
-Add `https://your-backend.vercel.app/api/auth/google-callback` to Authorized Redirect URIs in Google Cloud Console.
-
-### Update Prisma for production
-
-If your schema has changed, run:
-```bash
-npx prisma db push
-```
-
-### CORS
-
-Update your `backend/src/index.ts` CORS origin to include your production frontend URL.
-
----
-
-## Important Notes
-
-- **Never commit your `.env` file** — use Vercel environment variables only
-- Vercel serverless functions have a 10s execution limit on the free tier; long-running tasks should be handled asynchronously
-- The free tier supports up to 100GB bandwidth and 6,000 build minutes per month
+1. npm install
+2. npx prisma generate
+3. npx prisma migrate deploy
+4. npm run build
+5. npm start

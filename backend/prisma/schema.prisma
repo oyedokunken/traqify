@@ -22,8 +22,15 @@ enum SignInMethod {
 
 enum OrderStatus {
   PENDING
+  APPROVED
   COMPLETED
   CANCELLED
+}
+
+enum ProductType {
+  SIMPLE
+  DOWNLOADABLE
+  VARIABLE
 }
 
 enum InviteStatus {
@@ -81,6 +88,7 @@ model Organization {
   auditLogs   AuditLog[]
   invites     StaffInvite[]
   categories  ProductCategory[]
+  wishlists   Wishlist[]
 
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
@@ -159,6 +167,8 @@ model Product {
   imageUrl       String?
   imageUrls      String[]         @default([])
   status         String           @default("published")
+  productType    ProductType      @default(SIMPLE)
+  downloadUrl    String?
   isActive       Boolean          @default(true)
 
   categoryId     String?
@@ -264,6 +274,27 @@ model OrderItem {
   product   Product @relation(fields: [productId], references: [id])
 
   @@map("order_items")
+}
+
+model Wishlist {
+  id             String       @id @default(cuid())
+  sessionId      String
+  email          String?
+  productIds     String[]
+  slug           String
+  sent30min      Boolean      @default(false)
+  sent2hr        Boolean      @default(false)
+  sentDay1       Boolean      @default(false)
+  sentDay3       Boolean      @default(false)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([sessionId, organizationId])
+  @@map("wishlists")
 }
 
 model NewsletterSubscriber {

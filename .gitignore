@@ -49,3 +49,11 @@ next-env.d.ts
 
 # Local notes (may contain sensitive info)
 prompts.txt
+
+# Deployment docs (contain env details)
+DEPLOY.md
+backend/DEPLOY.md
+frontend/DEPLOY.md
+
+# Local upload files (use Supabase Storage in production)
+backend/uploads/

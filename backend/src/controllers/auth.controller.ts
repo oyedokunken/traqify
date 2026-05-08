@@ -4,7 +4,7 @@ import prisma from "../config/database";
 import { signToken, signRefreshToken, verifyRefreshToken } from "../utils/jwt";
 import { createOTP, verifyOTP, generatePasswordResetToken, verifyPasswordResetToken, markPasswordResetTokenUsed } from "../utils/otp";
 import { sendEmail } from "../config/email";
-import { otpEmailTemplate, passwordResetEmailTemplate, welcomeEmailTemplate } from "../emails/templates";
+import { otpEmailTemplate, passwordResetEmailTemplate, welcomeEmailTemplate, passwordChangedEmailTemplate } from "../emails/templates";
 import {
   registerStep1Schema,
   verifyOTPSchema,
@@ -132,8 +132,12 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     const { email, password } = parsed.data;
     const user = await prisma.user.findUnique({ where: { email } });
 
-    if (!user || !user.password) {
+    if (!user) {
       res.status(401).json({ error: "Invalid email or password." });
+      return;
+    }
+    if (!user.password) {
+      res.status(401).json({ error: "This account uses Google Sign-In. Please use the Continue with Google button to sign in.", isGoogleAccount: true });
       return;
     }
 
@@ -246,6 +250,9 @@ export const googleCallback = async (req: Request, res: Response): Promise<void>
         },
         include: { organization: { select: { id: true, name: true, slug: true, logoUrl: true } } },
       }) as any;
+    } else if (user.password && !user.avatarUrl?.includes("google")) {
+      res.redirect(`${frontendUrl}/login?error=email_account`);
+      return;
     } else {
       user = await prisma.user.update({
         where: { id: user.id },
@@ -304,6 +311,8 @@ export const changePassword = async (req: Request, res: Response): Promise<void>
     const hash = await bcrypt.hash(newPassword, 12);
     await prisma.user.update({ where: { id: user.id }, data: { password: hash } });
     await createAuditLog(user.id, user.organizationId || "", "UPDATE", "USER", user.id, "Changed account password");
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+    await sendEmail(user.email, "Your Traqify password was changed", passwordChangedEmailTemplate(user.name || "there", `${frontendUrl}/login`)).catch(() => {});
     res.json({ message: "Password updated successfully." });
   } catch {
     res.status(500).json({ error: "Failed to change password." });

@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import prisma from "../config/database";
 import { sendEmail } from "../config/email";
+import { wishlistReminderTemplate } from "../emails/templates";
 
 export const getStoreProducts = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -9,7 +10,7 @@ export const getStoreProducts = async (req: Request, res: Response): Promise<voi
 
     const org = await prisma.organization.findUnique({
       where: { slug },
-      select: { id: true, name: true, slug: true, logoUrl: true, website: true },
+      select: { id: true, name: true, slug: true, logoUrl: true, website: true, email: true, phone: true, address: true, storePublished: true },
     });
 
     if (!org) {
@@ -17,16 +18,23 @@ export const getStoreProducts = async (req: Request, res: Response): Promise<voi
       return;
     }
 
+    if (!org.storePublished) {
+      res.status(403).json({ error: "This store is currently offline." });
+      return;
+    }
+
     const products = await prisma.product.findMany({
       where: {
         organizationId: org.id,
         isActive: true,
+        status: "published",
         ...(search ? { name: { contains: String(search), mode: "insensitive" } } : {}),
         ...(category ? { productCategory: { slug: String(category) } } : {}),
         ...(inStock === "true" ? { inventory: { quantity: { gt: 0 } } } : {}),
       },
       include: {
         inventory: { select: { quantity: true, lowStockAlert: true } },
+        productCategory: { select: { id: true, name: true, slug: true } },
       },
       orderBy:
         sort === "price_asc" ? { price: "asc" }
@@ -143,24 +151,53 @@ export const storeCheckout = async (req: Request, res: Response): Promise<void> 
       .map((i: { product: { name: string }; quantity: number; subtotal?: number; unitPrice: number }) => `<tr><td style="padding:8px 0;border-bottom:1px solid #f0f0f0">${i.product.name} × ${i.quantity}</td><td style="padding:8px 0;border-bottom:1px solid #f0f0f0;text-align:right;font-weight:600">₦${(i.subtotal || i.unitPrice * i.quantity).toLocaleString()}</td></tr>`)
       .join("");
 
+    const orgFull = await prisma.organization.findUnique({
+      where: { id: org.id },
+      select: { email: true, phone: true, address: true, website: true },
+    });
+    const contactLines = [
+      orgFull?.email ? `Email: ${orgFull.email}` : null,
+      orgFull?.phone ? `Phone: ${orgFull.phone}` : null,
+      orgFull?.address ? `Address: ${orgFull.address}` : null,
+      orgFull?.website ? `Website: ${orgFull.website}` : null,
+    ].filter(Boolean).map((l) => `<p style="margin:2px 0;color:#6b7280;font-size:12px">${l}</p>`).join("");
+
     await sendEmail(
       email,
-      `Your order ${orderNumber} from ${org.name}`,
-      `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px">
-        <div style="margin-bottom:24px"><span style="background:#DE1010;color:white;padding:6px 14px;border-radius:8px;font-size:16px;font-weight:700">Traqify</span></div>
-        <h2 style="font-size:22px;font-weight:700;color:#0a0a0a;margin-bottom:4px">Order confirmed!</h2>
-        <p style="color:#6b7280;font-size:14px;margin-bottom:24px">Hi ${name}, your order from <strong>${org.name}</strong> has been received.</p>
-        <div style="background:#f9f9f9;border-radius:8px;padding:16px;margin-bottom:20px">
-          <p style="font-size:12px;color:#9ca3af;margin-bottom:4px">ORDER NUMBER</p>
-          <p style="font-size:18px;font-weight:700;color:#0a0a0a">${orderNumber}</p>
+      `Order ${orderNumber} confirmed - ${org.name}`,
+      `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;padding-bottom:20px;border-bottom:1px solid #f0f0f0">
+          ${org.logoUrl ? `<img src="${org.logoUrl}" alt="${org.name}" style="width:40px;height:40px;border-radius:8px;object-fit:cover">` : `<div style="width:40px;height:40px;background:#DE1010;border-radius:8px;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:16px">${org.name[0]}</div>`}
+          <div>
+            <p style="margin:0;font-weight:700;color:#0a0a0a;font-size:16px">${org.name}</p>
+            ${contactLines}
+          </div>
         </div>
-        <table style="width:100%;border-collapse:collapse;font-size:14px">${itemsHtml}
-          <tr><td style="padding:12px 0;font-weight:700">Total</td><td style="padding:12px 0;font-weight:700;text-align:right;color:#DE1010">₦${totalAmount.toLocaleString()}</td></tr>
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px;margin-bottom:20px;display:flex;align-items:center;gap:12px">
+          <span style="font-size:24px">&#10003;</span>
+          <div>
+            <p style="margin:0;font-weight:700;color:#166534;font-size:15px">Order confirmed!</p>
+            <p style="margin:4px 0 0;color:#166534;font-size:13px">Hi ${name}, we have received your order.</p>
+          </div>
+        </div>
+        <div style="background:#f9fafb;border-radius:8px;padding:16px;margin-bottom:20px">
+          <p style="font-size:11px;color:#9ca3af;margin:0 0 4px;text-transform:uppercase;letter-spacing:.5px">Order number</p>
+          <p style="font-size:20px;font-weight:700;color:#0a0a0a;margin:0">${orderNumber}</p>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:16px">
+          <tr style="border-bottom:2px solid #f0f0f0">
+            <th style="text-align:left;padding:8px 0;font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase">Item</th>
+            <th style="text-align:right;padding:8px 0;font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase">Amount</th>
+          </tr>
+          ${itemsHtml}
+          <tr><td style="padding:12px 0;font-weight:700;border-top:2px solid #f0f0f0">Total</td><td style="padding:12px 0;font-weight:700;text-align:right;color:#DE1010;border-top:2px solid #f0f0f0">&#8358;${totalAmount.toLocaleString()}</td></tr>
         </table>
-        <p style="color:#6b7280;font-size:13px;margin-top:24px">Payment method: <strong>${paymentMethod || "Transfer"}</strong>. We will contact you to arrange delivery.</p>
-        ${notes ? `<p style="color:#6b7280;font-size:13px">Notes: ${notes}</p>` : ""}
-        <hr style="border:none;border-top:1px solid #f0f0f0;margin:24px 0"/>
-        <p style="color:#9ca3af;font-size:12px">Powered by Traqify</p>
+        <div style="background:#fef9f0;border:1px solid #fde68a;border-radius:8px;padding:14px;margin-bottom:16px">
+          <p style="margin:0;font-size:13px;color:#92400e"><strong>Payment:</strong> ${paymentMethod || "Bank Transfer"}. Our team will reach out with payment details shortly.</p>
+          ${notes ? `<p style="margin:8px 0 0;font-size:13px;color:#92400e"><strong>Your notes:</strong> ${notes}</p>` : ""}
+        </div>
+        <hr style="border:none;border-top:1px solid #f0f0f0;margin:24px 0">
+        <p style="color:#9ca3af;font-size:11px;text-align:center;margin:0">Powered by <strong style="color:#DE1010">Traqify</strong></p>
       </div>`
     );
 
@@ -172,4 +209,85 @@ export const storeCheckout = async (req: Request, res: Response): Promise<void> 
   } catch {
     res.status(500).json({ error: "Failed to process order." });
   }
+};
+
+export const saveWishlist = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { slug } = req.params;
+    const { sessionId, email, productIds } = req.body;
+    if (!sessionId || !Array.isArray(productIds)) {
+      res.status(400).json({ error: "sessionId and productIds required." });
+      return;
+    }
+    const org = await prisma.organization.findUnique({
+      where: { slug },
+      select: { id: true, storePublished: true },
+    });
+    if (!org || !org.storePublished) { res.status(404).json({ error: "Store not found." }); return; }
+
+    if (productIds.length === 0) {
+      await prisma.wishlist.deleteMany({ where: { sessionId, organizationId: org.id } });
+      res.json({ message: "Wishlist cleared." });
+      return;
+    }
+
+    const wishlist = await prisma.wishlist.upsert({
+      where: { sessionId_organizationId: { sessionId, organizationId: org.id } },
+      create: { sessionId, email: email || null, productIds, slug, organizationId: org.id },
+      update: { email: email || undefined, productIds, updatedAt: new Date() },
+    });
+    res.json({ id: wishlist.id });
+  } catch {
+    res.status(500).json({ error: "Failed to save wishlist." });
+  }
+};
+
+export const processWishlistEmails = async (): Promise<void> => {
+  const now = new Date();
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+
+  const schedules = [
+    { field: "sent30min" as const, label: "30 minutes ago", minMs: 30 * 60 * 1000, maxMs: 45 * 60 * 1000 },
+    { field: "sent2hr"   as const, label: "a couple of hours ago", minMs: 2 * 3600 * 1000, maxMs: 3 * 3600 * 1000 },
+    { field: "sentDay1"  as const, label: "yesterday", minMs: 24 * 3600 * 1000, maxMs: 26 * 3600 * 1000 },
+    { field: "sentDay3"  as const, label: "3 days ago", minMs: 72 * 3600 * 1000, maxMs: 80 * 3600 * 1000 },
+  ];
+
+  for (const schedule of schedules) {
+    const minDate = new Date(now.getTime() - schedule.maxMs);
+    const maxDate = new Date(now.getTime() - schedule.minMs);
+
+    const wishlists = await prisma.wishlist.findMany({
+      where: {
+        email: { not: null },
+        [schedule.field]: false,
+        createdAt: { gte: minDate, lte: maxDate },
+      },
+      include: { organization: { select: { name: true, logoUrl: true } } },
+    });
+
+    for (const wl of wishlists) {
+      try {
+        const products = await prisma.product.findMany({
+          where: { id: { in: wl.productIds }, organizationId: wl.organizationId },
+          select: { name: true },
+        });
+        if (products.length === 0) continue;
+        const storeUrl = `${frontendUrl}/store/${wl.slug}`;
+        const html = wishlistReminderTemplate(
+          wl.organization.name, wl.organization.logoUrl,
+          storeUrl, products.map((p) => p.name), schedule.label
+        );
+        await sendEmail(wl.email!, `Your wishlist at ${wl.organization.name} is waiting`, html);
+        await prisma.wishlist.update({ where: { id: wl.id }, data: { [schedule.field]: true } });
+      } catch (err) {
+        console.error(`Wishlist email failed for ${wl.id}:`, err);
+      }
+    }
+  }
+
+  // Delete wishlists older than 4 days
+  await prisma.wishlist.deleteMany({
+    where: { createdAt: { lt: new Date(now.getTime() - 4 * 24 * 3600 * 1000) } },
+  });
 };

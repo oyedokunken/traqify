@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Save, Building2, User, Lock, CheckCircle, XCircle } from "lucide-react";
+import { Save, Building2, User, Lock, CheckCircle, XCircle, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,6 +28,7 @@ export default function SettingsPage({ params }: { params: { slug: string } }) {
   const [result, setResult] = useState<ResultModal>(null);
   const [orgData, setOrgData] = useState<any>(null);
 
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const profileForm = useForm({ defaultValues: { name: user?.name || "", email: user?.email || "" } });
   const pwForm = useForm<{ currentPassword: string; newPassword: string; confirmPassword: string }>();
   const orgForm = useForm({ defaultValues: { name: "", email: "", phone: "", address: "", industry: "", size: "" } });
@@ -43,6 +44,19 @@ export default function SettingsPage({ params }: { params: { slug: string } }) {
   }, [params.slug, user?.organizationId]);
 
   const flash = (type: "success" | "error", msg: string) => { setResult({ type, msg }); setTimeout(() => setResult(null), 4000); };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarUploading(true);
+    try {
+      const fd = new FormData(); fd.append("avatar", file);
+      await api.post("/api/auth/upload-avatar", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      await refreshUser();
+      flash("success", "Profile picture updated.");
+    } catch (err: any) { flash("error", err.response?.data?.error || "Upload failed."); }
+    finally { setAvatarUploading(false); e.target.value = ""; }
+  };
 
   const onSaveProfile = async (data: any) => {
     try { await api.patch("/api/auth/me", { name: data.name }); await refreshUser(); flash("success", "Profile updated successfully."); }
@@ -99,7 +113,23 @@ export default function SettingsPage({ params }: { params: { slug: string } }) {
             <motion.div key="profile" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }}
               className="bg-white rounded-xl border border-gray-200 p-6">
               <h3 className="font-semibold text-[#0a0a0a] mb-1">Personal information</h3>
-              <p className="text-gray-400 text-sm mb-5">Update your display name.</p>
+              <p className="text-gray-400 text-sm mb-5">Update your display name and profile picture.</p>
+              {/* Avatar upload */}
+              <div className="flex items-center gap-4 mb-6">
+                <div className="relative">
+                  <div className="w-16 h-16 rounded-full bg-gray-100 overflow-hidden flex items-center justify-center">
+                    {user?.avatarUrl ? <img src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" /> : <span className="text-xl font-bold text-gray-400">{user?.name?.[0]?.toUpperCase() || "?"}</span>}
+                  </div>
+                  <label className="absolute bottom-0 right-0 w-6 h-6 bg-[#0a0a0a] rounded-full flex items-center justify-center cursor-pointer hover:bg-black/80 transition-colors">
+                    <Camera size={11} className="text-white" />
+                    <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleAvatarUpload} disabled={avatarUploading} />
+                  </label>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-[#0a0a0a]">{user?.name || "Your name"}</p>
+                  <p className="text-xs text-gray-400">{avatarUploading ? "Uploading..." : "Click camera icon to change"}</p>
+                </div>
+              </div>
               <form onSubmit={profileForm.handleSubmit(onSaveProfile)} className="space-y-4">
                 <div>
                   <Label>Full name</Label>

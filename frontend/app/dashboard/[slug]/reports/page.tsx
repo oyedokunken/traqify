@@ -41,9 +41,11 @@ export default function ReportsPage({ params }: { params: { slug: string } }) {
   };
   const closeModal = () => { setActiveReport(null); setModalType(null); };
 
+  const today = new Date().toISOString().split("T")[0];
+
   const downloadPDF = async () => {
     if (!activeReport) return;
-    setLoading(true);
+    setLoading(true); setError("");
     try {
       const res = await api.get(`/api/reports/${activeReport}/pdf?from=${dateFrom}&to=${dateTo}`, { responseType: "blob" });
       const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
@@ -51,18 +53,24 @@ export default function ReportsPage({ params }: { params: { slug: string } }) {
       a.href = url; a.download = `${activeReport}-report-${dateFrom}-${dateTo}.pdf`; a.click();
       URL.revokeObjectURL(url);
       closeModal();
-    } catch { setError("Failed to generate PDF. Please try again."); }
+    } catch (err: any) {
+      const msg = err.response?.data?.error || "Failed to generate PDF. Please try again.";
+      setError(msg);
+    }
     finally { setLoading(false); }
   };
 
   const emailReport = async () => {
     if (!activeReport || !emailTo) return;
-    setLoading(true);
+    setLoading(true); setError("");
     try {
       await api.post(`/api/reports/${activeReport}/email`, { to: emailTo, from: dateFrom, to_date: dateTo });
       setSuccess(`Report sent to ${emailTo}.`);
       setTimeout(closeModal, 2000);
-    } catch { setError("Failed to send report. Please try again."); }
+    } catch (err: any) {
+      const msg = err.response?.data?.error || "Failed to send report. Please try again.";
+      setError(msg);
+    }
     finally { setLoading(false); }
   };
 
@@ -138,11 +146,11 @@ export default function ReportsPage({ params }: { params: { slug: string } }) {
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <Label className="text-xs">From date</Label>
-                        <Input type="date" className="mt-1 text-sm" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+                        <Input type="date" className="mt-1 text-sm" value={dateFrom} max={today} onChange={(e) => setDateFrom(e.target.value)} />
                       </div>
                       <div>
                         <Label className="text-xs">To date</Label>
-                        <Input type="date" className="mt-1 text-sm" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+                        <Input type="date" className="mt-1 text-sm" value={dateTo} max={today} onChange={(e) => setDateTo(e.target.value)} />
                       </div>
                     </div>
                     {modalType === "email" && (

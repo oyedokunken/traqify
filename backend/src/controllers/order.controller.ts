@@ -161,7 +161,7 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
     const orgId = req.user!.organizationId!;
     const { status } = req.body;
 
-    if (!["PENDING", "COMPLETED", "CANCELLED"].includes(status)) {
+    if (!["PENDING", "APPROVED", "COMPLETED", "CANCELLED"].includes(status)) {
       res.status(400).json({ error: "Invalid order status." });
       return;
     }

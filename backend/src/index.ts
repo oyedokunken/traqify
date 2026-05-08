@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import path from "path";
 import helmet from "helmet";
 import morgan from "morgan";
 import rateLimit from "express-rate-limit";
@@ -19,6 +20,7 @@ import reportRoutes from "./routes/report.routes";
 import auditRoutes from "./routes/audit.routes";
 import newsletterRoutes from "./routes/newsletter.routes";
 import storeRoutes from "./routes/store.routes";
+import { processWishlistEmails } from "./controllers/store.controller";
 import categoryRoutes from "./routes/category.routes";
 
 const app = express();
@@ -55,6 +57,7 @@ const authLimiter = rateLimit({
 app.use(limiter);
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString(), service: "Traqify API" });
@@ -79,6 +82,8 @@ app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`Traqify API running on port ${PORT} in ${process.env.NODE_ENV} mode`);
+  // Wishlist reminder job - runs every 5 minutes
+  setInterval(() => { processWishlistEmails().catch((e) => console.error("Wishlist job error:", e)); }, 5 * 60 * 1000);
 });
 
 export default app;

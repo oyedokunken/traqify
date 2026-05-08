@@ -228,6 +228,42 @@ export const passwordResetByAdminEmailTemplate = (name: string, tempPassword: st
     <p style="${bodyStyle}">Please log in and change your password immediately. For security reasons, do not share this password with anyone.</p>
   `);
 
+export const passwordChangedEmailTemplate = (name: string, loginUrl: string): string =>
+  wrapEmail(`
+    <h1 style="${headingStyle}">Your password was changed</h1>
+    <p style="${bodyStyle}">Hi ${name},</p>
+    <p style="${bodyStyle}">Your Traqify account password was just changed. If you made this change, no further action is needed.</p>
+    <p style="${bodyStyle}">If you did not make this change, please reset your password immediately and contact support.</p>
+    <a href="${loginUrl}" style="${buttonStyle}">Go to Login</a>
+    <p style="${bodyStyle}" style="margin-top: 24px; color: #71717a; font-size: 13px;">This is an automated security notification.</p>
+  `);
+
+export const storeStatusEmailTemplate = (orgName: string, published: boolean, storeUrl: string, dashboardUrl: string): string =>
+  wrapEmail(`
+    <h1 style="${headingStyle}">Your store is now ${published ? "live" : "offline"}</h1>
+    <p style="${bodyStyle}">Your store for <strong>${orgName}</strong> has been ${published ? "published and is now visible to customers" : "taken offline and is no longer accessible to customers"}.</p>
+    ${published ? `<p style="${bodyStyle}">Customers can now browse and purchase from your store at the link below.</p><a href="${storeUrl}" style="${buttonStyle}">View Store</a>` : `<p style="${bodyStyle}">You can republish your store at any time from the Store section of your dashboard.</p><a href="${dashboardUrl}" style="${buttonStyle}">Go to Dashboard</a>`}
+  `);
+
+export const wishlistReminderTemplate = (
+  orgName: string, orgLogoUrl: string | null, storeUrl: string,
+  productNames: string[], delayLabel: string
+): string =>
+  wrapEmail(`
+    <div style="text-align:center;margin-bottom:24px">
+      ${orgLogoUrl ? `<img src="${orgLogoUrl}" alt="${orgName}" style="width:48px;height:48px;border-radius:12px;object-fit:cover;margin-bottom:12px">` : ""}
+      <p style="margin:0;font-size:13px;color:#6b7280">from <strong>${orgName}</strong></p>
+    </div>
+    <h1 style="${headingStyle}">Your wishlist is waiting for you</h1>
+    <p style="${bodyStyle}">You saved some items in your wishlist ${delayLabel}. They are still available now.</p>
+    <div style="background:#f9fafb;border-radius:10px;padding:16px;margin:20px 0">
+      ${productNames.map((n) => `<p style="margin:4px 0;font-size:14px;color:#0a0a0a">&#10084; ${n}</p>`).join("")}
+    </div>
+    <p style="${bodyStyle}">Do not miss out. Head back to the store to complete your purchase.</p>
+    <a href="${storeUrl}" style="${buttonStyle}">Back to Store</a>
+    <p style="font-size:11px;color:#9ca3af;text-align:center;margin-top:24px">Powered by <strong style="color:#DE1010">Traqify</strong></p>
+  `);
+
 export const reportEmailTemplate = (orgName: string, reportLabel: string, dateFrom: string, dateTo: string, dashboardUrl: string): string =>
   wrapEmail(`
     <h1 style="${headingStyle}">${reportLabel}</h1>

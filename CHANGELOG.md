@@ -5,6 +5,48 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.2.0] - 2026-05-08
+
+### Added
+- **Supabase Storage uploads**: product images (`products` bucket), org logos and user avatars (`avatars` bucket); replaced local disk `multer.diskStorage` with `memoryStorage` + `uploadFile()`
+- **Wishlist system**: localStorage persistence + `POST /api/store/:slug/wishlist` backend sync; email capture modal on first wishlist item; reminder emails at 30min, 2hr, 1 day, 3 days via background job
+- **Logistics page**: `/dashboard/[slug]/logistics` shows APPROVED orders as cards with customer contact info, item list, and "Mark delivered" button; OWNER/MANAGER only
+- **APPROVED order status**: new `APPROVED` value in `OrderStatus` enum; quick-approve button (✓) on orders table; Approve button in order detail modal
+- **Product type field**: `ProductType` enum (SIMPLE, DOWNLOADABLE, VARIABLE); `downloadUrl` field; product modal shows download URL input when type is DOWNLOADABLE
+- **Wishlist email job**: `processWishlistEmails()` runs every 5 minutes via `setInterval` in backend entrypoint; auto-deletes wishlists older than 4 days
+- **Store info section**: public store page now shows store details (logo, name, contact, website) in a dark banner section below products, linkable via `#store-info` anchor
+- **Store off-canvas mobile menu**: left-sliding drawer on mobile with category navigation, cart/wishlist counts, and About Store link
+- **Cart and wishlist in store navbar**: cart and wishlist icons with live count badges in public store header
+- **Category nav in store header**: desktop horizontal pill-style tabs for categories in store navbar
+- **Full-width logo display**: if org logo is uploaded, header shows full-width `object-contain` image; if not, shows text store name
+- **Product detail drawer**: image gallery with thumbnail strip, wishlist toggle button, discount % badge
+- **Image deduplication**: `imageUrl` and `imageUrls[]` are deduped before cycling to prevent showing same image twice
+- **User avatar upload**: `POST /api/auth/upload-avatar` endpoint; avatar displayed in topbar and sidebar
+- **Open Graph image**: `/public/og.jpg` set as OG and Twitter card image in root `layout.tsx`
+- **React phone input on create-org**: `PhoneInput` with international dialling, defaults to NG; replaces plain text input
+- **Address required on create-org**: business address field is now required (min 5 chars)
+- **Industry dropdown sorted alphabetically** in create-org and settings pages
+- **Favicon updated**: `app/icon.svg` now uses the Traqify grid mark (4 squares) consistent with the app logo
+- **Footer mobile fix**: footer columns stack properly on mobile; bottom links wrap correctly with `flex-wrap`
+- **SECURITY.md and CONTRIBUTING.md** project root documentation files added
+- **Sidebar Logistics item**: `Truck` icon, OWNER/MANAGER visibility
+- **`info` Badge variant**: blue badge style for APPROVED status
+
+### Changed
+- Public store layout: 2-column (filter sidebar + products) instead of 3-column; store info moved from right sidebar to dedicated section below products
+- `updateOrderStatus` backend now accepts APPROVED in addition to PENDING/COMPLETED/CANCELLED
+- `getStoreProducts` now filters `status: "published"` and returns full org contact fields
+- `OrderDetailModal` and orders page both updated to handle APPROVED status with Approve/Mark-completed buttons
+
+### Fixed
+- Old favicon (letter T path shape) replaced with correct grid logo mark
+- Footer links overflow on mobile (now flex-wrap)
+- `imageUrl` being shown twice on hover cycle (deduped with `Array.from(new Set(...))`)
+- `useState` inside IIFE render pattern in detail drawer (hoisted `activeDetailImg` to component level)
+- `Set` spread TypeScript error (replaced with `Array.from(new Set(...))`)
+
+---
+
 ## [1.1.0] - 2026-05-08
 
 ### Added

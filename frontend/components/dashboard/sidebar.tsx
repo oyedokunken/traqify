@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Package, ShoppingCart, Users, BarChart3,
   BookOpen, Warehouse, UserCog, LogOut, ChevronLeft, ChevronRight,
-  Settings, Tag, Globe,
+  Settings, Tag, Globe, Truck,
 } from "lucide-react";
 import { cn, getInitials, ROLE_LABELS } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
@@ -22,6 +22,7 @@ const navItems = [
   { href: "customers",   label: "Customers",   icon: Users,           roles: ["OWNER","MANAGER","CASHIER"] },
   { href: "staff",       label: "Staff",       icon: UserCog,         roles: ["OWNER","MANAGER"] },
   { href: "store",       label: "Store",       icon: Globe,           roles: ["OWNER","MANAGER"] },
+  { href: "logistics",   label: "Logistics",   icon: Truck,           roles: ["OWNER","MANAGER"] },
   { href: "reports",     label: "Reports",     icon: BarChart3,       roles: ["OWNER","MANAGER","AUDITOR"] },
   { href: "audit-logs",  label: "Audit Logs",  icon: BookOpen,        roles: ["OWNER","AUDITOR"] },
   { href: "settings",    label: "Settings",    icon: Settings,        roles: ["OWNER","MANAGER","CASHIER","AUDITOR"] },
@@ -29,16 +30,17 @@ const navItems = [
 
 interface SidebarProps {
   slug: string;
+  collapsed: boolean;
+  onCollapse: (v: boolean) => void;
 }
 
-export function Sidebar({ slug }: SidebarProps) {
+export function Sidebar({ slug, collapsed, onCollapse }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
-  const [collapsed, setCollapsed] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-  const toggle = () => setCollapsed((c) => !c);
+  const toggle = () => onCollapse(!collapsed);
   const confirmLogout = () => { setShowLogoutConfirm(false); logout(); router.push("/login"); };
 
   const role = user?.role || "CASHIER";
@@ -50,10 +52,11 @@ export function Sidebar({ slug }: SidebarProps) {
       {/* react-tooltip portal — renders to document.body, never clips */}
       <Tooltip id="sidebar-tip" place="right" className="!text-xs !py-1.5 !px-2.5 !rounded-lg !bg-[#1a1a1a] !border !border-white/10 z-[100]" />
 
-      <motion.aside
-        animate={{ width: collapsed ? 64 : 240 }}
-        transition={{ duration: 0.2, ease: "easeInOut" }}
-        className="h-screen bg-[#0a0a0a] text-white flex flex-col z-30 flex-shrink-0 overflow-hidden"
+      <aside
+        className={cn(
+          "h-screen bg-[#0a0a0a] text-white flex flex-col flex-shrink-0 overflow-hidden transition-all duration-200",
+          collapsed ? "w-16" : "w-60"
+        )}
       >
         {/* Header */}
         <div className={cn(
@@ -94,8 +97,8 @@ export function Sidebar({ slug }: SidebarProps) {
           )}
         </div>
 
-        {/* Nav — overflow-y-auto for long lists, no overflow-x so no horizontal scrollbar */}
-        <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto overflow-x-hidden">
+        {/* Nav — scrollable, native scrollbar hidden via inline style */}
+        <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto overflow-x-hidden no-scrollbar">
           {allowed.map((item) => {
             const isActive = pathname.includes(`/dashboard/${slug}/${item.href}`);
             return (
@@ -150,7 +153,7 @@ export function Sidebar({ slug }: SidebarProps) {
             {!collapsed && <span>Sign out</span>}
           </button>
         </div>
-      </motion.aside>
+      </aside>
 
       {/* Logout confirmation */}
       <AnimatePresence>

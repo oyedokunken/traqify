@@ -116,6 +116,9 @@ The system follows a clean **separation of concerns** between a Next.js 14 App R
 | File storage | Supabase Storage | Product images, avatars |
 | Email | Nodemailer | Gmail SMTP, HTML templates |
 | Security | Helmet, rate-limit | Per-route rate limiting on auth endpoints |
+| Phone input | react-phone-number-input | International flag selector, default NG |
+| PDF generation | PDFKit | Landscape A4 report PDFs |
+| File upload | Multer (memoryStorage) | JPG/PNG/WebP; max 2 MB |
 | Font | Jost | Google Fonts |
 
 ---
@@ -144,17 +147,27 @@ Four roles with granular middleware enforcement:
 
 ### Products and Inventory
 - Create products with name, SKU, category, price, compare-at price, description
-- Image upload (JPG / PNG / WebP, max 2 MB) to Supabase Storage
+- **Product types**: SIMPLE, DOWNLOADABLE (with download URL), VARIABLE
+- **Multi-image** support: up to 4 images per product; first image is cover
+- **Auto-SKU generation** from product name
+- Image upload (JPG / PNG / WebP, max 2 MB) to **Supabase Storage** (`products` bucket)
 - Per-product inventory with configurable low-stock alert threshold
 - Inventory adjustment log
 - Low-stock dashboard badge
+- Category management page (`/dashboard/[slug]/categories`)
 
 ### Orders
 - POS-style order creation: search products, set quantities, attach customers
-- Order status machine: `PENDING` > `PROCESSING` > `COMPLETED` / `CANCELLED` / `REFUNDED`
+- Order status flow: `PENDING` → `APPROVED` → `COMPLETED` / `CANCELLED`
+- Quick-approve button on orders table; Approve button in detail modal
 - Inventory auto-decremented on order creation
 - Order detail modal with full item and customer breakdown
-- Email confirmation to customer
+- Email confirmation to customer with org contact details
+
+### Logistics
+- `/dashboard/[slug]/logistics` — OWNER/MANAGER only
+- Shows all APPROVED orders as cards with customer contact info and item list
+- "Mark delivered" button sets order to COMPLETED
 
 ### Customers
 - Full customer records (name, email, phone, address)
@@ -169,7 +182,13 @@ Four roles with granular middleware enforcement:
 
 ### Public Store
 - Each org gets `/store/[slug]` as a public product catalog
-- Filters: keyword search, category, sort (newest / price / name), in-stock toggle
+- **Responsive**: mobile off-canvas drawer menu with category nav, cart/wishlist counts
+- **Store navbar**: full-width logo (or text fallback), cart badge, wishlist badge, category tabs (desktop)
+- **Store info section** below products: org contact details linkable via `#store-info`
+- Filters: keyword search, category (left sidebar), max price
+- **Product cards**: hover image cycling, wishlist heart overlay, discount % badge
+- **Product detail drawer**: image gallery with thumbnail strip, wishlist toggle, Add to cart
+- **Wishlist**: localStorage + backend sync; email capture; reminder emails at 30min/2hr/1day/3days
 - Cart with quantity controls
 - Guest checkout: name, email, phone, address, payment method, notes
 - Confirmation email to customer on order placement
@@ -182,8 +201,10 @@ Four roles with granular middleware enforcement:
 - All charts have proper empty states
 
 ### Reports
-- Date-range sales report with total revenue, order count, item list
-- PDF print from browser with org name and branding
+- 6 report types: Revenue, Products, Orders, Customers, Inventory, Staff
+- Date-range filtering
+- **PDF download**: `GET /api/reports/:type/pdf` — PDFKit, landscape A4
+- **Email report**: `POST /api/reports/:type/email` — sends PDF as attachment
 
 ### Audit Logs
 - Every create / update / delete / login event logged with user, entity, and timestamp
@@ -196,9 +217,12 @@ Branded HTML templates for:
 - Password reset
 - Staff invitation
 - Welcome email after verification
-- Order confirmation (to customer)
+- Order confirmation (to customer, includes org contact details)
 - Account restriction notice
 - Admin-initiated password reset
+- **Wishlist reminder** (4 waves: 30min, 2hr, 1 day, 3 days after wishlist creation)
+- Store published/unpublished notification
+- Report delivery
 
 ---
 
@@ -213,14 +237,20 @@ User
   lastLoginAt, isRestricted
 
 Organization
-  id, name, slug (unique), email, phone, address
+  id, name, slug (unique), email, phone, address, website
   industry, size, logoUrl
+  storePublished Boolean
   ownerId (FK -> User)
 
 Product
-  id, name, sku (unique per org), category
-  price, comparePrice, description, imageUrl
-  isActive, organizationId
+  id, name, sku (unique per org)
+  price, comparePrice, description
+  imageUrl, imageUrls String[]
+  productType (SIMPLE|DOWNLOADABLE|VARIABLE)
+  downloadUrl
+  status (published|draft), isActive
+  categoryId (FK -> ProductCategory)
+  organizationId
 
 Inventory
   id, quantity, lowStockAlert
@@ -251,7 +281,18 @@ PasswordResetToken
 AuditLog
   id, userId, organizationId
   action (CREATE|UPDATE|DELETE|LOGIN)
-  entity, entityId, description
+  entity, entityId, details
+  ipAddress, userAgent
+  createdAt
+
+ProductCategory
+  id, name, slug, description
+  organizationId
+
+Wishlist
+  id, sessionId, email, productIds String[]
+  slug, organizationId
+  sent30min, sent2hr, sentDay1, sentDay3 Boolean
   createdAt
 
 NewsletterSubscriber
@@ -273,13 +314,14 @@ All protected endpoints require `Authorization: Bearer <token>`.
 | POST | `/login` | Public | Email + password login |
 | POST | `/refresh` | Public | Refresh access token |
 | POST | `/logout` | Auth | Invalidate refresh token |
-| POST | `/forgot-password` | Public | Send reset link (returns 404 if email not found) |
+| POST | `/forgot-password` | Public | Send reset link |
 | POST | `/reset-password` | Public | Set new password via token |
 | GET  | `/google-redirect` | Public | Redirect to Google consent screen |
 | GET  | `/google-callback` | Public | Handle OAuth callback, issue JWT |
 | GET  | `/me` | Auth | Get current user profile |
 | PATCH | `/me` | Auth | Update name / avatarUrl |
 | POST | `/change-password` | Auth | Change password (requires current password) |
+| POST | `/upload-avatar` | Auth | Upload avatar to Supabase (`avatars` bucket) |
 
 ### Organizations (`/api/org` or `/api/organizations`)
 | Method | Path | Auth | Description |
@@ -287,6 +329,29 @@ All protected endpoints require `Authorization: Bearer <token>`.
 | POST | `/` | Auth | Create organization |
 | GET  | `/:slug` | Auth + OrgMember | Get organization details |
 | PATCH | `/:slug` | OWNER only | Update org settings |
+| POST | `/:slug/upload-logo` | OWNER only | Upload logo to Supabase (`avatars` bucket) |
+| GET  | `/:slug/store` | Public | Public store data (org + products + categories) |
+
+### Categories (`/api/categories`)
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/` | Auth | List categories for org |
+| POST | `/` | MANAGER+ | Create category |
+| PATCH | `/:id` | MANAGER+ | Update category |
+| DELETE | `/:id` | OWNER only | Delete category |
+
+### Store / Public (`/api/store`)
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/:slug` | Public | Public store product list |
+| POST | `/:slug/checkout` | Public | Guest checkout — creates order + sends email |
+| POST | `/:slug/wishlist` | Public | Sync wishlist (sessionId + productIds + optional email) |
+
+### Reports (`/api/reports`)
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/:type/pdf` | OWNER/MANAGER | Stream PDF report |
+| POST | `/:type/email` | OWNER/MANAGER | Email PDF as attachment |
 
 ### Products (`/api/products`)
 | Method | Path | Auth | Description |
@@ -306,10 +371,11 @@ All protected endpoints require `Authorization: Bearer <token>`.
 ### Orders (`/api/orders`)
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/` | Auth | List orders (paginated, filterable) |
+| GET | `/` | Auth | List orders (paginated, filterable by status) |
 | POST | `/` | CASHIER+ | Create order |
 | GET | `/:id` | Auth | Get order detail |
-| PATCH | `/:id/status` | MANAGER+ | Update order status |
+| PATCH | `/:id/status` | MANAGER+ | Update order status (PENDING/APPROVED/COMPLETED/CANCELLED) |
+| DELETE | `/:id` | OWNER only | Delete order |
 
 ### Customers (`/api/customers`)
 | Method | Path | Auth | Description |

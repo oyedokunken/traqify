@@ -15,10 +15,31 @@ interface AuditLog {
   id: string;
   action: string;
   entity: string;
-  description: string;
+  entityId?: string;
+  details?: string;
   ipAddress?: string;
   createdAt: string;
   user?: { id: string; name?: string; email: string; avatarUrl?: string };
+}
+
+function describeLog(log: AuditLog): string {
+  if (log.details) return log.details;
+  const entityMap: Record<string, string> = {
+    Product: "product", Order: "order", Customer: "customer", User: "user account",
+    Organization: "organization", Category: "category", Inventory: "inventory",
+    Staff: "staff member", Report: "report",
+  };
+  const entityLabel = entityMap[log.entity] || log.entity.toLowerCase();
+  const actionMap: Record<string, string> = {
+    CREATE: `Created a new ${entityLabel}`,
+    UPDATE: `Updated a ${entityLabel}`,
+    DELETE: `Deleted a ${entityLabel}`,
+    LOGIN: "Logged in",
+    LOGOUT: "Logged out",
+    EXPORT: `Exported ${entityLabel} report`,
+    INVITE: `Invited a staff member`,
+  };
+  return actionMap[log.action] || `${log.action} on ${entityLabel}`;
 }
 
 const actionVariant: Record<string, any> = {
@@ -46,7 +67,7 @@ export default function AuditLogsPage({ params }: { params: { slug: string } }) 
   useEffect(() => { fetchLogs(); }, [page]);
 
   const filtered = logs.filter((l) =>
-    l.description?.toLowerCase().includes(search.toLowerCase()) ||
+    describeLog(l).toLowerCase().includes(search.toLowerCase()) ||
     l.entity?.toLowerCase().includes(search.toLowerCase()) ||
     l.user?.name?.toLowerCase().includes(search.toLowerCase()) ||
     l.user?.email?.toLowerCase().includes(search.toLowerCase())
@@ -113,7 +134,7 @@ export default function AuditLogsPage({ params }: { params: { slug: string } }) 
                       <Badge variant="outline" className="text-xs">{log.entity}</Badge>
                     </td>
                     <td className="px-5 py-3.5 text-sm text-gray-600 max-w-xs">
-                      <p className="truncate">{log.description}</p>
+                      <p className="truncate">{describeLog(log)}</p>
                     </td>
                     <td className="px-5 py-3.5 text-xs text-gray-400 hidden lg:table-cell whitespace-nowrap">
                       {formatDateTime(log.createdAt)}
