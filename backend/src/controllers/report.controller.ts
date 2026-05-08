@@ -14,6 +14,8 @@ export const getOverview = async (req: AuthRequest, res: Response): Promise<void
     const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
+    const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { slug: true, storePublished: true } });
+
     const [
       totalRevenue,
       monthRevenue,
@@ -53,6 +55,8 @@ export const getOverview = async (req: AuthRequest, res: Response): Promise<void
       totalProducts,
       totalCustomers,
       lowStockCount: Number(lowStockCount[0]?.count || 0),
+      storePublished: org?.storePublished || false,
+      orgSlug: org?.slug || "",
     });
   } catch {
     res.status(500).json({ error: "Failed to fetch overview data." });
@@ -321,7 +325,6 @@ export const downloadReport = async (req: AuthRequest, res: Response): Promise<v
 
     const org = await prisma.organization.findUnique({ where: { id: orgId } });
     const rows = await buildReportData(type, orgId, fromDate, toDate);
-    if (rows.length === 0 && DATE_RANGE_TYPES.includes(type)) { res.status(404).json({ error: "No data found for the selected date range." }); return; }
 
     const pdf = await buildPDF(type, label, org, from || "", to || "", rows as any[]);
     res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${type}-report.pdf"` });
@@ -348,7 +351,6 @@ export const emailReport = async (req: AuthRequest, res: Response): Promise<void
 
     const org = await prisma.organization.findUnique({ where: { id: orgId } });
     const rows = await buildReportData(type, orgId, fromDate, toDate);
-    if (rows.length === 0 && DATE_RANGE_TYPES.includes(type)) { res.status(404).json({ error: "No data found for the selected date range." }); return; }
 
     const pdf = await buildPDF(type, label, org, from || "", to_date || "", rows as any[]);
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";

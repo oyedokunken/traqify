@@ -116,7 +116,7 @@ export const getPublicStore = async (req: Request, res: Response): Promise<void>
     const { slug } = req.params;
     const org = await prisma.organization.findUnique({
       where: { slug },
-      select: { id: true, name: true, slug: true, logoUrl: true, website: true, email: true, phone: true, address: true, storePublished: true },
+      select: { id: true, name: true, slug: true, logoUrl: true, website: true, email: true, phone: true, address: true, description: true, industry: true, storePublished: true },
     });
 
     if (!org) {

@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import { OrderStatus } from "@prisma/client";
 import prisma from "../config/database";
 import { sendEmail } from "../config/email";
-import { wishlistReminderTemplate } from "../emails/templates";
+import { wishlistReminderTemplate, newOrderEmailTemplate } from "../emails/templates";
 import { createAuditLog } from "../utils/audit";
 import https from "https";
 
@@ -43,6 +43,7 @@ export const getStoreProducts = async (req: Request, res: Response): Promise<voi
         sort === "price_asc" ? { price: "asc" }
         : sort === "price_desc" ? { price: "desc" }
         : sort === "name" ? { name: "asc" }
+        : sort === "oldest" ? { createdAt: "asc" }
         : { createdAt: "desc" },
     });
 
@@ -150,7 +151,7 @@ export const storeCheckout = async (req: Request, res: Response): Promise<void> 
 
     const orgOwner = await prisma.user.findFirst({
       where: { organizationId: org.id, role: "OWNER" },
-      select: { id: true },
+      select: { id: true, email: true },
     });
     if (!orgOwner) {
       res.status(500).json({ error: "Store configuration error." });
@@ -182,6 +183,13 @@ export const storeCheckout = async (req: Request, res: Response): Promise<void> 
     }
 
     createAuditLog(orgOwner.id, org.id, "CREATE", "Order", order.id, `Store order ${orderNumber} placed by ${name} (${email}) — ₦${totalAmount.toLocaleString()}`, req).catch(() => {});
+
+    // Notify org owner by email
+    sendEmail(
+      orgOwner.email,
+      `New store order received — ${org.name}`,
+      newOrderEmailTemplate(org.name, order.id, name, totalAmount, orderItemsData.length, `${process.env.FRONTEND_URL || "http://localhost:3000"}/dashboard/${org.slug}/orders`)
+    ).catch((e) => console.error("[Email] Store order notification failed:", e.message));
 
     const itemsHtml = order.orderItems
       .map((i: { product: { name: string }; quantity: number; subtotal?: number; unitPrice: number }) => `<tr><td style="padding:8px 0;border-bottom:1px solid #f0f0f0">${i.product.name} × ${i.quantity}</td><td style="padding:8px 0;border-bottom:1px solid #f0f0f0;text-align:right;font-weight:600">₦${(i.subtotal || i.unitPrice * i.quantity).toLocaleString()}</td></tr>`)
