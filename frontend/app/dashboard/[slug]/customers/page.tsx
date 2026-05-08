@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Search, Users, Trash2, Eye } from "lucide-react";
+import { Plus, Search, Users, Trash2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,7 +11,6 @@ import { ErrorModal } from "@/components/shared/error-modal";
 import api from "@/lib/api";
 import { formatDate, getInitials } from "@/lib/utils";
 import { useForm } from "react-hook-form";
-import { motion as m } from "framer-motion";
 
 interface Customer {
   id: string;
@@ -32,6 +31,8 @@ export default function CustomersPage({ params }: { params: { slug: string } }) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showAdd, setShowAdd] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const { register, handleSubmit, reset, formState: { isSubmitting } } = useForm<{ name: string; email: string; phone: string; address: string }>();
 
   const fetchCustomers = () => {
@@ -56,12 +57,15 @@ export default function CustomersPage({ params }: { params: { slug: string } }) 
     } catch (err: any) { setError(err.response?.data?.error || "Failed to add customer."); }
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Remove "${name}"?`)) return;
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleteLoading(true);
     try {
-      await api.delete(`/api/customers/${id}`);
-      setCustomers((c) => c.filter((x) => x.id !== id));
+      await api.delete(`/api/customers/${deleteTarget.id}`);
+      setCustomers((c) => c.filter((x) => x.id !== deleteTarget.id));
+      setDeleteTarget(null);
     } catch { setError("Failed to delete customer."); }
+    finally { setDeleteLoading(false); }
   };
 
   return (
@@ -150,7 +154,7 @@ export default function CustomersPage({ params }: { params: { slug: string } }) 
                     <td className="px-5 py-3.5 text-sm text-gray-600 hidden md:table-cell">{c._count?.orders ?? 0}</td>
                     <td className="px-5 py-3.5 text-sm text-gray-500 hidden lg:table-cell">{formatDate(c.createdAt)}</td>
                     <td className="px-5 py-3.5">
-                      <button onClick={() => handleDelete(c.id, c.name)} className="text-gray-300 hover:text-[#DE1010] transition-colors">
+                      <button onClick={() => setDeleteTarget(c)} className="text-gray-300 hover:text-[#DE1010] transition-colors">
                         <Trash2 size={15} />
                       </button>
                     </td>
@@ -170,6 +174,26 @@ export default function CustomersPage({ params }: { params: { slug: string } }) 
         )}
       </div>
       <ErrorModal isOpen={!!error} onClose={() => setError("")} message={error} />
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setDeleteTarget(null)} />
+          <motion.div initial={{ opacity: 0, scale: 0.95, y: 12 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="relative z-10 bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm text-center">
+            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle size={24} className="text-[#DE1010]" />
+            </div>
+            <h3 className="font-bold text-[#0a0a0a] mb-1">Remove customer?</h3>
+            <p className="text-gray-500 text-sm mb-5"><span className="font-semibold">{deleteTarget.name}</span> and all their data will be permanently removed.</p>
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+              <Button className="flex-1 bg-[#DE1010] hover:bg-red-700 text-white" onClick={confirmDelete} disabled={deleteLoading}>
+                {deleteLoading ? "Removing..." : "Yes, remove"}
+              </Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

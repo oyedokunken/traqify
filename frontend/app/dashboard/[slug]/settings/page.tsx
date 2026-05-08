@@ -31,7 +31,7 @@ export default function SettingsPage({ params }: { params: { slug: string } }) {
   const [avatarUploading, setAvatarUploading] = useState(false);
   const profileForm = useForm({ defaultValues: { name: user?.name || "", email: user?.email || "" } });
   const pwForm = useForm<{ currentPassword: string; newPassword: string; confirmPassword: string }>();
-  const orgForm = useForm({ defaultValues: { name: "", email: "", phone: "", address: "", website: "", industry: "", size: "" } });
+  const orgForm = useForm({ defaultValues: { phone: "", address: "", website: "", industry: "", size: "" } });
 
   // Fetch org details once
   useEffect(() => {
@@ -39,7 +39,7 @@ export default function SettingsPage({ params }: { params: { slug: string } }) {
     api.get(`/api/organizations/${params.slug}`).then((r) => {
       const o = r.data;
       setOrgData(o);
-      orgForm.reset({ name: o.name || "", email: o.email || "", phone: o.phone || "", address: o.address || "", website: o.website || "", industry: o.industry || "", size: o.size || "" });
+      orgForm.reset({ phone: o.phone || "", address: o.address || "", website: o.website || "", industry: o.industry || "", size: o.size || "" });
     }).catch(() => {});
   }, [params.slug, user?.organizationId]);
 
@@ -98,10 +98,10 @@ export default function SettingsPage({ params }: { params: { slug: string } }) {
           {/* Result modal */}
           <AnimatePresence>
             {result && (
-              <>
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 z-50" onClick={() => setResult(null)} />
-                <motion.div initial={{ opacity: 0, scale: 0.95, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
-                  className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-white rounded-2xl shadow-xl p-8 w-full max-w-sm text-center">
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setResult(null)}>
+                <motion.div initial={{ opacity: 0, scale: 0.95, y: 12 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
+                  className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-sm text-center" onClick={(e) => e.stopPropagation()}>
                   <div className={cn("w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4", result.type === "success" ? "bg-green-100" : "bg-red-100")}>
                     {result.type === "success" ? <CheckCircle size={28} className="text-green-600" /> : <XCircle size={28} className="text-red-500" />}
                   </div>
@@ -109,7 +109,7 @@ export default function SettingsPage({ params }: { params: { slug: string } }) {
                   <p className="text-gray-500 text-sm mb-6">{result.msg}</p>
                   <button onClick={() => setResult(null)} className="w-full py-2.5 bg-[#0a0a0a] text-white rounded-xl text-sm font-semibold hover:bg-black/80 transition-colors">OK</button>
                 </motion.div>
-              </>
+              </motion.div>
             )}
           </AnimatePresence>
 
@@ -164,13 +164,12 @@ export default function SettingsPage({ params }: { params: { slug: string } }) {
               <p className="text-gray-400 text-sm mb-5">These details appear on your public store and invoices.</p>
               {/* Immutable fields notice */}
               <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 mb-5 text-xs text-amber-700">
-                Company name, industry, and team size were set during registration and cannot be changed.
+                Company name and business email were set during registration and cannot be changed.
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
                 {[
                   { label: "Company name", value: orgData?.name },
-                  { label: "Industry", value: orgData?.industry },
-                  { label: "Team size", value: orgData?.size },
+                  { label: "Business email", value: orgData?.email },
                 ].map(({ label, value }) => (
                   <div key={label} className="bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-200">
                     <p className="text-[10px] text-gray-400 mb-0.5">{label}</p>
@@ -181,17 +180,23 @@ export default function SettingsPage({ params }: { params: { slug: string } }) {
               <form onSubmit={orgForm.handleSubmit(onSaveOrg)} className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <Label>Business email</Label>
-                    <Input className="mt-1.5" type="email" placeholder="info@company.com" {...orgForm.register("email")} />
+                    <Label>Industry</Label>
+                    <Input className="mt-1.5" placeholder="e.g. Technology" {...orgForm.register("industry")} />
                   </div>
+                  <div>
+                    <Label>Team size</Label>
+                    <Input className="mt-1.5" placeholder="e.g. 1-10" {...orgForm.register("size")} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label>Business phone</Label>
                     <Input className="mt-1.5" placeholder="+234 800 000 0000" {...orgForm.register("phone")} />
                   </div>
-                </div>
-                <div>
-                  <Label>Address</Label>
-                  <Input className="mt-1.5" placeholder="123 Business Road, Lagos" {...orgForm.register("address")} />
+                  <div>
+                    <Label>Address</Label>
+                    <Input className="mt-1.5" placeholder="123 Business Road, Lagos" {...orgForm.register("address")} />
+                  </div>
                 </div>
                 <div>
                   <Label>Website</Label>

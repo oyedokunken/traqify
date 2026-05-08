@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Search, ShoppingCart, Eye, CheckCircle } from "lucide-react";
+import { Plus, Search, ShoppingCart, Eye, CheckCircle, Trash2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -46,6 +46,26 @@ export default function OrdersPage({ params }: { params: { slug: string } }) {
   const [total, setTotal] = useState(0);
 
   const canCreate = ["OWNER", "MANAGER", "CASHIER"].includes(user?.role || "");
+  const canManage = ["OWNER", "MANAGER"].includes(user?.role || "");
+  const [approveTarget, setApproveTarget] = useState<Order | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Order | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  const handleApprove = async () => {
+    if (!approveTarget) return;
+    setActionLoading(true);
+    try { await api.patch(`/api/orders/${approveTarget.id}/status`, { status: "APPROVED" }); fetchOrders(); setApproveTarget(null); }
+    catch { setError("Failed to approve order."); }
+    finally { setActionLoading(false); }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setActionLoading(true);
+    try { await api.delete(`/api/orders/${deleteTarget.id}`); fetchOrders(); setDeleteTarget(null); }
+    catch { setError("Failed to delete order."); }
+    finally { setActionLoading(false); }
+  };
 
   const fetchOrders = () => {
     setLoading(true);
@@ -129,16 +149,21 @@ export default function OrdersPage({ params }: { params: { slug: string } }) {
                     </td>
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-2">
-                        {order.status === "PENDING" && ["OWNER", "MANAGER"].includes(user?.role || "") && (
-                          <button onClick={async (e) => { e.stopPropagation(); await api.patch(`/api/orders/${order.id}/status`, { status: "APPROVED" }); fetchOrders(); }}
-                            title="Approve order"
+                        {order.status === "PENDING" && canManage && (
+                          <button onClick={() => setApproveTarget(order)} title="Approve order"
                             className="text-gray-400 hover:text-green-600 transition-colors">
                             <CheckCircle size={16} />
                           </button>
                         )}
-                        <button onClick={() => setSelectedOrder(order)} className="text-gray-400 hover:text-[#DE1010] transition-colors">
+                        <button onClick={() => setSelectedOrder(order)} className="text-gray-400 hover:text-[#0a0a0a] transition-colors">
                           <Eye size={16} />
                         </button>
+                        {canManage && (
+                          <button onClick={() => setDeleteTarget(order)} title="Delete order"
+                            className="text-gray-400 hover:text-[#DE1010] transition-colors">
+                            <Trash2 size={15} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -160,6 +185,48 @@ export default function OrdersPage({ params }: { params: { slug: string } }) {
       {showCreate && <CreateOrderModal onClose={() => setShowCreate(false)} onSaved={() => { setShowCreate(false); fetchOrders(); }} />}
       {selectedOrder && <OrderDetailModal order={selectedOrder} onClose={() => setSelectedOrder(null)} onUpdated={fetchOrders} />}
       <ErrorModal isOpen={!!error} onClose={() => setError("")} message={error} />
+
+      {/* Approve confirmation modal */}
+      {approveTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setApproveTarget(null)} />
+          <motion.div initial={{ opacity: 0, scale: 0.95, y: 12 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="relative z-10 bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm text-center">
+            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle size={24} className="text-green-600" />
+            </div>
+            <h3 className="font-bold text-[#0a0a0a] mb-1">Approve order?</h3>
+            <p className="text-gray-500 text-sm mb-5">Order <span className="font-semibold">{approveTarget.orderNumber}</span> will be marked as approved and sent to logistics.</p>
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setApproveTarget(null)}>Cancel</Button>
+              <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={handleApprove} disabled={actionLoading}>
+                {actionLoading ? "Approving..." : "Yes, approve"}
+              </Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Delete confirmation modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setDeleteTarget(null)} />
+          <motion.div initial={{ opacity: 0, scale: 0.95, y: 12 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="relative z-10 bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm text-center">
+            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle size={24} className="text-[#DE1010]" />
+            </div>
+            <h3 className="font-bold text-[#0a0a0a] mb-1">Delete order?</h3>
+            <p className="text-gray-500 text-sm mb-5">Order <span className="font-semibold">{deleteTarget.orderNumber}</span> will be permanently deleted. This cannot be undone.</p>
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+              <Button className="flex-1 bg-[#DE1010] hover:bg-red-700 text-white" onClick={handleDelete} disabled={actionLoading}>
+                {actionLoading ? "Deleting..." : "Yes, delete"}
+              </Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
