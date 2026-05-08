@@ -51,7 +51,11 @@ Create these public buckets in Supabase Storage:
 ### Option A: Via Vercel Dashboard
 1. Go to https://vercel.com/new
 2. Import your GitHub repo
-3. Select the `backend` folder as root directory
+3. Configure these settings:
+   - **Root Directory**: `backend`
+   - **Build Command**: `npm run build`
+   - **Output Directory**: `dist`
+   - **Install Command**: `npm install`
 4. Click **Configure**
 5. Add all environment variables (see below)
 6. Click **Deploy**
@@ -177,3 +181,39 @@ cp .env.example .env
 ```
 
 Then fill in your local credentials (use Supabase local or dev project).
+
+---
+
+## Environment Variables Reference (.env.example)
+
+Copy these directly to Vercel environment variables:
+
+```env
+DATABASE_URL=postgresql://user:password@host:5432/dbname?pgbouncer=true
+DIRECT_URL=postgresql://user:password@host:5432/dbname
+
+PORT=5000
+NODE_ENV=development
+API_URL=http://localhost:5000
+FRONTEND_URL=http://localhost:3000
+
+JWT_SECRET=your-jwt-secret-here
+JWT_REFRESH_SECRET=your-refresh-secret-here
+JWT_EXPIRES_IN=7d
+
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your@gmail.com
+SMTP_PASS=your-gmail-app-password
+SMTP_FROM="Traqify <your@gmail.com>"
+
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+
+PAYSTACK_SECRET_KEY=sk_test_your_paystack_secret_key
+PAYSTACK_PUBLIC_KEY=pk_test_your_paystack_public_key
+```
