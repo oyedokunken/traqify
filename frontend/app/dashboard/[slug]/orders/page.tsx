@@ -68,7 +68,7 @@ export default function OrdersPage({ params }: { params: { slug: string } }) {
   return (
     <div>
       <Topbar title="Orders" slug={params.slug} />
-      <div className="p-6">
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="p-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <div className="relative">
@@ -155,7 +155,7 @@ export default function OrdersPage({ params }: { params: { slug: string } }) {
             <Button variant="outline" size="sm" disabled={page >= Math.ceil(total / 20)} onClick={() => setPage(p => p + 1)}>Next</Button>
           </div>
         )}
-      </div>
+      </motion.div>
 
       {showCreate && <CreateOrderModal onClose={() => setShowCreate(false)} onSaved={() => { setShowCreate(false); fetchOrders(); }} />}
       {selectedOrder && <OrderDetailModal order={selectedOrder} onClose={() => setSelectedOrder(null)} onUpdated={fetchOrders} />}

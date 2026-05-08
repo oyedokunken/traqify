@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Search, Edit, Trash2, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ interface Product {
 
 export default function ProductsPage({ params }: { params: { slug: string } }) {
   const { user } = useAuth();
+  const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
@@ -95,7 +97,7 @@ export default function ProductsPage({ params }: { params: { slug: string } }) {
           {canEdit && (
             <Button onClick={() => {
               if (categories.length === 0) { setError("You need at least one product category before adding products. Go to Categories to create one."); return; }
-              setEditProduct(null); setShowModal(true);
+              router.push(`/dashboard/${params.slug}/products/new`);
             }} className="gap-2">
               <Plus size={16} /> Add product
             </Button>

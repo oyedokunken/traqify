@@ -42,7 +42,7 @@ export function Footer() {
     <footer className="bg-[#111111] text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-10">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-10 mb-12">
-          <div className="col-span-2 lg:col-span-2">
+          <div className="lg:col-span-2">
             <div className="mb-4">
               <Logo size="md" className="[&_span:last-child]:text-white" />
             </div>
@@ -121,19 +121,17 @@ export function Footer() {
 
         <div className="border-t border-white/5 pt-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-col gap-2 text-xs text-gray-600 text-center sm:text-left">
-              <span>
-                &copy; {new Date().getFullYear()} Traqify. All rights reserved. Built with{" "}
+            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-3 gap-y-1 text-xs text-gray-600">
+              <span className="text-gray-600">&copy; {new Date().getFullYear()} Traqify. All rights reserved. Built with{" "}
                 <span className="text-white">&#10084;&#65039;</span>{" "}by{" "}
                 <a href="https://wa.link/nv875h" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">@oyedokunken</a>
               </span>
-              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-3 gap-y-1">
-                <Link href="/privacy" className="text-gray-500 hover:text-white transition-colors">Privacy Policy</Link>
-                <span className="text-white/20">·</span>
-                <Link href="/terms" className="text-gray-500 hover:text-white transition-colors">Terms of Service</Link>
-                <span className="text-white/20">·</span>
-                <a href="https://github.com/oyedokunken/traqify" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-white transition-colors">GitHub</a>
-              </div>
+              <span className="text-white/20 hidden sm:inline">|</span>
+              <Link href="/privacy" className="text-gray-500 hover:text-white transition-colors">Privacy Policy</Link>
+              <span className="text-white/20">·</span>
+              <Link href="/terms" className="text-gray-500 hover:text-white transition-colors">Terms of Service</Link>
+              <span className="text-white/20">·</span>
+              <a href="https://github.com/oyedokunken/traqify" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-white transition-colors">GitHub</a>
             </div>
             <div className="flex items-center justify-center sm:justify-end gap-3">
               <Image src="/payments.png" alt="Payment methods" width={180} height={28} className="h-7 w-auto object-contain" />
