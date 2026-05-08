@@ -11,15 +11,6 @@ const transporter = nodemailer.createTransport({
   tls: { rejectUnauthorized: false },
 });
 
-transporter.verify((error) => {
-  if (error) {
-    console.error("[SMTP] Connection failed:", error.message);
-    console.error("[SMTP] Check SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS env vars");
-  } else {
-    console.log("[SMTP] Ready ✓ —", process.env.SMTP_USER);
-  }
-});
-
 interface Attachment { filename: string; content: Buffer | string; contentType?: string; }
 
 export const sendEmail = async (to: string, subject: string, html: string, attachments?: Attachment[]): Promise<void> => {
