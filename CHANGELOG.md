@@ -5,6 +5,41 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.3.0] - 2026-05-08
+
+### Added
+- **Audit log completeness**: LOGIN event on successful email/password sign-in; CREATE/Order event on store checkout; EXPORT/Report on PDF download and email; detailed store publish/unpublish log message
+- **Audit log frontend**: `describeLog()` entity map extended with `ProductCategory` and `StaffInvite`; `actionVariant` map covers LOGIN, LOGOUT, EXPORT, INVITE badge colours
+- **Order status emails**: `orderApprovedEmailTemplate` and `orderCompletedEmailTemplate` — sent to customer on status change (non-blocking)
+- **Low-stock email alert**: sent to org OWNER when inventory stock ≤ `lowStockAlert` threshold on update
+- **Customer chart API**: `GET /api/reports/customer-chart?period=` returns cumulative daily customer registration data
+- **Variable product attributes UI**: `/products/new` attribute builder (name + comma-separated values) generates `ProductVariant` rows on save
+- **Downloadable product toggle**: URL tab or file upload tab on `/products/new`
+- **Validation error modal**: Zod `onFormError` handler surfaces field errors in AnimatePresence overlay on `/products/new`
+- **Store checkout audit log**: `CREATE/Order` logged via `orgOwner.id` after successful checkout
+
+### Changed
+- **Google Fonts → `next/font/google`**: Jost font is now self-hosted at build time; removes external `fonts.googleapis.com` request that violated Vercel's Content Security Policy
+- **Overview charts**: order bar chart replaced with AreaChart; customer chart fetches real API data instead of mock
+- **Product card images**: `object-cover` on store product cards (fills container, no whitespace)
+- **Individual product main image**: `aspect-[4/5]` + `object-contain p-2` (portrait images no longer cropped at top/bottom)
+- **Inventory API**: `getInventory` now includes `productCategory: { name: true }` relation
+- **Frontend inventory page**: renders `product.productCategory?.name` as badge
+- **`backend/.env.example`**: fully rewritten — clean section headers, precise comments linking to source dashboards, no duplicate entries
+- **`frontend/.env.local.example`**: new file with all four required `NEXT_PUBLIC_*` variables documented
+
+### Fixed
+- **CORS broken in production**: `FRONTEND_URL` was not set on Vercel → Express defaulted to `http://localhost:3000` → blocked all requests from `traqify.vercel.app`
+- **All API calls failing in production**: `NEXT_PUBLIC_API_URL` not set on Vercel frontend → Axios fell back to `http://localhost:5000` → CORS + network errors
+- **Google OAuth `redirect_uri_mismatch`**: `API_URL` not set on Vercel → redirect used `http://localhost:5000`; also added `https://traqify-api.vercel.app/api/auth/google-callback` to Google Cloud Console
+- **Express rate-limit `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR`**: added `app.set("trust proxy", 1)` so Vercel's proxy headers are trusted
+- **SMTP cold-start noise**: removed `transporter.verify()` module-level call (ran on every Vercel serverless cold start, logged false failures); errors now surfaced per-send via `sendEmail()` catch
+- **Emails not sending in production**: `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS` were missing from Vercel env vars
+- **`Cannot GET /`**: added `app.get("/")` root handler returning JSON API info
+- **`backend/.env` duplicate JWT entries**: cleaned to single correct base64 JWT_SECRET / JWT_REFRESH_SECRET
+
+---
+
 ## [1.2.0] - 2026-05-08
 
 ### Added
