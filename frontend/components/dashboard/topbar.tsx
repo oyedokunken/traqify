@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { Bell, Search, Settings, LogOut, X } from "lucide-react";
+import { Bell, Search, Settings, LogOut, X, Menu } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
@@ -8,6 +8,7 @@ import { getInitials } from "@/lib/utils";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import api from "@/lib/api";
+import { useSidebar } from "@/lib/sidebar-context";
 
 interface TopbarProps {
   title: string;
@@ -24,6 +25,7 @@ interface SearchResult {
 export function Topbar({ title, slug }: TopbarProps) {
   const { user, logout } = useAuth();
   const router = useRouter();
+  const { openMobile } = useSidebar();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -116,8 +118,17 @@ export function Topbar({ title, slug }: TopbarProps) {
 
   return (
     <>
-      <header className="sticky top-0 z-20 h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 gap-4">
-        <h1 className="text-base font-semibold text-[#0a0a0a] flex-shrink-0">{title}</h1>
+      <header className="sticky top-0 z-20 h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 gap-3">
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button
+            className="md:hidden p-2 -ml-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            onClick={openMobile}
+            aria-label="Open menu"
+          >
+            <Menu size={20} />
+          </button>
+          <h1 className="text-base font-semibold text-[#0a0a0a]">{title}</h1>
+        </div>
 
         <div className="flex items-center gap-2 flex-1 justify-end">
           {/* Search */}

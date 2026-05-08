@@ -10,6 +10,8 @@ import { Topbar } from "@/components/dashboard/topbar";
 import { ErrorModal } from "@/components/shared/error-modal";
 import api from "@/lib/api";
 import { formatDateTime, getInitials } from "@/lib/utils";
+import { useAuth } from "@/lib/auth-context";
+import { useRoleGuard } from "@/lib/use-role-guard";
 
 interface AuditLog {
   id: string;
@@ -53,6 +55,8 @@ const actionVariant: Record<string, any> = {
 };
 
 export default function AuditLogsPage({ params }: { params: { slug: string } }) {
+  const { user: _user } = useAuth();
+  const { blocked } = useRoleGuard(["OWNER", "AUDITOR"], `/dashboard/${params.slug}/overview`);
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -76,6 +80,8 @@ export default function AuditLogsPage({ params }: { params: { slug: string } }) 
     l.user?.name?.toLowerCase().includes(search.toLowerCase()) ||
     l.user?.email?.toLowerCase().includes(search.toLowerCase())
   );
+
+  if (blocked) return null;
 
   return (
     <div>

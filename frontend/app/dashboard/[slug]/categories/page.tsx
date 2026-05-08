@@ -10,12 +10,14 @@ import { Topbar } from "@/components/dashboard/topbar";
 import api from "@/lib/api";
 import { formatDate } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
+import { useRoleGuard } from "@/lib/use-role-guard";
 import { useForm } from "react-hook-form";
 
 interface Category { id: string; name: string; slug: string; description?: string; createdAt: string; _count?: { products: number }; }
 
 export default function CategoriesPage({ params }: { params: { slug: string } }) {
   const { user } = useAuth();
+  const { blocked } = useRoleGuard(["OWNER", "MANAGER"], `/dashboard/${params.slug}/overview`);
   const [cats, setCats] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -50,6 +52,8 @@ export default function CategoriesPage({ params }: { params: { slug: string } })
   };
 
   const filtered = cats.filter((c) => c.name.toLowerCase().includes(search.toLowerCase()));
+
+  if (blocked) return null;
 
   return (
     <div>
