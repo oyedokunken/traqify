@@ -192,6 +192,11 @@ export const removeStaff = async (req: AuthRequest, res: Response): Promise<void
       return;
     }
 
+    if (member.role === "OWNER") {
+      res.status(403).json({ error: "You cannot remove the organization owner." });
+      return;
+    }
+
     await prisma.user.update({ where: { id: userId }, data: { organizationId: null } });
     await createAuditLog(req.user!.id, orgId, "DELETE", "User", userId, `Removed ${member.name} from the organization`, req);
     res.json({ message: `${member.name} has been removed from the organization.` });
@@ -208,6 +213,11 @@ export const resetStaffPassword = async (req: AuthRequest, res: Response): Promi
     const member = await prisma.user.findFirst({ where: { id: userId, organizationId: orgId } });
     if (!member) {
       res.status(404).json({ error: "Staff member not found." });
+      return;
+    }
+
+    if (member.role === "OWNER") {
+      res.status(403).json({ error: "You cannot reset the owner's password from here." });
       return;
     }
 

@@ -5,6 +5,36 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.4.0] - 2026-05-08
+
+### Added
+- **Newsletter dashboard**: `/dashboard/[slug]/newsletter` — subscriber stats (total / last 7 days / this month), searchable table, status badge, CSV export, live refresh; OWNER/MANAGER only
+- **Admin new-order notification email**: `newOrderEmailTemplate` sent to org OWNER on every new order placed — both from dashboard (`POST /api/orders`) and public store checkout
+- **Overview: Open Storefront button**: button in the overview header links to the public store; if store is unpublished, shows an error modal with a link to the Storefront settings page
+- **Overview: chart period filter**: toggle between 7 / 30 / 90-day windows for all three charts (revenue, orders, customer growth) — updates chart titles dynamically
+- **Products: type filter**: "All types" dropdown on the products page filters by SIMPLE / DOWNLOADABLE / VARIABLE; backed by new `productType` query param on `GET /api/products`
+- **Products: type pill**: product cards now show a coloured badge for product type (secondary / info / warning)
+- **Store description field**: `description String?` column added to the `Organization` Prisma model; editable in Settings > Organization tab (textarea, max 500 chars); rendered below store name in the public store info banner
+- **Store sort bar**: sort dropdown above products grid on the public store (`/store/[slug]`) — Newest, Oldest, Price low→high, Price high→low, Name A–Z; client-side sort with page reset
+- **Backend `oldest` sort**: `getStoreProducts` handles `sort=oldest` (`createdAt asc`)
+- **RBAC hardening**: `removeStaff` and `resetStaffPassword` backend functions now return `403` if the target user has the OWNER role
+
+### Changed
+- **Orders page**: table rows are now fully clickable (opens the order detail modal); action buttons (approve, eye, delete) stop click propagation so they still work independently
+- **Settings page**: org form default values now include `description`; fetched org data resets `description` field on load; `updateOrgSchema` now includes `industry`, `size`, and `description` (was dropping them silently)
+- **`getOverview` API**: response now includes `storePublished` and `orgSlug` so the overview page can determine storefront link and status without an extra request
+- **Sidebar**: "Store" label renamed to "Storefront"; "Newsletter" nav item added (OWNER/MANAGER only)
+
+### Fixed
+- **Invite accept redirect**: was using `res.data.user.organization?.slug` (always `undefined`) — now correctly uses `res.data.orgSlug` returned by the `acceptInvite` endpoint
+- **`initialStock` / `lowStockAlert` validation**: inputs on `/products/new` were registered without `valueAsNumber: true`; Zod received a string, failed `z.number()` validation, and blocked form submission
+- **`updateOrgSchema` missing fields**: `industry` and `size` were in `createOrganizationSchema` but absent from `updateOrgSchema`, silently dropping those fields on every settings save
+- **Logistics order count**: count query was not filtering by APPROVED status, showing incorrect totals
+- **PDF report 404 on empty data**: `downloadReport` and `emailReport` returned `404` when no rows matched the date range; now generates an empty PDF instead
+- **Admin order email `orgOwner.email` missing**: `orgOwner` select in `store.controller.ts` was missing the `email` field, causing the notification send to fail silently
+
+---
+
 ## [1.3.0] - 2026-05-08
 
 ### Added
