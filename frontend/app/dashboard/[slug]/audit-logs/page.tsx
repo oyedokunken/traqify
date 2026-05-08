@@ -26,8 +26,8 @@ function describeLog(log: AuditLog): string {
   if (log.details) return log.details;
   const entityMap: Record<string, string> = {
     Product: "product", Order: "order", Customer: "customer", User: "user account",
-    Organization: "organization", Category: "category", Inventory: "inventory",
-    Staff: "staff member", Report: "report",
+    Organization: "organization", ProductCategory: "product category", Inventory: "inventory",
+    StaffInvite: "staff invitation", Report: "report",
   };
   const entityLabel = entityMap[log.entity] || log.entity.toLowerCase();
   const actionMap: Record<string, string> = {
@@ -36,8 +36,8 @@ function describeLog(log: AuditLog): string {
     DELETE: `Deleted a ${entityLabel}`,
     LOGIN: "Logged in",
     LOGOUT: "Logged out",
-    EXPORT: `Exported ${entityLabel} report`,
-    INVITE: `Invited a staff member`,
+    EXPORT: `Exported ${entityLabel}`,
+    INVITE: `Sent a staff invitation`,
   };
   return actionMap[log.action] || `${log.action} on ${entityLabel}`;
 }
@@ -46,6 +46,10 @@ const actionVariant: Record<string, any> = {
   CREATE: "success",
   UPDATE: "info",
   DELETE: "destructive",
+  LOGIN: "secondary",
+  LOGOUT: "secondary",
+  EXPORT: "warning",
+  INVITE: "outline",
 };
 
 export default function AuditLogsPage({ params }: { params: { slug: string } }) {

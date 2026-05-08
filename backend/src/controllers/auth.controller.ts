@@ -165,6 +165,10 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
 
+    if (user.organizationId) {
+      createAuditLog(user.id, user.organizationId, "LOGIN", "User", user.id, "Logged in", req).catch(() => {});
+    }
+
     const token = signToken({
       userId: user.id,
       email: user.email,

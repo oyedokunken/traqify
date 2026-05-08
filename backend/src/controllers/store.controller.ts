@@ -3,6 +3,7 @@ import { OrderStatus } from "@prisma/client";
 import prisma from "../config/database";
 import { sendEmail } from "../config/email";
 import { wishlistReminderTemplate } from "../emails/templates";
+import { createAuditLog } from "../utils/audit";
 import https from "https";
 
 export const getStoreProducts = async (req: Request, res: Response): Promise<void> => {
@@ -179,6 +180,8 @@ export const storeCheckout = async (req: Request, res: Response): Promise<void> 
         data: { quantity: { decrement: item.quantity } },
       });
     }
+
+    createAuditLog(orgOwner.id, org.id, "CREATE", "Order", order.id, `Store order ${orderNumber} placed by ${name} (${email}) — ₦${totalAmount.toLocaleString()}`, req).catch(() => {});
 
     const itemsHtml = order.orderItems
       .map((i: { product: { name: string }; quantity: number; subtotal?: number; unitPrice: number }) => `<tr><td style="padding:8px 0;border-bottom:1px solid #f0f0f0">${i.product.name} × ${i.quantity}</td><td style="padding:8px 0;border-bottom:1px solid #f0f0f0;text-align:right;font-weight:600">₦${(i.subtotal || i.unitPrice * i.quantity).toLocaleString()}</td></tr>`)
