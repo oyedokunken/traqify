@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Package, Search, ShoppingCart, X, Plus, Minus, ChevronLeft, ChevronRight, Heart, MapPin, Phone, Mail, Globe, Star, SlidersHorizontal } from "lucide-react";
+import { Package, Search, ShoppingCart, ShoppingBag, X, Plus, Minus, ChevronLeft, ChevronRight, Heart, MapPin, Phone, Mail, Globe, Star, SlidersHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollToTop } from "@/components/shared/scroll-to-top";
