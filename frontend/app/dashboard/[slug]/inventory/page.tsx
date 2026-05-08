@@ -15,7 +15,7 @@ interface InventoryItem {
   productId: string;
   quantity: number;
   lowStockAlert: number;
-  product: { id: string; name: string; sku: string; category?: string };
+  product: { id: string; name: string; sku: string; productCategory?: { name: string } | null };
 }
 
 export default function InventoryPage({ params }: { params: { slug: string } }) {
@@ -105,7 +105,7 @@ export default function InventoryPage({ params }: { params: { slug: string } }) 
                       <td className="px-5 py-3.5 text-sm font-medium text-[#0a0a0a]">{item.product.name}</td>
                       <td className="px-5 py-3.5 text-sm text-gray-500 hidden md:table-cell">{item.product.sku}</td>
                       <td className="px-5 py-3.5 hidden md:table-cell">
-                        {item.product.category && <Badge variant="outline" className="text-xs">{item.product.category}</Badge>}
+                        {item.product.productCategory?.name ? <Badge variant="outline" className="text-xs">{item.product.productCategory.name}</Badge> : <span className="text-xs text-gray-400">—</span>}
                       </td>
                       <td className="px-5 py-3.5">
                         {isEditing ? (
