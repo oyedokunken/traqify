@@ -29,6 +29,8 @@ export default function StaffPage({ params }: { params: { slug: string } }) {
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -60,11 +62,15 @@ export default function StaffPage({ params }: { params: { slug: string } }) {
     finally { setConfirmAction(null); }
   };
 
-  const filtered = staff.filter((s) =>
-    s.name?.toLowerCase().includes(search.toLowerCase()) ||
-    s.email.toLowerCase().includes(search.toLowerCase()) ||
-    s.role.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = staff.filter((s) => {
+    const matchSearch = !search ||
+      s.name?.toLowerCase().includes(search.toLowerCase()) ||
+      s.email.toLowerCase().includes(search.toLowerCase());
+    const matchRole = !roleFilter || s.role === roleFilter;
+    const matchStatus = !statusFilter ||
+      (statusFilter === "active" ? s.isActive : !s.isActive);
+    return matchSearch && matchRole && matchStatus;
+  });
 
   const actionLabels: Record<string, { title: string; msg: string; btn: string }> = {
     access: { title: confirmAction?.isActive ? "Restrict access?" : "Restore access?", msg: `This will ${confirmAction?.isActive ? "prevent" : "restore"} ${confirmAction?.name}'s ability to log in.`, btn: confirmAction?.isActive ? "Restrict" : "Restore" },
@@ -87,10 +93,26 @@ export default function StaffPage({ params }: { params: { slug: string } }) {
           )}
         </AnimatePresence>
 
-        <div className="flex items-center justify-between mb-6 gap-4">
-          <div className="relative w-64">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <Input placeholder="Search staff..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <div className="flex flex-wrap items-center justify-between mb-6 gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Input placeholder="Search staff..." className="pl-9 w-52" value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+            <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}
+              className="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <option value="">All roles</option>
+              <option value="OWNER">Owner</option>
+              <option value="MANAGER">Manager</option>
+              <option value="CASHIER">Cashier</option>
+              <option value="AUDITOR">Auditor</option>
+            </select>
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+              className="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <option value="">All status</option>
+              <option value="active">Active</option>
+              <option value="restricted">Restricted</option>
+            </select>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-gray-500">{filtered.length} member{filtered.length !== 1 ? "s" : ""}</span>

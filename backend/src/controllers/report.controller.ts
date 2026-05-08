@@ -24,7 +24,6 @@ export const getOverview = async (req: AuthRequest, res: Response): Promise<void
       monthOrders,
       totalProducts,
       totalCustomers,
-      lowStockCount,
     ] = await Promise.all([
       prisma.order.aggregate({ where: { organizationId: orgId, status: "COMPLETED" }, _sum: { totalAmount: true } }),
       prisma.order.aggregate({ where: { organizationId: orgId, status: "COMPLETED", createdAt: { gte: startOfMonth } }, _sum: { totalAmount: true } }),
@@ -33,14 +32,13 @@ export const getOverview = async (req: AuthRequest, res: Response): Promise<void
       prisma.order.count({ where: { organizationId: orgId, createdAt: { gte: startOfMonth } } }),
       prisma.product.count({ where: { organizationId: orgId, isActive: true } }),
       prisma.customer.count({ where: { organizationId: orgId } }),
-      prisma.$queryRaw<{ count: bigint }[]>`
-        SELECT COUNT(*) as count FROM inventory i
-        JOIN products p ON p.id = i."productId"
-        WHERE p."organizationId" = ${orgId}
-          AND p."isActive" = true
-          AND i.quantity <= i."lowStockAlert"
-      `,
     ]);
+
+    const allInventory = await prisma.inventory.findMany({
+      where: { product: { organizationId: orgId, isActive: true } },
+      select: { quantity: true, lowStockAlert: true },
+    });
+    const lowStockCount = allInventory.filter((i) => i.quantity <= i.lowStockAlert).length;
 
     const monthRev = monthRevenue._sum.totalAmount || 0;
     const lastMonthRev = lastMonthRevenue._sum.totalAmount || 0;
@@ -54,7 +52,7 @@ export const getOverview = async (req: AuthRequest, res: Response): Promise<void
       monthOrders,
       totalProducts,
       totalCustomers,
-      lowStockCount: Number(lowStockCount[0]?.count || 0),
+      lowStockCount,
       storePublished: org?.storePublished || false,
       orgSlug: org?.slug || "",
     });

@@ -48,6 +48,7 @@ export default function ProductPage({ params }: { params: { slug: string; id: st
   const [cart, setCart] = useState<CartItem[]>([]);
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [showCart, setShowCart] = useState(false);
+  const [reviews, setReviews] = useState<{ id: string; rating: number; comment?: string; customerName: string; createdAt: string }[]>([]);
   const cartCount = cart.reduce((s, i) => s + i.qty, 0);
 
   useEffect(() => {
@@ -56,6 +57,12 @@ export default function ProductPage({ params }: { params: { slug: string; id: st
     const wl = localStorage.getItem(`traqify_wishlist_${params.slug}`);
     if (wl) try { setWishlist(JSON.parse(wl)); } catch {}
   }, [params.slug]);
+
+  useEffect(() => {
+    api.get(`/api/reviews/product/${params.id}`)
+      .then((r) => setReviews(r.data || []))
+      .catch(() => {});
+  }, [params.id]);
 
   useEffect(() => {
     api.get(`/api/organizations/${params.slug}/store`).then((r) => {
@@ -267,6 +274,28 @@ export default function ProductPage({ params }: { params: { slug: string; id: st
         </div>
 
         {/* Upsells */}
+        {/* Customer reviews */}
+        {reviews.length > 0 && (
+          <section className="mb-12">
+            <h2 className="text-lg font-bold text-[#0a0a0a] mb-5">Customer reviews</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {reviews.map((r) => (
+                <div key={r.id} className="bg-white rounded-xl border border-gray-100 p-4">
+                  <div className="flex items-center gap-0.5 mb-2">
+                    {[1,2,3,4,5].map((n) => (
+                      <Star key={n} size={13} className={n <= r.rating ? "fill-amber-400 text-amber-400" : "fill-gray-200 text-gray-200"} />
+                    ))}
+                    <span className="text-xs text-gray-400 ml-1">{r.rating}/5</span>
+                  </div>
+                  {r.comment && <p className="text-sm text-gray-700 leading-relaxed mb-2">&ldquo;{r.comment}&rdquo;</p>}
+                  <p className="text-xs font-medium text-[#0a0a0a]">{r.customerName}</p>
+                  <p className="text-[10px] text-gray-400">{new Date(r.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         {upsells.length > 0 && (
           <section>
             <h2 className="text-lg font-bold text-[#0a0a0a] mb-5">

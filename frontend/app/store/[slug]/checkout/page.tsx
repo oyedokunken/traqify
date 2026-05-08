@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { CheckCircle, Package, ShoppingCart, Shield, Lock, ChevronRight, RefreshCw } from "lucide-react";
+import { CheckCircle, Package, ShoppingCart, Shield, Lock, ChevronRight, RefreshCw, Star } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -44,7 +44,13 @@ export default function CheckoutPage({ params }: { params: { slug: string } }) {
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState<{ orderNumber: string; total: number } | null>(null);
+  const [success, setSuccess] = useState<{ orderNumber: string; total: number; orderId: string } | null>(null);
+  const [reviewedIds, setReviewedIds] = useState<string[]>([]);
+  const [activeReview, setActiveReview] = useState<string | null>(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewDone, setReviewDone] = useState<string[]>([]);
   const [org, setOrg] = useState<{ name: string; logoUrl?: string } | null>(null);
   const [captcha, setCaptcha] = useState(() => makeCaptcha());
   const [captchaInput, setCaptchaInput] = useState("");
@@ -75,7 +81,7 @@ export default function CheckoutPage({ params }: { params: { slug: string } }) {
       const items = cart.map((i) => ({ productId: i.id, quantity: i.qty }));
       const res = await api.post(`/api/store/${params.slug}/checkout`, { name, email, phone, address, notes, items, paymentMethod: "PAYSTACK", paystackReference: reference });
       localStorage.removeItem(`traqify_cart_${params.slug}`);
-      setSuccess({ orderNumber: res.data.orderNumber, total: res.data.totalAmount });
+      setSuccess({ orderNumber: res.data.orderNumber, total: res.data.totalAmount, orderId: res.data.id });
     } catch (err: any) {
       setError(err.response?.data?.error || "Payment verified but order creation failed. Contact support.");
     } finally { setLoading(false); }
@@ -105,23 +111,89 @@ export default function CheckoutPage({ params }: { params: { slug: string } }) {
     </div>
   );
 
+  const submitReview = async (productId: string) => {
+    if (!success) return;
+    setReviewSubmitting(true);
+    try {
+      await api.post("/api/reviews", {
+        orderId: success.orderId, productId, rating: reviewRating,
+        comment: reviewComment || undefined, customerName: name, customerEmail: email,
+      });
+      setReviewDone((prev) => [...prev, productId]);
+      setActiveReview(null); setReviewComment(""); setReviewRating(5);
+    } catch {} finally { setReviewSubmitting(false); }
+  };
+
   if (success) return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl p-8 max-w-md w-full text-center shadow-sm border border-gray-100">
-        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <CheckCircle size={32} className="text-green-600" />
-        </div>
-        <h1 className="text-xl font-bold text-[#0a0a0a] mb-2">Order placed!</h1>
-        <p className="text-gray-500 text-sm mb-4">A confirmation has been sent to <strong>{email}</strong>.</p>
-        <div className="bg-gray-50 rounded-xl p-4 mb-6">
-          <p className="text-xs text-gray-400 mb-1">ORDER NUMBER</p>
-          <p className="font-bold text-[#0a0a0a] text-lg">{success.orderNumber}</p>
-          <p className="text-xs text-gray-500 mt-1">Total: <strong>{formatCurrency(success.total)}</strong></p>
-        </div>
-        <Link href={`/store/${params.slug}`} className="block w-full py-3 bg-[#DE1010] text-white rounded-xl font-semibold text-sm hover:bg-red-700 transition-colors">
-          Continue shopping
-        </Link>
-      </motion.div>
+    <div className="min-h-screen bg-gray-50 py-12 px-4">
+      <div className="max-w-md mx-auto">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl p-8 text-center shadow-sm border border-gray-100 mb-4">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <CheckCircle size={32} className="text-green-600" />
+          </div>
+          <h1 className="text-xl font-bold text-[#0a0a0a] mb-2">Order placed!</h1>
+          <p className="text-gray-500 text-sm mb-4">A confirmation has been sent to <strong>{email}</strong>.</p>
+          <div className="bg-gray-50 rounded-xl p-4 mb-6">
+            <p className="text-xs text-gray-400 mb-1">ORDER NUMBER</p>
+            <p className="font-bold text-[#0a0a0a] text-lg">{success.orderNumber}</p>
+            <p className="text-xs text-gray-500 mt-1">Total: <strong>{formatCurrency(success.total)}</strong></p>
+          </div>
+          <Link href={`/store/${params.slug}`} className="block w-full py-3 bg-[#DE1010] text-white rounded-xl font-semibold text-sm hover:bg-red-700 transition-colors">
+            Continue shopping
+          </Link>
+        </motion.div>
+
+        {/* Review prompts */}
+        {cart.length > 0 && (
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+            className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <h2 className="font-semibold text-[#0a0a0a] text-sm mb-1">How was your order?</h2>
+            <p className="text-xs text-gray-400 mb-4">Leave a review for the products you purchased.</p>
+            <div className="space-y-3">
+              {cart.map((item) => (
+                <div key={item.id} className="border border-gray-100 rounded-xl p-3">
+                  <div className="flex items-center gap-3">
+                    {item.imageUrl && <img src={item.imageUrl} alt={item.name} className="w-9 h-9 rounded-lg object-cover border border-gray-100 flex-shrink-0" />}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-[#0a0a0a] truncate">{item.name}</p>
+                      <p className="text-xs text-gray-400">Qty: {item.qty}</p>
+                    </div>
+                    {reviewDone.includes(item.id) ? (
+                      <span className="text-xs text-green-600 font-medium flex items-center gap-1"><CheckCircle size={12} /> Reviewed</span>
+                    ) : (
+                      <button onClick={() => { setActiveReview(activeReview === item.id ? null : item.id); setReviewRating(5); setReviewComment(""); }}
+                        className="text-xs text-[#DE1010] font-medium hover:underline">
+                        {activeReview === item.id ? "Cancel" : "Review"}
+                      </button>
+                    )}
+                  </div>
+                  {activeReview === item.id && (
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <div className="flex items-center gap-1 mb-3">
+                        {[1,2,3,4,5].map((n) => (
+                          <button key={n} type="button" onClick={() => setReviewRating(n)}>
+                            <Star size={20} className={n <= reviewRating ? "fill-amber-400 text-amber-400" : "text-gray-200 fill-gray-200"} />
+                          </button>
+                        ))}
+                        <span className="text-xs text-gray-500 ml-1">{reviewRating}/5</span>
+                      </div>
+                      <textarea
+                        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-[#DE1010]/20 min-h-[64px]"
+                        placeholder="Share your experience (optional)..."
+                        value={reviewComment} onChange={(e) => setReviewComment(e.target.value)}
+                      />
+                      <button onClick={() => submitReview(item.id)} disabled={reviewSubmitting}
+                        className="mt-2 w-full py-2 bg-[#0a0a0a] text-white rounded-lg text-sm font-medium hover:bg-black/80 transition-colors disabled:opacity-50">
+                        {reviewSubmitting ? "Submitting..." : "Submit review"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </div>
     </div>
   );
 

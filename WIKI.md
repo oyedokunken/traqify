@@ -11,10 +11,11 @@
 8. [Staff Management](#staff-management)
 9. [Public Store](#public-store)
 10. [Newsletter](#newsletter)
-11. [Reports and Analytics](#reports-and-analytics)
-12. [Audit Logs](#audit-logs)
-13. [Email System](#email-system)
-14. [API Reference](#api-reference)
+11. [Product Reviews](#product-reviews)
+12. [Reports and Analytics](#reports-and-analytics)
+13. [Audit Logs](#audit-logs)
+14. [Email System](#email-system)
+15. [API Reference](#api-reference)
 
 ---
 
@@ -54,21 +55,27 @@ Traqify is a full-stack multi-tenant SaaS application.
 
 ## Roles and Permissions
 
-| Action                     | OWNER | MANAGER | CASHIER | AUDITOR |
-|----------------------------|:-----:|:-------:|:-------:|:-------:|
-| View products/inventory    |  Yes  |   Yes   |   Yes   |   Yes   |
-| Create/edit products       |  Yes  |   Yes   |         |         |
-| Create orders              |  Yes  |   Yes   |   Yes   |         |
-| View orders                |  Yes  |   Yes   |   Yes   |   Yes   |
-| Approve/update order status|  Yes  |   Yes   |         |         |
-| Manage customers           |  Yes  |   Yes   |   Yes   |         |
-| Invite staff               |  Yes  |   Yes   |         |         |
-| Restrict/remove staff      |  Yes  |   Yes   |         |         |
-| View staff list            |  Yes  |   Yes   |         |         |
-| View newsletter subscribers|  Yes  |   Yes   |         |         |
-| View reports               |  Yes  |   Yes   |         |   Yes   |
-| View audit logs            |  Yes  |         |         |   Yes   |
-| Manage org settings        |  Yes  |         |         |         |
+Role hierarchy scores used by backend middleware: OWNER=4, MANAGER=3, AUDITOR=2, CASHIER=1.
+`isAtLeastAuditor` allows OWNER/MANAGER/AUDITOR (excludes CASHIER).
+
+| Action                      | OWNER | MANAGER | CASHIER | AUDITOR |
+|-----------------------------|:-----:|:-------:|:-------:|:-------:|
+| View products/inventory     |  Yes  |   Yes   |   Yes   |   Yes   |
+| Create/edit products        |  Yes  |   Yes   |         |         |
+| Create orders               |  Yes  |   Yes   |   Yes   |         |
+| View orders                 |  Yes  |   Yes   |   Yes   |   Yes   |
+| Approve/update order status |  Yes  |   Yes   |         |         |
+| View customers              |  Yes  |   Yes   |   Yes   |   Yes   |
+| Manage customers            |  Yes  |   Yes   |   Yes   |         |
+| Invite staff                |  Yes  |   Yes   |         |         |
+| Restrict/remove staff       |  Yes  |   Yes   |         |         |
+| View staff list             |  Yes  |   Yes   |         |         |
+| View newsletter subscribers |  Yes  |   Yes   |         |         |
+| Moderate reviews            |  Yes  |   Yes   |         |         |
+| View financial reports      |  Yes  |   Yes   |         |   Yes   |
+| View audit logs             |  Yes  |         |         |   Yes   |
+| Manage org/store settings   |  Yes  |   Yes   |         |         |
+| Change own password         |  Yes  |   Yes   |   Yes   |   Yes   |
 
 **Note**: OWNER accounts cannot be restricted, removed, or have their password reset by other staff.
 
@@ -103,6 +110,7 @@ The products list supports four filters simultaneously:
 - **Type** (All types / Simple / Downloadable / Variable)
 
 Product cards show type pills: Simple (gray), Downloadable (blue), Variable (amber).
+Products with at least one approved review also show an amber star pill with the review count.
 
 ### Inventory
 - Inventory is automatically created and linked to each product on creation
@@ -210,6 +218,37 @@ Located at `/dashboard/[slug]/newsletter` (OWNER/MANAGER only).
 ### Subscription Form
 The public newsletter subscription form on the landing page posts to `POST /api/newsletter/subscribe`.
 A welcome email is sent to the subscriber automatically.
+
+---
+
+## Product Reviews
+
+### How reviews work
+1. Customer completes a purchase (order status: COMPLETED)
+2. On the order success screen, each purchased product shows a "Review" button
+3. Customer selects a 1–5 star rating and optional comment, then submits
+4. Review is stored with status **PENDING**
+5. OWNER or MANAGER visits `/dashboard/[slug]/reviews` to approve or reject
+6. Only **APPROVED** reviews are shown publicly
+
+### Backend
+- `POST /api/reviews` — public endpoint, requires a COMPLETED order and the product must be in that order; one review per (orderId, productId) pair
+- `GET /api/reviews/product/:id` — public, returns APPROVED reviews for a product
+- `GET /api/reviews` — authenticated (OWNER/MANAGER), paginated with optional `status` filter
+- `PATCH /api/reviews/:id/moderate` — body `{ action: "approve" | "reject" }`
+- `DELETE /api/reviews/:id` — permanently removes a review
+
+### Dashboard Reviews page
+Located at `/dashboard/[slug]/reviews` — tabs for PENDING / APPROVED / REJECTED.
+Actions: **Approve**, **Reject**, **Delete**. Search by customer name, product name, or comment text.
+
+### Review counts on product cards
+Products with at least one approved review show an amber star pill (e.g. ★ 3) on:
+- Dashboard `/dashboard/[slug]/products` product grid
+- Public store `/store/[slug]` product grid
+
+### Public display
+Approved reviews appear as a card grid on `/store/[slug]/products/[id]` below the upsell section.
 
 ---
 

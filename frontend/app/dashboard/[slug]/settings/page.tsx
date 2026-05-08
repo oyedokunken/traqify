@@ -136,17 +136,19 @@ export default function SettingsPage({ params }: { params: { slug: string } }) {
                 </div>
               </div>
               <form onSubmit={profileForm.handleSubmit(onSaveProfile)} className="space-y-4">
-                <div>
-                  <Label>Full name</Label>
-                  <Input className="mt-1.5" {...profileForm.register("name")} />
-                </div>
-                <div>
-                  <Label>Email address</Label>
-                  <div className="relative mt-1.5">
-                    <Input type="email" value={user?.email || ""} disabled className="pr-28" />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[10px] font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
-                      <ShieldCheck size={11} /> Verified
-                    </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Full name</Label>
+                    <Input className="mt-1.5" {...profileForm.register("name")} />
+                  </div>
+                  <div>
+                    <Label>Email address</Label>
+                    <div className="relative mt-1.5">
+                      <Input type="email" value={user?.email || ""} disabled className="pr-28" />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[10px] font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                        <ShieldCheck size={11} /> Verified
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <Button type="submit" size="sm" className="gap-2 mt-2" disabled={profileForm.formState.isSubmitting}>
@@ -198,19 +200,21 @@ export default function SettingsPage({ params }: { params: { slug: string } }) {
                     <Input className="mt-1.5" placeholder="123 Business Road, Lagos" {...orgForm.register("address")} />
                   </div>
                 </div>
-                <div>
-                  <Label>Website</Label>
-                  <Input className="mt-1.5" placeholder="https://yoursite.com" {...orgForm.register("website")} />
-                </div>
-                <div>
-                  <Label>Store description</Label>
-                  <textarea
-                    className="mt-1.5 flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
-                    placeholder="A short description of your store that appears on your public storefront..."
-                    maxLength={500}
-                    {...orgForm.register("description")}
-                  />
-                  <p className="text-xs text-gray-400 mt-1">Max 500 characters</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Website</Label>
+                    <Input className="mt-1.5" placeholder="https://yoursite.com" {...orgForm.register("website")} />
+                  </div>
+                  <div>
+                    <Label>Store description</Label>
+                    <textarea
+                      className="mt-1.5 flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
+                      placeholder="A short description of your store..."
+                      maxLength={500}
+                      {...orgForm.register("description")}
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Max 500 characters</p>
+                  </div>
                 </div>
                 <Button type="submit" size="sm" className="gap-2 mt-2" disabled={orgForm.formState.isSubmitting}>
                   <Save size={14} />{orgForm.formState.isSubmitting ? "Saving..." : "Save changes"}

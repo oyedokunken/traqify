@@ -24,6 +24,7 @@ interface Product {
   imageUrls?: string[];
   productCategory?: { id: string; name: string };
   inventory?: { quantity: number };
+  _count?: { reviews: number };
 }
 
 interface CartItem extends Product { qty: number; }
@@ -101,6 +102,12 @@ function ProductCard({ product, images, inStock, inWishlist, slug, onAddToCart, 
             <p className="font-bold text-[#0a0a0a] text-sm">{formatCurrency(product.price)}</p>
             {product.comparePrice && product.comparePrice > product.price && <p className="text-[10px] text-gray-400 line-through">{formatCurrency(product.comparePrice)}</p>}
           </div>
+          {(product._count?.reviews ?? 0) > 0 && (
+            <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full font-medium">
+              <Star size={9} className="fill-amber-400 text-amber-400" />
+              {product._count!.reviews}
+            </span>
+          )}
         </div>
         {/* View + cart icon + wishlist icon */}
         <div className="flex items-center gap-1.5">
@@ -264,7 +271,15 @@ export default function PublicStorePage({ params }: { params: { slug: string } }
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
           {/* Logo / Store name */}
           <div className="flex items-center flex-shrink-0">
-            {org?.logoUrl ? (
+            {org?.website ? (
+              <a href={org.website} target="_blank" rel="noopener noreferrer" className="flex items-center">
+                {org?.logoUrl ? (
+                  <img src={org.logoUrl} alt={org.name} className="h-10 w-auto max-w-[180px] object-contain" />
+                ) : (
+                  <h1 className="font-bold text-lg text-[#0a0a0a] truncate max-w-[180px]">{org?.name}</h1>
+                )}
+              </a>
+            ) : org?.logoUrl ? (
               <img src={org.logoUrl} alt={org.name} className="h-10 w-auto max-w-[180px] object-contain" />
             ) : (
               <h1 className="font-bold text-lg text-[#0a0a0a] truncate max-w-[180px]">{org?.name}</h1>

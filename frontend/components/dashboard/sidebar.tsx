@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Package, ShoppingCart, Users, BarChart3,
   BookOpen, Warehouse, UserCog, LogOut, ChevronLeft, ChevronRight,
-  Settings, Tag, Globe, Truck, Mail, X,
+  Settings, Tag, Globe, Truck, Mail, X, Star,
 } from "lucide-react";
 import { cn, getInitials, ROLE_LABELS } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
@@ -20,12 +20,13 @@ const navItems = [
   { href: "categories",  label: "Categories",  icon: Tag,             roles: ["OWNER","MANAGER"] },
   { href: "inventory",   label: "Inventory",   icon: Warehouse,       roles: ["OWNER","MANAGER","AUDITOR"] },
   { href: "orders",      label: "Orders",      icon: ShoppingCart,    roles: ["OWNER","MANAGER","CASHIER","AUDITOR"] },
-  { href: "customers",   label: "Customers",   icon: Users,           roles: ["OWNER","MANAGER","CASHIER"] },
+  { href: "customers",   label: "Customers",   icon: Users,           roles: ["OWNER","MANAGER","CASHIER","AUDITOR"] },
   { href: "staff",       label: "Staff",       icon: UserCog,         roles: ["OWNER","MANAGER"] },
   { href: "store",       label: "Storefront",  icon: Globe,           roles: ["OWNER","MANAGER"] },
   { href: "logistics",   label: "Logistics",   icon: Truck,           roles: ["OWNER","MANAGER"] },
   { href: "reports",     label: "Reports",     icon: BarChart3,       roles: ["OWNER","MANAGER","AUDITOR"] },
   { href: "newsletter",  label: "Newsletter",  icon: Mail,            roles: ["OWNER","MANAGER"] },
+  { href: "reviews",     label: "Reviews",     icon: Star,            roles: ["OWNER","MANAGER"] },
   { href: "audit-logs",  label: "Audit Logs",  icon: BookOpen,        roles: ["OWNER","AUDITOR"] },
   { href: "settings",    label: "Settings",    icon: Settings,        roles: ["OWNER","MANAGER","CASHIER","AUDITOR"] },
 ];
