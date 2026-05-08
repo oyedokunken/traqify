@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
+import { Jost } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 import { Toaster } from "@/components/ui/toaster";
 import { ScrollToTop } from "@/components/shared/scroll-to-top";
+
+const jost = Jost({ subsets: ["latin"], display: "swap", variable: "--font-jost" });
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://traqify.vercel.app"),
@@ -26,16 +29,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,100..900;1,100..900&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body>
+    <html lang="en" className={jost.variable}>
+      <body className={jost.className}>
         <AuthProvider>
           {children}
           <Toaster />

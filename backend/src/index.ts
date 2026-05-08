@@ -59,6 +59,10 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
+app.get("/", (_req, res) => {
+  res.json({ service: "Traqify API", status: "ok", version: "1.0.0", docs: "/health" });
+});
+
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString(), service: "Traqify API" });
 });
