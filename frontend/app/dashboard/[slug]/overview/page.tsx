@@ -81,15 +81,16 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
   }, [params.slug]);
 
   useEffect(() => {
-    Promise.all([
-      api.get("/api/reports/overview"),
-      api.get(`/api/reports/revenue-chart?period=${period}`),
-      api.get(`/api/reports/customer-chart?period=${period}`),
-    ]).then(([overview, chartData, customerData]) => {
-      setData(overview.data);
-      setChart(chartData.data || []);
-      setCustomerChart(customerData.data || []);
-    }).catch(() => {}).finally(() => setLoading(false));
+    api.get("/api/reports/overview")
+      .then((r) => setData(r.data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+    api.get(`/api/reports/revenue-chart?period=${period}`)
+      .then((r) => setChart(r.data || []))
+      .catch(() => {});
+    api.get(`/api/reports/customer-chart?period=${period}`)
+      .then((r) => setCustomerChart(r.data || []))
+      .catch(() => {});
   }, []);
 
   const changePeriod = async (p: number) => {
@@ -126,14 +127,14 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
     {
       title: "Revenue this month",
       value: formatCurrency(data?.monthRevenue || 0),
-      sub: `${data?.revenueGrowth && data.revenueGrowth >= 0 ? "+" : ""}${data?.revenueGrowth}% from last month`,
+      sub: `${(data?.revenueGrowth ?? 0) >= 0 ? "+" : ""}${data?.revenueGrowth ?? 0}% from last month`,
       icon: DollarSign,
       trend: (data?.revenueGrowth || 0) >= 0 ? "up" : "down",
     },
     {
       title: "Orders this month",
       value: data?.monthOrders?.toLocaleString() || "0",
-      sub: `${data?.totalOrders?.toLocaleString()} total orders`,
+      sub: `${(data?.totalOrders ?? 0).toLocaleString()} total orders`,
       icon: ShoppingCart,
       trend: "up",
     },

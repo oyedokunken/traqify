@@ -9,8 +9,8 @@ type RoleHierarchy = {
 const roleHierarchy: RoleHierarchy = {
   OWNER: 4,
   MANAGER: 3,
-  CASHIER: 2,
-  AUDITOR: 1,
+  AUDITOR: 2,
+  CASHIER: 1,
 };
 
 export const requireRole = (...roles: UserRole[]) => {

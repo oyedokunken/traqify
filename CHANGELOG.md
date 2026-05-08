@@ -5,6 +5,35 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.6.0] - 2026-05-08
+
+### Added
+- **Product reviews**: end-to-end review system — `Review` Prisma model with `ReviewStatus` (PENDING/APPROVED/REJECTED), unique constraint on `[orderId, productId]`; backend controller (`submitReview`, `getProductReviews`, `getDashboardReviews`, `moderateReview`, `deleteReview`) and routes at `/api/reviews`
+- **Reviews dashboard page**: `/dashboard/[slug]/reviews` — tabbed PENDING/APPROVED/REJECTED views, search, approve/reject/delete actions; OWNER/MANAGER only
+- **Review submission on order success**: checkout success screen now prompts customers to rate each purchased product with a 1–5 star widget and optional comment; review submitted to `/api/reviews`
+- **Public product detail reviews**: approved reviews shown in a grid below upsells on `/store/[slug]/products/[id]`
+- **Review count on product cards**: amber star pill with review count shown on dashboard products page and public store product grid (only when count > 0)
+- **Staff page filters**: Role filter (All / Owner / Manager / Cashier / Auditor) and Status filter (All / Active / Restricted) alongside the existing search input
+- **Newsletter refresh modal**: clicking "Refresh" on the newsletter page shows a success modal summarising Total subscribers, Last 7 days, and This month; shows error modal on failure
+- **Reviews sidebar nav item**: "Reviews" added to sidebar for OWNER/MANAGER with `Star` icon
+
+### Changed
+- **RBAC hierarchy**: swapped AUDITOR (2) and CASHIER (1) scores so `isAtLeastAuditor` correctly excludes CASHIER from financial reports and read-all routes while AUDITOR retains full read access
+- **Sidebar Customers**: AUDITOR added to allowed roles (AUDITOR has read-all access per role matrix)
+- **Settings layout**: Full name and Email fields are now side-by-side (50%/50% grid) on desktop; Website and Store description fields are side-by-side (50%/50% grid) on desktop
+- **Store logo link**: logo (or store name) on public store header is now wrapped in an anchor tag linking to `org.website` (opens in new tab) when a website URL is set
+- **Overview API**: replaced `$queryRaw` low-stock query with safe Prisma `findMany` + JS filter to eliminate 500 errors; revenue growth display uses `?? 0` fallback to prevent "undefined%"
+- **Overview data fetch**: split single `Promise.all` into three independent calls so a chart failure never blanks the stats cards
+- **Store controller `getStoreProducts`**: `description` field added to org select; approved review count (`_count.reviews` where status=APPROVED) added to product include
+- **Product controller `getProducts`**: `_count.reviews` added alongside `_count.orderItems` in product list include
+
+### Fixed
+- **Overview undefined% / undefined total orders**: `data?.revenueGrowth` and `data?.totalOrders` now use `?? 0` fallback; stats cards correctly show 0 when API response is null
+- **CASHIER accessing financial reports**: corrected `roleHierarchy` so CASHIER (score 1) is below `isAtLeastAuditor` threshold (score 2)
+- **Newsletter modal JSX syntax**: wrapped newsletter page return in fragment `<>` to allow modal alongside main content div
+
+---
+
 ## [1.4.0] - 2026-05-08
 
 ### Added

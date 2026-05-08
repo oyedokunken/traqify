@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Mail, Users, Search, Download, RefreshCw, Calendar } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -28,13 +28,17 @@ export default function NewsletterPage({ params }: { params: { slug: string } })
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshModal, setRefreshModal] = useState<{ open: boolean; type: "success" | "error" }>({ open: false, type: "success" });
 
   const fetchSubscribers = async (silent = false) => {
     if (!silent) setLoading(true); else setRefreshing(true);
     try {
       const res = await api.get("/api/newsletter/subscribers");
       setSubscribers(res.data);
-    } catch {} finally {
+      if (silent) setRefreshModal({ open: true, type: "success" });
+    } catch {
+      if (silent) setRefreshModal({ open: true, type: "error" });
+    } finally {
       setLoading(false); setRefreshing(false);
     }
   };
@@ -64,6 +68,7 @@ export default function NewsletterPage({ params }: { params: { slug: string } })
   if (blocked) return null;
 
   return (
+    <>
     <div>
       <Topbar title="Newsletter" slug={params.slug} />
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="p-6">
@@ -176,5 +181,51 @@ export default function NewsletterPage({ params }: { params: { slug: string } })
         </div>
       </motion.div>
     </div>
+
+      {/* Refresh summary modal */}
+    <AnimatePresence>
+      {refreshModal.open && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4"
+          onClick={() => setRefreshModal((m) => ({ ...m, open: false }))}>
+          <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
+            className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl"
+            onClick={(e) => e.stopPropagation()}>
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4 ${
+              refreshModal.type === "success" ? "bg-green-100" : "bg-red-50"
+            }`}>
+              {refreshModal.type === "success"
+                ? <Mail size={22} className="text-green-600" />
+                : <Mail size={22} className="text-[#DE1010]" />}
+            </div>
+            <h3 className="font-bold text-[#0a0a0a] text-base text-center mb-4">
+              {refreshModal.type === "success" ? "Newsletter updated" : "Refresh failed"}
+            </h3>
+            {refreshModal.type === "success" && (
+              <div className="space-y-2 mb-5">
+                {([
+                  ["Total subscribers", subscribers.length],
+                  ["Last 7 days", subscribers.filter((s) => new Date(s.createdAt) > new Date(Date.now() - 7 * 86400000)).length],
+                  ["This month", subscribers.filter((s) => { const d = new Date(s.createdAt); const n = new Date(); return d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear(); }).length],
+                ] as [string, number][]).map(([label, val]) => (
+                  <div key={label} className="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-2.5">
+                    <span className="text-sm text-gray-500">{label}</span>
+                    <span className="text-sm font-bold text-[#0a0a0a]">{val}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {refreshModal.type === "error" && (
+              <p className="text-sm text-gray-500 text-center mb-5">Could not fetch subscribers. Please check your connection and try again.</p>
+            )}
+            <button onClick={() => setRefreshModal((m) => ({ ...m, open: false }))}
+              className="w-full py-2.5 bg-[#0a0a0a] text-white rounded-xl text-sm font-medium hover:bg-black/80 transition-colors">
+              Got it
+            </button>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+    </>
   );
 }

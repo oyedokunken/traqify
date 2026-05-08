@@ -39,6 +39,12 @@ enum InviteStatus {
   EXPIRED
 }
 
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model User {
   id             String       @id @default(cuid())
   name           String?
@@ -90,6 +96,7 @@ model Organization {
   invites     StaffInvite[]
   categories  ProductCategory[]
   wishlists   Wishlist[]
+  reviews     Review[]
 
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
@@ -181,6 +188,7 @@ model Product {
   inventory      Inventory?
   orderItems     OrderItem[]
   variants       ProductVariant[]
+  reviews        Review[]
 
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
@@ -255,6 +263,7 @@ model Order {
   createdBy      User         @relation(fields: [createdById], references: [id])
 
   orderItems     OrderItem[]
+  reviews        Review[]
 
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
@@ -305,6 +314,30 @@ model NewsletterSubscriber {
   createdAt DateTime @default(now())
 
   @@map("newsletter_subscribers")
+}
+
+model Review {
+  id            String        @id @default(cuid())
+  rating        Int
+  comment       String?
+  customerName  String
+  customerEmail String?
+  status        ReviewStatus  @default(PENDING)
+
+  productId     String
+  product       Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  orderId       String
+  order         Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@unique([orderId, productId])
+  @@map("reviews")
 }
 
 model AuditLog {

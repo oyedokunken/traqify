@@ -13,7 +13,7 @@ export const getStoreProducts = async (req: Request, res: Response): Promise<voi
 
     const org = await prisma.organization.findUnique({
       where: { slug },
-      select: { id: true, name: true, slug: true, logoUrl: true, website: true, email: true, phone: true, address: true, storePublished: true },
+      select: { id: true, name: true, slug: true, logoUrl: true, website: true, email: true, phone: true, address: true, description: true, storePublished: true },
     });
 
     if (!org) {
@@ -38,6 +38,7 @@ export const getStoreProducts = async (req: Request, res: Response): Promise<voi
       include: {
         inventory: { select: { quantity: true, lowStockAlert: true } },
         productCategory: { select: { id: true, name: true, slug: true } },
+        _count: { select: { reviews: { where: { status: "APPROVED" } } } },
       },
       orderBy:
         sort === "price_asc" ? { price: "asc" }

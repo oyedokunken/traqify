@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Search, Edit, Trash2, Package } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Package, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -195,6 +195,12 @@ export default function ProductsPage({ params }: { params: { slug: string } }) {
                         <Badge variant={TYPE_VARIANTS[product.productType] || "outline"} className="text-[10px]">
                           {TYPE_LABELS[product.productType] || product.productType}
                         </Badge>
+                      )}
+                      {((product as any)._count?.reviews ?? 0) > 0 && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full font-medium">
+                          <Star size={9} className="fill-amber-400 text-amber-400" />
+                          {(product as any)._count.reviews}
+                        </span>
                       )}
                     </div>
                   </CardContent>
