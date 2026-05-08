@@ -2,8 +2,8 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
-import { ImagePlus, AlertCircle, Wand2, ArrowLeft, GripVertical, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ImagePlus, AlertCircle, Wand2, ArrowLeft, GripVertical, X, Plus, Upload, Link as LinkIcon, Tag } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -49,7 +49,12 @@ export default function NewProductPage({ params }: { params: { slug: string } })
   const [uploadProgress, setUploadProgress] = useState(false);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [downloadMode, setDownloadMode] = useState<"url" | "upload">("url");
+  const [downloadFile, setDownloadFile] = useState<File | null>(null);
+  const [attributes, setAttributes] = useState<{ name: string; values: string; id: number }[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
+  const downloadFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     api.get("/api/categories").then((r) => setCategories(r.data)).catch(() => {});
@@ -101,8 +106,13 @@ export default function NewProductPage({ params }: { params: { slug: string } })
   };
   const onDragEnd = () => setDragIdx(null);
 
+  const onFormError = (errs: any) => {
+    const msgs = Object.values(errs).map((e: any) => e?.message).filter(Boolean) as string[];
+    setValidationErrors(msgs);
+  };
+
   const onSubmit = async (data: any) => {
-    setIsLoading(true); setError("");
+    setIsLoading(true); setError(""); setValidationErrors([]);
     try {
       const uploadedUrls: string[] = [];
       if (imageFiles.length > 0) {
@@ -120,6 +130,21 @@ export default function NewProductPage({ params }: { params: { slug: string } })
       const existingUrls = imagePreviews.filter((p) => !p.startsWith("blob:"));
       const allUrls = [...existingUrls, ...uploadedUrls];
 
+      let downloadUrl = data.downloadUrl || undefined;
+      if (data.productType === "DOWNLOADABLE" && downloadMode === "upload" && downloadFile) {
+        const fd = new FormData(); fd.append("image", downloadFile);
+        try {
+          const r = await api.post("/api/products/upload-image", fd, { headers: { "Content-Type": "multipart/form-data" } });
+          downloadUrl = r.data.url;
+        } catch { setError("Failed to upload downloadable file."); setIsLoading(false); return; }
+      }
+
+      const variants = data.productType === "VARIABLE"
+        ? attributes.flatMap((attr) =>
+            attr.values.split(",").map((v) => ({ name: attr.name.trim(), value: v.trim() })).filter((v) => v.name && v.value)
+          )
+        : undefined;
+
       await api.post("/api/products", {
         ...data,
         price: parseFloat(data.price),
@@ -130,7 +155,8 @@ export default function NewProductPage({ params }: { params: { slug: string } })
         imageUrls: allUrls,
         categoryId: data.categoryId || undefined,
         productType: data.productType || "SIMPLE",
-        downloadUrl: data.productType === "DOWNLOADABLE" ? (data.downloadUrl || undefined) : undefined,
+        downloadUrl: data.productType === "DOWNLOADABLE" ? downloadUrl : undefined,
+        variants,
       });
       router.push(`/dashboard/${params.slug}/products`);
     } catch (err: any) { setError(err.response?.data?.error || "Failed to save product."); }
@@ -151,7 +177,7 @@ export default function NewProductPage({ params }: { params: { slug: string } })
           <h1 className="text-sm font-semibold text-[#0a0a0a]">Add new product</h1>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <form onSubmit={handleSubmit(onSubmit, onFormError)}>
           {error && (
             <div className="flex items-start gap-2 text-sm text-[#DE1010] bg-red-50 px-4 py-3 rounded-lg mb-6 border border-red-200">
               <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />{error}
@@ -289,12 +315,73 @@ export default function NewProductPage({ params }: { params: { slug: string } })
                   </select>
                 </div>
                 {productType === "DOWNLOADABLE" && (
-                  <div>
-                    <Label>Download URL</Label>
-                    <Input className="mt-1.5" placeholder="https://…" {...register("downloadUrl")} />
-                    <p className="text-xs text-gray-400 mt-1">Customers receive this link after purchase.</p>
+                  <div className="space-y-2">
+                    <Label>Download file</Label>
+                    <div className="flex gap-2 mt-1.5">
+                      <button type="button" onClick={() => setDownloadMode("url")}
+                        className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-all ${downloadMode === "url" ? "border-[#DE1010] bg-red-50 text-[#DE1010]" : "border-gray-200 text-gray-500 hover:border-gray-300"}`}>
+                        <LinkIcon size={12} /> Enter URL
+                      </button>
+                      <button type="button" onClick={() => setDownloadMode("upload")}
+                        className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-all ${downloadMode === "upload" ? "border-[#DE1010] bg-red-50 text-[#DE1010]" : "border-gray-200 text-gray-500 hover:border-gray-300"}`}>
+                        <Upload size={12} /> Upload file
+                      </button>
+                    </div>
+                    {downloadMode === "url" ? (
+                      <>
+                        <Input className="mt-1.5" placeholder="https://…" {...register("downloadUrl")} />
+                        <p className="text-xs text-gray-400">Customers receive this link after purchase.</p>
+                      </>
+                    ) : (
+                      <>
+                        <button type="button" onClick={() => downloadFileRef.current?.click()}
+                          className="w-full mt-1.5 flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 hover:border-[#DE1010]/40 rounded-lg py-3 text-sm text-gray-400 hover:text-[#DE1010] transition-colors">
+                          <Upload size={14} />
+                          {downloadFile ? downloadFile.name : "Choose file (PDF, ZIP, etc.)"}
+                        </button>
+                        <input ref={downloadFileRef} type="file" className="hidden"
+                          onChange={(e) => setDownloadFile(e.target.files?.[0] || null)} />
+                        <p className="text-xs text-gray-400">Max 2MB. Hosted on Supabase.</p>
+                      </>
+                    )}
                   </div>
                 )}
+
+                {productType === "VARIABLE" && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label>Product attributes</Label>
+                      <button type="button"
+                        onClick={() => setAttributes((a) => [...a, { name: "", values: "", id: Date.now() }])}
+                        className="text-[10px] text-[#DE1010] flex items-center gap-1 hover:underline">
+                        <Plus size={11} /> Add attribute
+                      </button>
+                    </div>
+                    {attributes.length === 0 && (
+                      <p className="text-xs text-gray-400">e.g. Size: S, M, L, XL or Colour: Red, Blue</p>
+                    )}
+                    {attributes.map((attr, i) => (
+                      <div key={attr.id} className="space-y-1.5 bg-gray-50 rounded-lg p-3">
+                        <div className="flex items-center gap-2">
+                          <Tag size={11} className="text-gray-400 flex-shrink-0" />
+                          <Input placeholder="Attribute (e.g. Size)"
+                            className="h-8 text-xs"
+                            value={attr.name}
+                            onChange={(e) => setAttributes((a) => a.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} />
+                          <button type="button" onClick={() => setAttributes((a) => a.filter((_, j) => j !== i))}
+                            className="p-1 hover:bg-gray-200 rounded transition-colors flex-shrink-0">
+                            <X size={12} className="text-gray-500" />
+                          </button>
+                        </div>
+                        <Input placeholder="Values, comma-separated (e.g. S, M, L, XL)"
+                          className="h-8 text-xs"
+                          value={attr.values}
+                          onChange={(e) => setAttributes((a) => a.map((x, j) => j === i ? { ...x, values: e.target.value } : x))} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <div className="flex items-center gap-2 pt-2">
                   <input type="checkbox" id="isActive" {...register("isActive")} className="w-4 h-4 accent-[#DE1010]" />
                   <Label htmlFor="isActive" className="cursor-pointer text-sm">Visible in store</Label>
@@ -313,6 +400,41 @@ export default function NewProductPage({ params }: { params: { slug: string } })
           </div>
         </form>
       </motion.div>
+
+      {/* Validation error modal */}
+      <AnimatePresence>
+        {validationErrors.length > 0 && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4"
+            onClick={() => setValidationErrors([])}>
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl"
+              onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center flex-shrink-0">
+                  <AlertCircle size={18} className="text-[#DE1010]" />
+                </div>
+                <div>
+                  <p className="font-semibold text-[#0a0a0a] text-sm">Fix the following errors</p>
+                  <p className="text-xs text-gray-400">Please correct all fields before saving.</p>
+                </div>
+              </div>
+              <ul className="space-y-1.5 mb-5">
+                {validationErrors.map((msg, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#DE1010] mt-1.5 flex-shrink-0" />
+                    {msg}
+                  </li>
+                ))}
+              </ul>
+              <button onClick={() => setValidationErrors([])}
+                className="w-full py-2.5 bg-[#0a0a0a] text-white rounded-xl text-sm font-medium hover:bg-black/80 transition-colors">
+                Got it, fix errors
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

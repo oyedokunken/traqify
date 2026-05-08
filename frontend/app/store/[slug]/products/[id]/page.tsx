@@ -166,9 +166,9 @@ export default function ProductPage({ params }: { params: { slug: string; id: st
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-16">
           {/* Gallery */}
           <motion.div initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} className="space-y-3">
-            <div className="relative aspect-square bg-white rounded-2xl overflow-hidden border border-gray-100">
+            <div className="relative aspect-[4/5] bg-white rounded-2xl overflow-hidden border border-gray-100">
               {images.length > 0 ? (
-                <img src={images[imgIdx]} alt={product.name} className="w-full h-full object-cover" />
+                <img src={images[imgIdx]} alt={product.name} className="w-full h-full object-contain p-2" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
                   <Package size={64} className="text-gray-200" />

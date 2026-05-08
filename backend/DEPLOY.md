@@ -186,34 +186,8 @@ Then fill in your local credentials (use Supabase local or dev project).
 
 ## Environment Variables Reference (.env.example)
 
-Copy these directly to Vercel environment variables:
+Copy `.env.example` to `.env` and fill in your actual values.
 
-```env
-DATABASE_URL="postgresql://postgres.brhnlhvdkmciqncdcovq:OyedokunKehinde100%25@aws-1-eu-west-2.pooler.supabase.com:5432/postgres?pgbouncer=true"
-DIRECT_URL="postgresql://postgres.brhnlhvdkmciqncdcovq:OyedokunKehinde100%25@aws-1-eu-west-2.pooler.supabase.com:5432/postgres"
+For production deployment, set these in Vercel Environment Variables.
 
-PORT=5000
-NODE_ENV=development
-API_URL=http://localhost:5000
-FRONTEND_URL=http://localhost:3000
-
-JWT_SECRET=6LFKB57OkIeA46Fnxv0a3T+GCKZWsq6lrj5miS5H3AFIzAh/MnY7DQ3JBFlYktaLoOrMPoZ/ICvyOtAXw2M0UQ==
-JWT_REFRESH_SECRET=H22gXMGJ3Qinv72opaefqVXDQ9VLx/5pjhNEOEZ8SWrdk9SPCJSPSrYJvOLHIkY4X6pCtLx/o37HgyPWb+kvPA==
-JWT_EXPIRES_IN=7d
-
-SUPABASE_URL=https://brhnlhvdkmciqncdcovq.supabase.co
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJyaG5saHZka21jaXFuY2Rjb3ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxNjM1MTMsImV4cCI6MjA5MzczOTUxM30.aqktdoMySliMgVw8FUQbJbRY0c-qfl_pzi6s_xvlZAE
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJyaG5saHZka21jaXFuY2Rjb3ZxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3ODE2MzUxMywiZXhwIjoyMDkzNzM5NTEzfQ.NKVvltDs8rigCsc6eIZrtkmmuN6zraIXOY8s2kSWqYE
-
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=decimaltechy@gmail.com
-SMTP_PASS=bqpbovtfljvazbfq
-SMTP_FROM="Traqify <decimaltechy@gmail.com>"
-
-GOOGLE_CLIENT_ID=120412435332-7vgnrlvs6uavdc7frsfpmsdoe5c00evt.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=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
-
-PAYSTACK_SECRET_KEY=sk_test_34a878fc9cee510f2eeb4fc5a3f7ffe88ee18238
-PAYSTACK_PUBLIC_KEY=pk_test_97ea3775550f1bd74cdaa1818a57b6a280f177e8
-```
+See `.env.example` file for the complete list of required variables.

@@ -74,7 +74,7 @@ function ProductCard({ product, images, inStock, inWishlist, slug, onAddToCart, 
       <Link href={`/store/${slug}/products/${product.id}`} className="block">
       <div className="relative h-48 bg-gray-50 flex items-center justify-center overflow-hidden cursor-pointer">
         {images.length > 0 ? (
-          <img src={images[imgIdx]} alt={product.name} className="w-full h-full object-contain transition-opacity duration-300 p-1" />
+          <img src={images[imgIdx]} alt={product.name} className="w-full h-full object-cover transition-opacity duration-300" />
         ) : (
           <Package size={32} className="text-gray-300" />
         )}
