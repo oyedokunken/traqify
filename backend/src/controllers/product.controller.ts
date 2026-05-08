@@ -7,24 +7,30 @@ import { AuthRequest } from "../middleware/auth.middleware";
 export const getProducts = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const orgId = req.user!.organizationId!;
-    const { search, category, isActive } = req.query;
+    const { search, category, categoryId, isActive, page, limit } = req.query;
+    const take = parseInt((limit as string) || "50");
+    const skip = (parseInt((page as string) || "1") - 1) * take;
 
-    const products = await prisma.product.findMany({
-      where: {
-        organizationId: orgId,
-        ...(search && { name: { contains: search as string, mode: "insensitive" } }),
-        ...(category && { category: category as string }),
-        ...(isActive !== undefined && { isActive: isActive === "true" }),
-      },
-      include: {
-        inventory: true,
-        variants: true,
-        _count: { select: { orderItems: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    const where: any = {
+      organizationId: orgId,
+      ...(search && { name: { contains: search as string, mode: "insensitive" } }),
+      ...(category && { category: category as string }),
+      ...(categoryId && { categoryId: categoryId as string }),
+      ...(isActive !== undefined && isActive !== "" && { isActive: isActive === "true" }),
+    };
 
-    res.json(products);
+    const [products, total] = await Promise.all([
+      prisma.product.findMany({
+        where,
+        include: { inventory: true, variants: true, productCategory: true, _count: { select: { orderItems: true } } },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take,
+      }),
+      prisma.product.count({ where }),
+    ]);
+
+    res.json({ products, total });
   } catch {
     res.status(500).json({ error: "Failed to fetch products." });
   }
@@ -60,7 +66,7 @@ export const createProduct = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
-    const { name, sku, description, price, comparePrice, category, imageUrl, isActive, variants, initialStock, lowStockAlert } = parsed.data;
+    const { name, sku, description, price, comparePrice, categoryId, imageUrl, imageUrls, status, isActive, variants, initialStock, lowStockAlert } = parsed.data;
 
     const existing = await prisma.product.findUnique({ where: { sku_organizationId: { sku, organizationId: orgId } } });
     if (existing) {
@@ -70,23 +76,17 @@ export const createProduct = async (req: AuthRequest, res: Response): Promise<vo
 
     const product = await prisma.product.create({
       data: {
-        name,
-        sku,
-        description,
-        price,
-        comparePrice,
-        category,
-        imageUrl,
+        name, sku, description, price, comparePrice,
+        categoryId: categoryId || undefined,
+        imageUrl: imageUrl || (imageUrls && imageUrls[0]) || undefined,
+        imageUrls: imageUrls || [],
+        status: status || "published",
         isActive: isActive ?? true,
         organizationId: orgId,
-        inventory: {
-          create: { quantity: initialStock ?? 0, lowStockAlert: lowStockAlert ?? 10 },
-        },
-        variants: variants
-          ? { create: variants }
-          : undefined,
+        inventory: { create: { quantity: initialStock ?? 0, lowStockAlert: lowStockAlert ?? 10 } },
+        variants: variants ? { create: variants } : undefined,
       },
-      include: { inventory: true, variants: true },
+      include: { inventory: true, variants: true, productCategory: true },
     });
 
     await createAuditLog(req.user!.id, orgId, "CREATE", "Product", product.id, `Created product: ${name}`, req);

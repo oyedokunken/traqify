@@ -12,7 +12,7 @@ export const getInventory = async (req: AuthRequest, res: Response): Promise<voi
       where: { product: { organizationId: orgId } },
       include: {
         product: {
-          select: { id: true, name: true, sku: true, category: true, imageUrl: true, isActive: true },
+          select: { id: true, name: true, sku: true, categoryId: true, imageUrl: true, isActive: true },
         },
       },
       orderBy: { product: { name: "asc" } },
@@ -34,12 +34,12 @@ export const getLowStock = async (req: AuthRequest, res: Response): Promise<void
         quantity: { lte: prisma.inventory.fields.lowStockAlert },
       },
       include: {
-        product: { select: { id: true, name: true, sku: true, category: true } },
+        product: { select: { id: true, name: true, sku: true, categoryId: true } },
       },
     });
 
     const results = await prisma.$queryRaw`
-      SELECT i.*, p.name, p.sku, p.category, p.id as product_id
+      SELECT i.*, p.name, p.sku, p."categoryId", p.id as product_id
       FROM inventory i
       JOIN products p ON p.id = i."productId"
       WHERE p."organizationId" = ${orgId}

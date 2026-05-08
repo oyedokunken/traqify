@@ -26,19 +26,26 @@ interface Customer {
 export default function CustomersPage({ params }: { params: { slug: string } }) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const LIMIT = 25;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const { register, handleSubmit, reset, formState: { isSubmitting } } = useForm<{ name: string; email: string; phone: string; address: string }>();
 
   const fetchCustomers = () => {
-    api.get(`/api/customers?search=${search}`)
-      .then((r) => setCustomers(r.data))
+    setLoading(true);
+    const p = new URLSearchParams({ page: String(page), limit: String(LIMIT) });
+    if (search) p.set("search", search);
+    api.get(`/api/customers?${p}`)
+      .then((r) => { const d = r.data; setCustomers(Array.isArray(d) ? d : d.customers || []); setTotal(typeof d.total === "number" ? d.total : (Array.isArray(d) ? d.length : 0)); })
       .catch(() => setError("Failed to load customers."))
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchCustomers(); }, [search]);
+  useEffect(() => { setPage(1); }, [search]);
+  useEffect(() => { fetchCustomers(); }, [search, page]);
 
   const onSubmit = async (data: any) => {
     try {
@@ -152,6 +159,14 @@ export default function CustomersPage({ params }: { params: { slug: string } }) 
               </tbody>
             </table>
           </motion.div>
+        )}
+
+        {total > LIMIT && (
+          <div className="flex justify-center gap-2 mt-6">
+            <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>Previous</Button>
+            <span className="px-3 py-1.5 text-sm text-gray-500">{page} / {Math.ceil(total / LIMIT)}</span>
+            <Button variant="outline" size="sm" disabled={page >= Math.ceil(total / LIMIT)} onClick={() => setPage((p) => p + 1)}>Next</Button>
+          </div>
         )}
       </div>
       <ErrorModal isOpen={!!error} onClose={() => setError("")} message={error} />

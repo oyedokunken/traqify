@@ -22,7 +22,7 @@ export const getStoreProducts = async (req: Request, res: Response): Promise<voi
         organizationId: org.id,
         isActive: true,
         ...(search ? { name: { contains: String(search), mode: "insensitive" } } : {}),
-        ...(category ? { category: String(category) } : {}),
+        ...(category ? { productCategory: { slug: String(category) } } : {}),
         ...(inStock === "true" ? { inventory: { quantity: { gt: 0 } } } : {}),
       },
       include: {
@@ -35,17 +35,13 @@ export const getStoreProducts = async (req: Request, res: Response): Promise<voi
         : { createdAt: "desc" },
     });
 
-    const categories = await prisma.product.findMany({
-      where: { organizationId: org.id, isActive: true, category: { not: null } },
-      select: { category: true },
-      distinct: ["category"],
+    const cats = await prisma.productCategory.findMany({
+      where: { organizationId: org.id },
+      select: { id: true, name: true, slug: true },
+      orderBy: { name: "asc" },
     });
 
-    res.json({
-      org,
-      products,
-      categories: categories.map((c: { category: string | null }) => c.category).filter((cat: string | null): cat is string => cat !== null),
-    });
+    res.json({ org, products, categories: cats });
   } catch {
     res.status(500).json({ error: "Failed to load store." });
   }

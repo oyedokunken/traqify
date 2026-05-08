@@ -10,12 +10,13 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-export const sendEmail = async (to: string, subject: string, html: string): Promise<void> => {
+interface Attachment { filename: string; content: Buffer | string; contentType?: string; }
+
+export const sendEmail = async (to: string, subject: string, html: string, attachments?: Attachment[]): Promise<void> => {
   await transporter.sendMail({
     from: process.env.SMTP_FROM || '"Traqify" <noreply@traqify.com>',
-    to,
-    subject,
-    html,
+    to, subject, html,
+    attachments: attachments?.map((a) => ({ filename: a.filename, content: a.content, contentType: a.contentType })),
   });
 };
 

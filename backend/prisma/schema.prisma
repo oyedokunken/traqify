@@ -70,8 +70,9 @@ model Organization {
   address     String?
   industry    String?
   size        String?
-  logoUrl     String?
-  website     String?
+  logoUrl        String?
+  website        String?
+  storePublished Boolean @default(false)
 
   users       User[]
   products    Product[]
@@ -79,6 +80,7 @@ model Organization {
   customers   Customer[]
   auditLogs   AuditLog[]
   invites     StaffInvite[]
+  categories  ProductCategory[]
 
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
@@ -129,6 +131,24 @@ model StaffInvite {
   @@map("staff_invites")
 }
 
+model ProductCategory {
+  id             String    @id @default(cuid())
+  name           String
+  slug           String
+  description    String?
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  products       Product[]
+
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([slug, organizationId])
+  @@map("product_categories")
+}
+
 model Product {
   id             String           @id @default(cuid())
   name           String
@@ -136,9 +156,13 @@ model Product {
   description    String?
   price          Float
   comparePrice   Float?
-  category       String?
   imageUrl       String?
+  imageUrls      String[]         @default([])
+  status         String           @default("published")
   isActive       Boolean          @default(true)
+
+  categoryId     String?
+  productCategory ProductCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
   organizationId String
   organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)

@@ -93,7 +93,10 @@ export const productSchema = z.object({
   price: z.number().positive("Price must be a positive number."),
   comparePrice: z.number().positive().optional(),
   category: z.string().optional(),
+  categoryId: z.string().optional(),
   imageUrl: z.string().url().optional().or(z.literal("")),
+  imageUrls: z.array(z.string().url()).optional().default([]),
+  status: z.string().optional().default("published"),
   isActive: z.boolean().optional().default(true),
   variants: z
     .array(
@@ -143,7 +146,11 @@ export const updateUserSchema = z.object({
 });
 
 export const updateOrgSchema = z.object({
+  name: z.string().min(2).max(100).optional(),
+  email: z.string().email().optional().or(z.literal("")),
   phone: z.string().optional(),
   address: z.string().optional(),
+  website: z.string().url().optional().or(z.literal("")),
   logoUrl: z.string().url().optional().or(z.literal("")),
+  storePublished: z.boolean().optional(),
 });

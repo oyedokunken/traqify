@@ -16,6 +16,8 @@ import { Label } from "@/components/ui/label";
 import { ErrorModal } from "@/components/shared/error-modal";
 import api from "@/lib/api";
 import { INDUSTRY_OPTIONS, ORG_SIZE_OPTIONS } from "@/lib/utils";
+import PhoneInput from "react-phone-number-input";
+import "react-phone-number-input/style.css";
 
 const step1Schema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -87,9 +89,11 @@ export default function RegisterPage() {
     }
   };
 
+  const [orgPhone, setOrgPhone] = useState("");
+
   const handleStep2 = async (data: Step2Data) => {
     try {
-      router.push(`/verify-email?email=${encodeURIComponent(step1Data!.email)}&orgName=${encodeURIComponent(data.orgName)}&orgEmail=${encodeURIComponent(data.orgEmail || "")}&orgPhone=${encodeURIComponent(data.orgPhone || "")}&orgAddress=${encodeURIComponent(data.orgAddress || "")}&industry=${encodeURIComponent(data.industry || "")}&size=${encodeURIComponent(data.size || "")}`);
+      router.push(`/verify-email?email=${encodeURIComponent(step1Data!.email)}&orgName=${encodeURIComponent(data.orgName)}&orgEmail=${encodeURIComponent(data.orgEmail || "")}&orgPhone=${encodeURIComponent(orgPhone || "")}&orgAddress=${encodeURIComponent(data.orgAddress || "")}&industry=${encodeURIComponent(data.industry || "")}&size=${encodeURIComponent(data.size || "")}`);
     } catch (err: any) {
       setError(err.response?.data?.error || "Failed to proceed.");
     }
@@ -218,6 +222,13 @@ export default function RegisterPage() {
                   <div>
                     <Label htmlFor="orgEmail">Business email (optional)</Label>
                     <Input id="orgEmail" type="email" placeholder="info@company.com" className="mt-1.5" {...form2.register("orgEmail")} />
+                  </div>
+                  <div>
+                    <Label>Business phone (optional)</Label>
+                    <PhoneInput
+                      international defaultCountry="NG" value={orgPhone} onChange={(v) => setOrgPhone(v || "")}
+                      className="mt-1.5 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-within:ring-2 focus-within:ring-ring"
+                    />
                   </div>
                   <div>
                     <Label htmlFor="orgAddress">Address (optional)</Label>

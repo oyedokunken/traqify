@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Search, Edit, Trash2, MoreHorizontal, Package } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -15,22 +15,22 @@ import { useAuth } from "@/lib/auth-context";
 import { ProductModal } from "@/components/dashboard/product-modal";
 
 interface Product {
-  id: string;
-  name: string;
-  sku: string;
-  price: number;
-  comparePrice?: number;
-  category?: string;
-  imageUrl?: string;
-  isActive: boolean;
-  inventory?: { quantity: number; lowStockAlert: number };
-  _count?: { orderItems: number };
+  id: string; name: string; sku: string; price: number; comparePrice?: number;
+  category?: string; imageUrl?: string; imageUrls?: string[]; isActive: boolean; status?: string;
+  productCategory?: { id: string; name: string };
+  inventory?: { quantity: number; lowStockAlert: number }; _count?: { orderItems: number };
 }
 
 export default function ProductsPage({ params }: { params: { slug: string } }) {
   const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const LIMIT = 20;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showModal, setShowModal] = useState(false);
@@ -38,14 +38,24 @@ export default function ProductsPage({ params }: { params: { slug: string } }) {
 
   const canEdit = user?.role === "OWNER" || user?.role === "MANAGER";
 
+  useEffect(() => { api.get("/api/categories").then((r) => setCategories(r.data)).catch(() => {}); }, []);
+
   const fetchProducts = () => {
-    api.get(`/api/products?search=${search}`)
-      .then((r) => setProducts(r.data))
+    setLoading(true);
+    const params = new URLSearchParams();
+    if (search) params.set("search", search);
+    if (categoryFilter) params.set("categoryId", categoryFilter);
+    if (statusFilter) params.set("isActive", statusFilter);
+    params.set("page", String(page));
+    params.set("limit", String(LIMIT));
+    api.get(`/api/products?${params}`)
+      .then((r) => { const d = r.data; setProducts(Array.isArray(d) ? d : d.products || []); setTotal(typeof d.total === "number" ? d.total : (Array.isArray(d) ? d.length : 0)); })
       .catch(() => setError("Failed to load products."))
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchProducts(); }, [search]);
+  useEffect(() => { setPage(1); }, [search, categoryFilter, statusFilter]);
+  useEffect(() => { fetchProducts(); }, [search, categoryFilter, statusFilter, page]);
 
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
@@ -64,20 +74,27 @@ export default function ProductsPage({ params }: { params: { slug: string } }) {
     <div>
       <Topbar title="Products" slug={params.slug} />
       <div className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="relative w-64">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <Input
-              placeholder="Search products..."
-              className="pl-9"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Input placeholder="Search products..." className="pl-9 w-52" value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+            <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}
+              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <option value="">All categories</option>
+              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <option value="">All status</option>
+              <option value="true">Active</option>
+              <option value="false">Inactive</option>
+            </select>
           </div>
           {canEdit && (
             <Button onClick={() => { setEditProduct(null); setShowModal(true); }} className="gap-2">
-              <Plus size={16} />
-              Add product
+              <Plus size={16} /> Add product
             </Button>
           )}
         </div>
@@ -144,7 +161,7 @@ export default function ProductsPage({ params }: { params: { slug: string } }) {
                       <p className="font-bold text-[#0a0a0a] text-sm whitespace-nowrap">{formatCurrency(product.price)}</p>
                     </div>
                     <div className="flex items-center justify-between mt-3">
-                      {product.category && <Badge variant="outline" className="text-xs">{product.category}</Badge>}
+                      {(product.productCategory?.name || product.category) && <Badge variant="outline" className="text-xs">{product.productCategory?.name || product.category}</Badge>}
                       <Badge variant={isLow ? "warning" : "success"} className="text-xs">
                         {product.inventory?.quantity ?? 0} in stock
                       </Badge>
@@ -154,6 +171,14 @@ export default function ProductsPage({ params }: { params: { slug: string } }) {
               );
             })}
           </motion.div>
+        )}
+
+        {total > LIMIT && (
+          <div className="flex justify-center gap-2 mt-6">
+            <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>Previous</Button>
+            <span className="px-3 py-1.5 text-sm text-gray-500">{page} / {Math.ceil(total / LIMIT)}</span>
+            <Button variant="outline" size="sm" disabled={page >= Math.ceil(total / LIMIT)} onClick={() => setPage((p) => p + 1)}>Next</Button>
+          </div>
         )}
       </div>
 

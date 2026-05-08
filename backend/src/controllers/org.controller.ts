@@ -101,7 +101,7 @@ export const getPublicStore = async (req: Request, res: Response): Promise<void>
     const { slug } = req.params;
     const org = await prisma.organization.findUnique({
       where: { slug },
-      select: { id: true, name: true, slug: true, logoUrl: true, website: true },
+      select: { id: true, name: true, slug: true, logoUrl: true, website: true, storePublished: true },
     });
 
     if (!org) {
@@ -109,8 +109,13 @@ export const getPublicStore = async (req: Request, res: Response): Promise<void>
       return;
     }
 
+    if (!org.storePublished) {
+      res.status(403).json({ error: "This store is currently offline." });
+      return;
+    }
+
     const products = await prisma.product.findMany({
-      where: { organizationId: org.id, isActive: true },
+      where: { organizationId: org.id, isActive: true, status: "published" },
       include: {
         inventory: { select: { quantity: true } },
         variants: true,

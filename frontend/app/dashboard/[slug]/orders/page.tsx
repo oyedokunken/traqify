@@ -36,6 +36,7 @@ export default function OrdersPage({ params }: { params: { slug: string } }) {
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
@@ -47,13 +48,16 @@ export default function OrdersPage({ params }: { params: { slug: string } }) {
 
   const fetchOrders = () => {
     setLoading(true);
-    api.get(`/api/orders?page=${page}&limit=20`)
+    const p = new URLSearchParams({ page: String(page), limit: "20" });
+    if (statusFilter) p.set("status", statusFilter);
+    api.get(`/api/orders?${p}`)
       .then((r) => { setOrders(r.data.orders); setTotal(r.data.total); })
       .catch(() => setError("Failed to load orders."))
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchOrders(); }, [page]);
+  useEffect(() => { setPage(1); }, [statusFilter]);
+  useEffect(() => { fetchOrders(); }, [page, statusFilter]);
 
   const filtered = orders.filter((o) =>
     o.orderNumber.toLowerCase().includes(search.toLowerCase()) ||
@@ -65,9 +69,18 @@ export default function OrdersPage({ params }: { params: { slug: string } }) {
       <Topbar title="Orders" slug={params.slug} />
       <div className="p-6">
         <div className="flex items-center justify-between mb-6">
-          <div className="relative w-64">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <Input placeholder="Search by order # or customer..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Input placeholder="Search by order # or customer..." className="pl-9 w-60" value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <option value="">All status</option>
+              <option value="PENDING">Pending</option>
+              <option value="COMPLETED">Completed</option>
+              <option value="CANCELLED">Cancelled</option>
+            </select>
           </div>
           {canCreate && (
             <Button onClick={() => setShowCreate(true)} className="gap-2">
