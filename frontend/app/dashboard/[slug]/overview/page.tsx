@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   TrendingUp,
@@ -14,7 +14,9 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Topbar } from "@/components/dashboard/topbar";
 import api from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import { formatCurrency } from "@/lib/utils";
+import { AnimatePresence } from "framer-motion";
 import {
   AreaChart,
   Area,
@@ -46,9 +48,27 @@ const fadeUp = { hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } };
 const stagger = { visible: { transition: { staggerChildren: 0.08 } } };
 
 export default function OverviewPage({ params }: { params: { slug: string } }) {
+  const { user } = useAuth();
   const [data, setData] = useState<OverviewData | null>(null);
   const [chart, setChart] = useState<ChartPoint[]>([]);
   const [loading, setLoading] = useState(true);
+  const [now, setNow] = useState(new Date());
+  const [showWelcome, setShowWelcome] = useState(false);
+
+  // Live clock
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Welcome modal: show once per browser session
+  useEffect(() => {
+    const key = `traqify_welcomed_${params.slug}`;
+    if (!localStorage.getItem(key)) {
+      setShowWelcome(true);
+      localStorage.setItem(key, "1");
+    }
+  }, [params.slug]);
 
   useEffect(() => {
     Promise.all([
@@ -102,10 +122,32 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
     },
   ];
 
+  const greeting = (() => {
+    const h = now.getHours();
+    if (h < 12) return "Good morning";
+    if (h < 17) return "Good afternoon";
+    return "Good evening";
+  })();
+
+  const timeStr = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+  const dateStr = now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
   return (
     <div>
       <Topbar title="Overview" slug={params.slug} />
       <div className="p-6">
+        {/* Greeting + clock */}
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-6 gap-1">
+          <div>
+            <h2 className="text-xl font-bold text-[#0a0a0a]">{greeting}, {user?.name?.split(" ")[0] || "there"}</h2>
+            <p className="text-sm text-gray-400 mt-0.5">{dateStr}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-2xl font-bold text-[#0a0a0a] font-mono tracking-tight">{timeStr}</p>
+            <p className="text-xs text-gray-400">Local time (24h)</p>
+          </div>
+        </div>
+
         <motion.div initial="hidden" animate="visible" variants={stagger}>
           <motion.div variants={fadeUp} className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
             {stats.map((stat, i) => (
@@ -170,6 +212,43 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
           </motion.div>
         </motion.div>
       </div>
+
+      {/* Welcome modal */}
+      <AnimatePresence>
+        {showWelcome && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl text-center"
+            >
+              <div className="w-14 h-14 rounded-xl bg-[#DE1010] flex items-center justify-center mx-auto mb-5">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                  <rect x="3" y="3" width="8" height="8" rx="1.5" fill="white"/>
+                  <rect x="13" y="3" width="8" height="8" rx="1.5" fill="white" opacity="0.7"/>
+                  <rect x="3" y="13" width="8" height="8" rx="1.5" fill="white" opacity="0.7"/>
+                  <rect x="13" y="13" width="8" height="8" rx="1.5" fill="white"/>
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-[#0a0a0a] mb-2">Welcome to Traqify</h2>
+              <p className="text-gray-500 text-sm leading-relaxed mb-1">
+                Hi {user?.name?.split(" ")[0] || "there"}, your workspace is ready. You can now add products, invite your team, and manage your store from this dashboard.
+              </p>
+              <p className="text-gray-400 text-xs mb-6">
+                {user?.organization?.name || "Your organization"} is set up and live.
+              </p>
+              <button
+                onClick={() => setShowWelcome(false)}
+                className="w-full px-6 py-3 bg-[#DE1010] text-white rounded-xl font-semibold text-sm hover:bg-red-700 transition-colors"
+              >
+                Get started
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

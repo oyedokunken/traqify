@@ -41,8 +41,8 @@ export function Footer() {
   return (
     <footer className="bg-[#111111] text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-10">
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-10 mb-12">
-          <div className="lg:col-span-2">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-10 mb-12">
+          <div className="col-span-2 lg:col-span-2">
             <div className="mb-4">
               <Logo size="md" className="[&_span:last-child]:text-white" />
             </div>
@@ -59,8 +59,7 @@ export function Footer() {
             </div>
           </div>
 
-          <div className="lg:col-span-3 grid grid-cols-2 gap-8">
-            <div>
+          <div>
               <h4 className="text-sm font-semibold mb-5 text-gray-200">Product</h4>
               <ul className="space-y-3">
                 {[
@@ -77,7 +76,7 @@ export function Footer() {
               </ul>
             </div>
 
-            <div>
+          <div>
               <h4 className="text-sm font-semibold mb-5 text-gray-200">Account</h4>
               <ul className="space-y-3">
                 {[
@@ -92,7 +91,6 @@ export function Footer() {
                 ))}
               </ul>
             </div>
-          </div>
 
           <div>
             <h4 className="text-sm font-semibold mb-5 text-gray-200">Stay updated</h4>
