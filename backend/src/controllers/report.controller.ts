@@ -101,7 +101,7 @@ export const getTopProducts = async (req: AuthRequest, res: Response): Promise<v
       take: parseInt(limit as string),
     });
 
-    const productIds = topProducts.map((p) => p.productId);
+    const productIds = topProducts.map((p: any) => p.productId);
     const products = await prisma.product.findMany({
       where: { id: { in: productIds } },
       select: { id: true, name: true, sku: true, categoryId: true, imageUrl: true },
@@ -150,11 +150,13 @@ const REPORT_LABELS: Record<string, string> = {
   customers: "Customers Report", inventory: "Inventory Report", staff: "Staff Report",
 };
 
+const DATE_RANGE_TYPES = ["revenue", "orders"];
+
 async function buildReportData(type: string, orgId: string, from: Date, to: Date) {
   if (type === "revenue") {
     return prisma.order.findMany({ where: { organizationId: orgId, createdAt: { gte: from, lte: to } }, include: { customer: true, orderItems: { include: { product: true } } }, orderBy: { createdAt: "desc" } });
   } else if (type === "products") {
-    return prisma.product.findMany({ where: { organizationId: orgId }, include: { inventory: true }, orderBy: { name: "asc" } });
+    return prisma.product.findMany({ where: { organizationId: orgId }, include: { inventory: true, productCategory: true }, orderBy: { name: "asc" } });
   } else if (type === "orders") {
     return prisma.order.findMany({ where: { organizationId: orgId, createdAt: { gte: from, lte: to } }, include: { customer: true }, orderBy: { createdAt: "desc" } });
   } else if (type === "customers") {
@@ -167,48 +169,107 @@ async function buildReportData(type: string, orgId: string, from: Date, to: Date
   return [];
 }
 
-function buildPDF(type: string, label: string, orgName: string, from: string, to: string, rows: any[]): Promise<Buffer> {
+function fmt(d: any): string { return d ? new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "-"; }
+function money(n: any): string { return Number(n || 0).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function safe(v: any, fallback = "-"): string { return (v !== null && v !== undefined && v !== "") ? String(v) : fallback; }
+
+function buildPDF(type: string, label: string, org: any, from: string, to: string, rows: any[]): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 50, size: "A4" });
+    const doc = new PDFDocument({ margin: 40, size: "A4", layout: "landscape" });
     const chunks: Buffer[] = [];
     doc.on("data", (c) => chunks.push(c));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
-    // Header
-    doc.fontSize(20).fillColor("#DE1010").text("Traqify", 50, 50).fillColor("#0a0a0a").fontSize(16).text(label, 50, 75);
-    doc.fontSize(10).fillColor("#6b7280").text(`Organisation: ${orgName}`, 50, 100).text(`Period: ${from} to ${to}`, 50, 115).text(`Generated: ${new Date().toLocaleDateString("en-GB")}`, 50, 130);
-    doc.moveTo(50, 148).lineTo(545, 148).strokeColor("#e5e7eb").stroke();
+    const PAGE_W = doc.page.width;
+    const CONTENT_W = PAGE_W - 80;
 
-    let y = 165;
-    const addRow = (cols: string[], widths: number[], bold = false) => {
-      const colors = bold ? "#f9fafb" : "#ffffff";
-      doc.rect(50, y - 5, 495, 20).fillColor(colors).fill();
-      let x = 50;
+    // Header band
+    doc.rect(0, 0, PAGE_W, 70).fillColor("#0a0a0a").fill();
+    doc.fontSize(18).fillColor("#DE1010").text("Traqify", 40, 18);
+    doc.fontSize(14).fillColor("#ffffff").text(label, 110, 20);
+    doc.fontSize(8).fillColor("#9ca3af")
+      .text(safe(org?.name, "Unknown Organisation"), 40, 42)
+      .text(`Generated: ${new Date().toLocaleString("en-GB")}`, 40, 53);
+
+    // Org contact info on the right
+    const rightX = PAGE_W - 280;
+    const orgLines = [
+      org?.address,
+      org?.phone,
+      org?.email,
+      org?.website,
+    ].filter(Boolean);
+    orgLines.forEach((line, i) => doc.fontSize(8).fillColor("#9ca3af").text(safe(line), rightX, 18 + i * 13, { width: 240, align: "right" }));
+
+    // Period sub-header
+    let y = 82;
+    const usesDateRange = DATE_RANGE_TYPES.includes(type);
+    if (usesDateRange && from && to) {
+      doc.fontSize(9).fillColor("#374151").text(`Period: ${fmt(from)} to ${fmt(to)}`, 40, y);
+      y += 18;
+    } else if (!usesDateRange) {
+      doc.fontSize(9).fillColor("#374151").text(`As of ${fmt(new Date())}`, 40, y);
+      y += 18;
+    }
+
+    doc.moveTo(40, y).lineTo(PAGE_W - 40, y).strokeColor("#e5e7eb").lineWidth(0.5).stroke();
+    y += 10;
+
+    // Table helpers
+    const ROW_H = 20;
+    let rowIndex = 0;
+    const addRow = (cols: string[], widths: number[], isHeader = false) => {
+      if (isHeader) {
+        doc.rect(40, y - 3, CONTENT_W, ROW_H).fillColor("#f3f4f6").fill();
+      } else if (rowIndex % 2 === 0) {
+        doc.rect(40, y - 3, CONTENT_W, ROW_H).fillColor("#fafafa").fill();
+      }
+      if (!isHeader) rowIndex++;
+      let x = 40;
       cols.forEach((c, i) => {
-        doc.fillColor(bold ? "#374151" : "#0a0a0a").fontSize(bold ? 9 : 9).text(String(c).slice(0, 40), x + 3, y, { width: widths[i] - 6 });
+        doc.fillColor(isHeader ? "#111827" : "#374151").fontSize(isHeader ? 8 : 8).font(isHeader ? "Helvetica-Bold" : "Helvetica")
+          .text(String(c).slice(0, 60), x + 3, y, { width: widths[i] - 6, lineBreak: false });
         x += widths[i];
       });
-      y += 22;
-      if (y > 760) { doc.addPage(); y = 60; }
+      y += ROW_H;
+      if (y > doc.page.height - 50) {
+        doc.addPage();
+        y = 40;
+        doc.rect(0, 0, PAGE_W, 8).fillColor("#DE1010").fill();
+        y = 20;
+      }
     };
 
-    if (type === "revenue" || type === "orders") {
-      addRow(["Order ID", "Customer", "Date", "Status", "Amount (NGN)"], [80, 140, 90, 90, 95], true);
-      rows.forEach((r) => addRow([r.id.slice(-8).toUpperCase(), r.customer?.name || "Guest", new Date(r.createdAt).toLocaleDateString("en-GB"), r.status, `${Number(r.totalAmount || 0).toLocaleString()}`], [80, 140, 90, 90, 95]));
+    const totalW = CONTENT_W;
+    if (type === "revenue") {
+      const w = [Math.round(totalW*0.12), Math.round(totalW*0.22), Math.round(totalW*0.12), Math.round(totalW*0.12), Math.round(totalW*0.16), Math.round(totalW*0.14), Math.round(totalW*0.12)];
+      addRow(["Order ID", "Customer", "Date", "Status", "Items", "Amount (NGN)", "Payment"], w, true);
+      rows.forEach((r) => addRow([r.id.slice(-8).toUpperCase(), safe(r.customer?.name, "Walk-in"), fmt(r.createdAt), safe(r.status), String(r.orderItems?.length || 0), money(r.totalAmount), safe(r.paymentMethod, "Cash")], w));
+    } else if (type === "orders") {
+      const w = [Math.round(totalW*0.12), Math.round(totalW*0.25), Math.round(totalW*0.14), Math.round(totalW*0.14), Math.round(totalW*0.18), Math.round(totalW*0.17)];
+      addRow(["Order ID", "Customer", "Date", "Status", "Amount (NGN)", "Payment"], w, true);
+      rows.forEach((r) => addRow([r.id.slice(-8).toUpperCase(), safe(r.customer?.name, "Walk-in"), fmt(r.createdAt), safe(r.status), money(r.totalAmount), safe(r.paymentMethod, "Cash")], w));
     } else if (type === "products") {
-      addRow(["Name", "SKU", "Price (NGN)", "Stock", "Status"], [160, 90, 95, 70, 80], true);
-      rows.forEach((r) => addRow([r.name, r.sku, Number(r.price).toLocaleString(), String(r.inventory?.quantity ?? 0), r.isActive ? "Active" : "Inactive"], [160, 90, 95, 70, 80]));
+      const w = [Math.round(totalW*0.28), Math.round(totalW*0.12), Math.round(totalW*0.18), Math.round(totalW*0.14), Math.round(totalW*0.12), Math.round(totalW*0.10), Math.round(totalW*0.06)];
+      addRow(["Name", "SKU", "Category", "Price (NGN)", "Stock", "Status", "Active"], w, true);
+      rows.forEach((r) => addRow([safe(r.name), safe(r.sku), safe(r.productCategory?.name, "Uncategorised"), money(r.price), String(r.inventory?.quantity ?? 0), safe(r.status, "draft"), r.isActive ? "Yes" : "No"], w));
     } else if (type === "customers") {
-      addRow(["Name", "Email", "Phone", "Orders"], [150, 160, 110, 75], true);
-      rows.forEach((r) => addRow([r.name, r.email || "", r.phone || "", String(r._count?.orders || 0)], [150, 160, 110, 75]));
+      const w = [Math.round(totalW*0.25), Math.round(totalW*0.28), Math.round(totalW*0.18), Math.round(totalW*0.15), Math.round(totalW*0.14)];
+      addRow(["Name", "Email", "Phone", "Orders", "Joined"], w, true);
+      rows.forEach((r) => addRow([safe(r.name), safe(r.email, "Not provided"), safe(r.phone, "Not provided"), String(r._count?.orders || 0), fmt(r.createdAt)], w));
     } else if (type === "inventory") {
-      addRow(["Product", "SKU", "Quantity", "Low Stock At", "Alert"], [170, 90, 75, 90, 70], true);
-      rows.forEach((r) => addRow([r.product?.name || "", r.product?.sku || "", String(r.quantity), String(r.lowStockAlert), r.quantity <= r.lowStockAlert ? "YES" : "No"], [170, 90, 75, 90, 70]));
+      const w = [Math.round(totalW*0.32), Math.round(totalW*0.14), Math.round(totalW*0.14), Math.round(totalW*0.14), Math.round(totalW*0.14), Math.round(totalW*0.12)];
+      addRow(["Product", "SKU", "Quantity", "Low Stock At", "Status", "Alert"], w, true);
+      rows.forEach((r) => addRow([safe(r.product?.name), safe(r.product?.sku), String(r.quantity), String(r.lowStockAlert), r.quantity <= r.lowStockAlert ? "Low Stock" : "OK", r.quantity <= r.lowStockAlert ? "YES" : "No"], w));
     } else if (type === "staff") {
-      addRow(["Name", "Email", "Role", "Joined", "Status"], [130, 160, 80, 80, 45], true);
-      rows.forEach((r) => addRow([r.name || "Pending", r.email, r.role, new Date(r.createdAt).toLocaleDateString("en-GB"), r.isActive ? "Active" : "Off"], [130, 160, 80, 80, 45]));
+      const w = [Math.round(totalW*0.22), Math.round(totalW*0.28), Math.round(totalW*0.14), Math.round(totalW*0.14), Math.round(totalW*0.12), Math.round(totalW*0.10)];
+      addRow(["Name", "Email", "Role", "Joined", "Last Login", "Active"], w, true);
+      rows.forEach((r) => addRow([safe(r.name, "Pending"), safe(r.email), safe(r.role), fmt(r.createdAt), fmt(r.lastLoginAt), r.isActive ? "Yes" : "No"], w));
     }
+
+    // Row count footer
+    doc.fontSize(8).fillColor("#9ca3af").text(`Total records: ${rows.length}`, 40, doc.page.height - 28);
 
     doc.end();
   });
@@ -222,12 +283,16 @@ export const downloadReport = async (req: AuthRequest, res: Response): Promise<v
     const label = REPORT_LABELS[type];
     if (!label) { res.status(400).json({ error: "Invalid report type." }); return; }
 
-    const org = await prisma.organization.findUnique({ where: { id: orgId } });
+    const today = new Date(); today.setHours(23, 59, 59, 999);
     const fromDate = from ? new Date(from) : new Date(Date.now() - 30 * 86400000);
-    const toDate = to ? new Date(to) : new Date();
-    const rows = await buildReportData(type, orgId, fromDate, toDate);
+    const toDate = to ? new Date(to) : today;
+    if (toDate > today) { res.status(400).json({ error: "End date cannot be in the future." }); return; }
 
-    const pdf = await buildPDF(type, label, org?.name || "", from || "", to || "", rows as any[]);
+    const org = await prisma.organization.findUnique({ where: { id: orgId } });
+    const rows = await buildReportData(type, orgId, fromDate, toDate);
+    if (rows.length === 0 && DATE_RANGE_TYPES.includes(type)) { res.status(404).json({ error: "No data found for the selected date range." }); return; }
+
+    const pdf = await buildPDF(type, label, org, from || "", to || "", rows as any[]);
     res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${type}-report.pdf"` });
     res.send(pdf);
   } catch {
@@ -244,14 +309,18 @@ export const emailReport = async (req: AuthRequest, res: Response): Promise<void
     if (!label) { res.status(400).json({ error: "Invalid report type." }); return; }
     if (!to) { res.status(400).json({ error: "Recipient email is required." }); return; }
 
-    const org = await prisma.organization.findUnique({ where: { id: orgId } });
+    const today = new Date(); today.setHours(23, 59, 59, 999);
     const fromDate = from ? new Date(from) : new Date(Date.now() - 30 * 86400000);
-    const toDate = to_date ? new Date(to_date) : new Date();
-    const rows = await buildReportData(type, orgId, fromDate, toDate);
+    const toDate = to_date ? new Date(to_date) : today;
+    if (toDate > today) { res.status(400).json({ error: "End date cannot be in the future." }); return; }
 
-    const pdf = await buildPDF(type, label, org?.name || "", from || "", to_date || "", rows as any[]);
+    const org = await prisma.organization.findUnique({ where: { id: orgId } });
+    const rows = await buildReportData(type, orgId, fromDate, toDate);
+    if (rows.length === 0 && DATE_RANGE_TYPES.includes(type)) { res.status(404).json({ error: "No data found for the selected date range." }); return; }
+
+    const pdf = await buildPDF(type, label, org, from || "", to_date || "", rows as any[]);
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
-    const html = reportEmailTemplate(org?.name || "", label, from || "", to_date || "", frontendUrl);
+    const html = reportEmailTemplate(org?.name || "", label, from || fmt(fromDate), to_date || fmt(toDate), `${frontendUrl}/dashboard/${org?.slug || ""}/reports`);
 
     await sendEmail(to, `${label} - ${org?.name}`, html, [{ filename: `${type}-report.pdf`, content: pdf, contentType: "application/pdf" }]);
     res.json({ message: `Report sent to ${to}.` });

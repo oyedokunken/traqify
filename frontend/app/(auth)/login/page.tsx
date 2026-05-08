@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Eye, EyeOff } from "lucide-react";
 import Image from "next/image";
@@ -24,12 +24,19 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { setUser } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+
+  useEffect(() => {
+    const e = searchParams.get("error");
+    if (e === "oauth_failed") setError("Google sign-in failed. Please try again.");
+    if (e === "email_account") setError("This email is registered with a password. Please sign in with your email and password instead.");
+  }, [searchParams]);
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -51,7 +58,8 @@ export default function LoginPage() {
         router.push(`/verify-email?email=${encodeURIComponent(data.email)}`);
         return;
       }
-      setError(err.response?.data?.error || "Login failed. Please try again.");
+      const msg = err.response?.data?.error || "Login failed. Please try again.";
+      setError(msg);
     }
   };
 
@@ -144,5 +152,13 @@ export default function LoginPage() {
 
       <ErrorModal isOpen={!!error} onClose={() => setError("")} message={error} />
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }

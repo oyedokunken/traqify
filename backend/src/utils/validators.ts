@@ -89,7 +89,7 @@ export const acceptInviteSchema = z.object({
 export const productSchema = z.object({
   name: z.string().min(1, "Product name is required.").max(200),
   sku: z.string().min(1, "SKU is required.").max(50),
-  description: z.string().optional(),
+  description: z.string().min(1, "Description is required."),
   price: z.number().positive("Price must be a positive number."),
   comparePrice: z.number().positive().optional(),
   category: z.string().optional(),

@@ -49,6 +49,8 @@ export function ProductModal({ product, onClose, onSaved }: ProductModalProps) {
       comparePrice: product?.comparePrice || "",
       categoryId: product?.categoryId || "",
       status: product?.status || "published",
+      productType: (product as any)?.productType || "SIMPLE",
+      downloadUrl: (product as any)?.downloadUrl || "",
       isActive: product?.isActive ?? true,
       initialStock: product?.inventory?.quantity || 0,
       lowStockAlert: product?.inventory?.lowStockAlert || 10,
@@ -56,6 +58,7 @@ export function ProductModal({ product, onClose, onSaved }: ProductModalProps) {
   });
 
   const nameValue = watch("name");
+  const productType = watch("productType");
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -84,7 +87,7 @@ export function ProductModal({ product, onClose, onSaved }: ProductModalProps) {
       if (imageFiles.length > 0) {
         setUploadProgress(true);
         for (const file of imageFiles) {
-          const fd = new FormData(); fd.append("file", file);
+          const fd = new FormData(); fd.append("image", file);
           try {
             const r = await api.post("/api/products/upload-image", fd, { headers: { "Content-Type": "multipart/form-data" } });
             uploadedUrls.push(r.data.url);
@@ -105,6 +108,8 @@ export function ProductModal({ product, onClose, onSaved }: ProductModalProps) {
         imageUrl: allUrls[0] || undefined,
         imageUrls: allUrls,
         categoryId: data.categoryId || undefined,
+        productType: data.productType || "SIMPLE",
+        downloadUrl: data.productType === "DOWNLOADABLE" ? (data.downloadUrl || undefined) : undefined,
       };
 
       if (isEdit) { await api.patch(`/api/products/${product.id}`, payload); }
@@ -213,14 +218,32 @@ export function ProductModal({ product, onClose, onSaved }: ProductModalProps) {
               </select>
             </div>
 
+            <div>
+              <Label>Product type</Label>
+              <select className={selectCls} {...register("productType")}>
+                <option value="SIMPLE">Simple product</option>
+                <option value="DOWNLOADABLE">Downloadable</option>
+                <option value="VARIABLE">Variable product</option>
+              </select>
+            </div>
+
+            {productType === "DOWNLOADABLE" && (
+              <div className="col-span-2">
+                <Label>Download URL</Label>
+                <Input className="mt-1.5" placeholder="https://..." {...register("downloadUrl")} />
+                <p className="text-xs text-gray-400 mt-1">Link customers receive after purchase</p>
+              </div>
+            )}
+
             <div className="flex items-center gap-2 pt-6">
               <input type="checkbox" id="isActive" {...register("isActive")} className="w-4 h-4 accent-[#DE1010]" />
               <Label htmlFor="isActive" className="cursor-pointer text-sm">Visible in store</Label>
             </div>
 
             <div className="col-span-2">
-              <Label>Description (optional)</Label>
-              <textarea className="mt-1.5 flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none" placeholder="Brief product description..." {...register("description")} />
+              <Label>Description</Label>
+              <textarea className="mt-1.5 flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none" placeholder="Brief product description..." {...register("description", { required: "Description is required." })} />
+              {errors.description && <p className="text-xs text-[#DE1010] mt-1">{errors.description.message as string}</p>}
             </div>
           </div>
 

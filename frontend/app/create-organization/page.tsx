@@ -15,12 +15,14 @@ import api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { INDUSTRY_OPTIONS, ORG_SIZE_OPTIONS } from "@/lib/utils";
 import { ErrorModal } from "@/components/shared/error-modal";
+import PhoneInput from "react-phone-number-input";
+import "react-phone-number-input/style.css";
 
 const schema = z.object({
   name: z.string().min(2, "Organization name is required."),
   email: z.string().email("A valid business email is required."),
   phone: z.string().min(7, "Phone number is required."),
-  address: z.string().optional(),
+  address: z.string().min(5, "Business address is required."),
   industry: z.string().min(1, "Please select an industry."),
   size: z.string().optional(),
 });
@@ -41,10 +43,13 @@ export default function CreateOrganizationPage() {
     }
   }, [user, router]);
 
+  const [phone, setPhone] = useState("");
+
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
+    setValue,
   } = useForm<FormData>({ resolver: zodResolver(schema) });
 
   const onSubmit = async (data: FormData) => {
@@ -120,13 +125,20 @@ export default function CreateOrganizationPage() {
 
                 <div>
                   <Label>Business phone</Label>
-                  <Input className="mt-1.5" placeholder="+234 800 000 0000" {...register("phone")} />
+                  <PhoneInput
+                    international
+                    defaultCountry="NG"
+                    value={phone}
+                    onChange={(val) => { setPhone(val || ""); setValue("phone", val || "", { shouldValidate: true }); }}
+                    className="mt-1.5 phone-input-wrapper"
+                  />
                   {errors.phone && <p className="text-xs text-[#DE1010] mt-1">{errors.phone.message}</p>}
                 </div>
 
                 <div>
-                  <Label>Address <span className="text-gray-400 text-xs font-normal">(optional)</span></Label>
+                  <Label>Business address</Label>
                   <Input className="mt-1.5" placeholder="123 Business Road, Lagos" {...register("address")} />
+                  {errors.address && <p className="text-xs text-[#DE1010] mt-1">{errors.address.message}</p>}
                 </div>
 
                 <Button type="submit" className="w-full gap-2" disabled={isSubmitting}>

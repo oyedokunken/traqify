@@ -34,8 +34,7 @@ const step1Schema = z.object({
 const step2Schema = z.object({
   orgName: z.string().min(2, "Organization name is required."),
   orgEmail: z.string().email().optional().or(z.literal("")),
-  orgPhone: z.string().optional(),
-  orgAddress: z.string().optional(),
+  orgAddress: z.string().min(3, "Business address is required."),
   industry: z.string().optional(),
   size: z.string().optional(),
 });
@@ -92,8 +91,9 @@ export default function RegisterPage() {
   const [orgPhone, setOrgPhone] = useState("");
 
   const handleStep2 = async (data: Step2Data) => {
+    if (!orgPhone) { setError("Business phone number is required."); return; }
     try {
-      router.push(`/verify-email?email=${encodeURIComponent(step1Data!.email)}&orgName=${encodeURIComponent(data.orgName)}&orgEmail=${encodeURIComponent(data.orgEmail || "")}&orgPhone=${encodeURIComponent(orgPhone || "")}&orgAddress=${encodeURIComponent(data.orgAddress || "")}&industry=${encodeURIComponent(data.industry || "")}&size=${encodeURIComponent(data.size || "")}`);
+      router.push(`/verify-email?email=${encodeURIComponent(step1Data!.email)}&orgName=${encodeURIComponent(data.orgName)}&orgEmail=${encodeURIComponent(data.orgEmail || "")}&orgPhone=${encodeURIComponent(orgPhone)}&orgAddress=${encodeURIComponent(data.orgAddress)}&industry=${encodeURIComponent(data.industry || "")}&size=${encodeURIComponent(data.size || "")}`);
     } catch (err: any) {
       setError(err.response?.data?.error || "Failed to proceed.");
     }
@@ -224,15 +224,16 @@ export default function RegisterPage() {
                     <Input id="orgEmail" type="email" placeholder="info@company.com" className="mt-1.5" {...form2.register("orgEmail")} />
                   </div>
                   <div>
-                    <Label>Business phone (optional)</Label>
+                    <Label>Business phone <span className="text-[#DE1010]">*</span></Label>
                     <PhoneInput
                       international defaultCountry="NG" value={orgPhone} onChange={(v) => setOrgPhone(v || "")}
                       className="mt-1.5 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-within:ring-2 focus-within:ring-ring"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="orgAddress">Address (optional)</Label>
+                    <Label htmlFor="orgAddress">Business address <span className="text-[#DE1010]">*</span></Label>
                     <Input id="orgAddress" placeholder="123 Business Road, Lagos" className="mt-1.5" {...form2.register("orgAddress")} />
+                    {form2.formState.errors.orgAddress && <p className="text-xs text-[#DE1010] mt-1">{form2.formState.errors.orgAddress.message}</p>}
                   </div>
 
                   <div className="flex gap-3">

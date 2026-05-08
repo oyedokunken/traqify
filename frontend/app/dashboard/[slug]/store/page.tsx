@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Globe, Copy, Eye, EyeOff, ExternalLink, CheckCircle } from "lucide-react";
+import { Globe, Copy, Eye, EyeOff, ExternalLink, CheckCircle, ImagePlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Topbar } from "@/components/dashboard/topbar";
 import api from "@/lib/api";
@@ -15,6 +15,8 @@ export default function StorePage({ params }: { params: { slug: string } }) {
   const [toggling, setToggling] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoError, setLogoError] = useState("");
   const storeUrl = `${typeof window !== "undefined" ? window.location.origin : "http://localhost:3000"}/store/${params.slug}`;
 
   const fetchStore = () => {
@@ -37,6 +39,20 @@ export default function StorePage({ params }: { params: { slug: string } }) {
     navigator.clipboard.writeText(storeUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!['image/jpeg','image/png','image/webp'].includes(file.type)) { setLogoError('Only JPG, PNG, or WebP allowed.'); return; }
+    if (file.size > 2 * 1024 * 1024) { setLogoError('Image must be under 2MB.'); return; }
+    setLogoUploading(true); setLogoError("");
+    try {
+      const fd = new FormData(); fd.append('logo', file);
+      const r = await api.post(`/api/organizations/${params.slug}/upload-logo`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      setStoreData((prev: any) => ({ ...prev, logoUrl: r.data.url }));
+    } catch { setLogoError('Failed to upload logo.'); }
+    finally { setLogoUploading(false); e.target.value = ''; }
   };
 
   return (
@@ -84,6 +100,30 @@ export default function StorePage({ params }: { params: { slug: string } }) {
                 className="px-3 py-2.5 rounded-lg border border-gray-200 hover:bg-gray-50 text-sm text-gray-600 flex items-center gap-1.5 transition-colors">
                 <ExternalLink size={14} /> Visit
               </a>
+            </div>
+          </div>
+
+          {/* Logo */}
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <h3 className="font-semibold text-[#0a0a0a] mb-1">Store logo</h3>
+            <p className="text-xs text-gray-400 mb-4">This logo appears on your public store page. JPG, PNG or WebP, max 2MB.</p>
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center overflow-hidden bg-gray-50 flex-shrink-0">
+                {storeData?.logoUrl ? (
+                  <img src={storeData.logoUrl} alt="Store logo" className="w-full h-full object-contain" />
+                ) : (
+                  <ImagePlus size={20} className="text-gray-300" />
+                )}
+              </div>
+              <div>
+                <label className="cursor-pointer">
+                  <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleLogoUpload} disabled={logoUploading || user?.role === 'CASHIER'} />
+                  <span className="inline-flex items-center gap-2 px-4 py-2 bg-[#0a0a0a] text-white text-sm font-medium rounded-lg hover:bg-black/80 transition-colors">
+                    {logoUploading ? 'Uploading...' : storeData?.logoUrl ? 'Replace logo' : 'Upload logo'}
+                  </span>
+                </label>
+                {logoError && <p className="text-xs text-[#DE1010] mt-1.5">{logoError}</p>}
+              </div>
             </div>
           </div>
 

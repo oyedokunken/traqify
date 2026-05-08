@@ -14,8 +14,8 @@ const steps = [
   },
   {
     icon: Building2,
-    title: "Set up your organization",
-    description: "Add your business name, invite your team, and assign roles — OWNER, MANAGER, CASHIER, or AUDITOR.",
+    title: "Set up your store",
+    description: "Add your business name, invite your team, and assign roles: OWNER, MANAGER, CASHIER, or AUDITOR.",
     color: "bg-purple-50 text-purple-600 border-purple-100",
     dot: "bg-purple-500",
   },

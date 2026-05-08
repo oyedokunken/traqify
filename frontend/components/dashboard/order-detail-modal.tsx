@@ -13,7 +13,7 @@ interface Order {
   id: string;
   orderNumber: string;
   totalAmount: number;
-  status: "PENDING" | "COMPLETED" | "CANCELLED";
+  status: "PENDING" | "APPROVED" | "COMPLETED" | "CANCELLED";
   paymentMethod?: string;
   notes?: string;
   createdAt: string;
@@ -24,9 +24,10 @@ interface Order {
 
 interface Props { order: Order; onClose: () => void; onUpdated: () => void }
 
-const statusVariant: Record<string, "success" | "warning" | "destructive"> = {
+const statusVariant: Record<string, "success" | "warning" | "destructive" | "info"> = {
   COMPLETED: "success",
   PENDING: "warning",
+  APPROVED: "info",
   CANCELLED: "destructive",
 };
 
@@ -122,11 +123,18 @@ export function OrderDetailModal({ order, onClose, onUpdated }: Props) {
             <Button variant="outline" size="sm" className="text-[#DE1010] border-red-200 hover:bg-red-50" onClick={() => updateStatus("CANCELLED")} disabled={loading}>
               Cancel order
             </Button>
-            {order.status === "PENDING" && (
-              <Button size="sm" onClick={() => updateStatus("COMPLETED")} disabled={loading}>
-                Mark as completed
-              </Button>
-            )}
+            <div className="flex gap-2">
+              {order.status === "PENDING" && (
+                <Button size="sm" variant="outline" onClick={() => updateStatus("APPROVED")} disabled={loading}>
+                  Approve
+                </Button>
+              )}
+              {(order.status === "PENDING" || order.status === "APPROVED") && (
+                <Button size="sm" onClick={() => updateStatus("COMPLETED")} disabled={loading}>
+                  Mark as completed
+                </Button>
+              )}
+            </div>
           </div>
         )}
       </motion.div>

@@ -45,7 +45,7 @@ export default function ProductsPage({ params }: { params: { slug: string } }) {
     const params = new URLSearchParams();
     if (search) params.set("search", search);
     if (categoryFilter) params.set("categoryId", categoryFilter);
-    if (statusFilter) params.set("isActive", statusFilter);
+    if (statusFilter) params.set("status", statusFilter);
     params.set("page", String(page));
     params.set("limit", String(LIMIT));
     api.get(`/api/products?${params}`)
@@ -87,13 +87,16 @@ export default function ProductsPage({ params }: { params: { slug: string } }) {
             </select>
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
               className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <option value="">All status</option>
-              <option value="true">Active</option>
-              <option value="false">Inactive</option>
+              <option value="">All statuses</option>
+              <option value="published">Published</option>
+              <option value="draft">Draft</option>
             </select>
           </div>
           {canEdit && (
-            <Button onClick={() => { setEditProduct(null); setShowModal(true); }} className="gap-2">
+            <Button onClick={() => {
+              if (categories.length === 0) { setError("You need at least one product category before adding products. Go to Categories to create one."); return; }
+              setEditProduct(null); setShowModal(true);
+            }} className="gap-2">
               <Plus size={16} /> Add product
             </Button>
           )}
@@ -109,7 +112,10 @@ export default function ProductsPage({ params }: { params: { slug: string } }) {
             <p className="text-gray-500 font-medium">No products yet</p>
             <p className="text-gray-400 text-sm mt-1">Add your first product to get started</p>
             {canEdit && (
-              <Button className="mt-4 gap-2" onClick={() => setShowModal(true)}>
+              <Button className="mt-4 gap-2" onClick={() => {
+                if (categories.length === 0) { setError("You need at least one product category before adding products. Go to Categories to create one."); return; }
+                setEditProduct(null); setShowModal(true);
+              }}>
                 <Plus size={15} /> Add product
               </Button>
             )}
@@ -164,6 +170,11 @@ export default function ProductsPage({ params }: { params: { slug: string } }) {
                       {(product.productCategory?.name || product.category) && <Badge variant="outline" className="text-xs">{product.productCategory?.name || product.category}</Badge>}
                       <Badge variant={isLow ? "warning" : "success"} className="text-xs">
                         {product.inventory?.quantity ?? 0} in stock
+                      </Badge>
+                    </div>
+                    <div className="mt-2">
+                      <Badge variant={product.status === "published" ? "success" : "secondary"} className="text-[10px]">
+                        {product.status === "published" ? "Published" : "Draft"}
                       </Badge>
                     </div>
                   </CardContent>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Search, ShoppingCart, Eye } from "lucide-react";
+import { Plus, Search, ShoppingCart, Eye, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +18,7 @@ interface Order {
   id: string;
   orderNumber: string;
   totalAmount: number;
-  status: "PENDING" | "COMPLETED" | "CANCELLED";
+  status: "PENDING" | "APPROVED" | "COMPLETED" | "CANCELLED";
   paymentMethod?: string;
   createdAt: string;
   customer?: { name: string; email?: string } | null;
@@ -26,9 +26,10 @@ interface Order {
   orderItems?: { id: string; quantity: number; unitPrice: number; subtotal?: number; product: { name: string; sku?: string } }[];
 }
 
-const statusVariant: Record<string, "success" | "warning" | "destructive" | "secondary"> = {
+const statusVariant: Record<string, "success" | "warning" | "destructive" | "secondary" | "info"> = {
   COMPLETED: "success",
   PENDING: "warning",
+  APPROVED: "info",
   CANCELLED: "destructive",
 };
 
@@ -78,6 +79,7 @@ export default function OrdersPage({ params }: { params: { slug: string } }) {
               className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               <option value="">All status</option>
               <option value="PENDING">Pending</option>
+              <option value="APPROVED">Approved</option>
               <option value="COMPLETED">Completed</option>
               <option value="CANCELLED">Cancelled</option>
             </select>
@@ -126,12 +128,18 @@ export default function OrdersPage({ params }: { params: { slug: string } }) {
                       </Badge>
                     </td>
                     <td className="px-5 py-3.5">
-                      <button
-                        onClick={() => setSelectedOrder(order)}
-                        className="text-gray-400 hover:text-[#DE1010] transition-colors"
-                      >
-                        <Eye size={16} />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {order.status === "PENDING" && ["OWNER", "MANAGER"].includes(user?.role || "") && (
+                          <button onClick={async (e) => { e.stopPropagation(); await api.patch(`/api/orders/${order.id}/status`, { status: "APPROVED" }); fetchOrders(); }}
+                            title="Approve order"
+                            className="text-gray-400 hover:text-green-600 transition-colors">
+                            <CheckCircle size={16} />
+                          </button>
+                        )}
+                        <button onClick={() => setSelectedOrder(order)} className="text-gray-400 hover:text-[#DE1010] transition-colors">
+                          <Eye size={16} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

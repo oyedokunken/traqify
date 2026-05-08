@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   TrendingUp,
@@ -52,6 +52,7 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(new Date());
   const [showWelcome, setShowWelcome] = useState(false);
+  const [showWelcomeBack, setShowWelcomeBack] = useState(false);
 
   // Live clock
   useEffect(() => {
@@ -59,12 +60,17 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
     return () => clearInterval(t);
   }, []);
 
-  // Welcome modal: show once per browser session
+  // First-time welcome: shown once ever (localStorage)
+  // Welcome back: shown once per login session (sessionStorage)
   useEffect(() => {
-    const key = `traqify_welcomed_${params.slug}`;
-    if (!localStorage.getItem(key)) {
+    const firstKey = `traqify_welcomed_${params.slug}`;
+    const sessionKey = `traqify_session_${params.slug}`;
+    if (!localStorage.getItem(firstKey)) {
       setShowWelcome(true);
-      localStorage.setItem(key, "1");
+      localStorage.setItem(firstKey, "1");
+    } else if (!sessionStorage.getItem(sessionKey)) {
+      setShowWelcomeBack(true);
+      sessionStorage.setItem(sessionKey, "1");
     }
   }, [params.slug]);
 
@@ -130,7 +136,7 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
   })();
 
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const timeStr = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, timeZone: tz });
+  const timeStr = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true, timeZone: tz });
   const dateStr = now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
   return (
@@ -250,7 +256,44 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
         </motion.div>
       </div>
 
-      {/* Welcome modal */}
+      {/* Welcome back modal (every login) */}
+      <AnimatePresence>
+        {showWelcomeBack && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 px-4 pb-6 sm:pb-0"
+          >
+            <motion.div
+              initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 40, opacity: 0 }}
+              className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-xl bg-[#DE1010] flex items-center justify-center flex-shrink-0">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <rect x="3" y="3" width="8" height="8" rx="1.5" fill="white"/>
+                    <rect x="13" y="3" width="8" height="8" rx="1.5" fill="white" opacity="0.7"/>
+                    <rect x="3" y="13" width="8" height="8" rx="1.5" fill="white" opacity="0.7"/>
+                    <rect x="13" y="13" width="8" height="8" rx="1.5" fill="white"/>
+                  </svg>
+                </div>
+                <div>
+                  <p className="font-bold text-[#0a0a0a] text-sm">Welcome back, {user?.name?.split(" ")[0] || "there"}</p>
+                  <p className="text-xs text-gray-400">{user?.organization?.name || "Your workspace"}</p>
+                </div>
+              </div>
+              <p className="text-sm text-gray-500 mb-4">Good to see you again. Your dashboard is up to date.</p>
+              <button
+                onClick={() => setShowWelcomeBack(false)}
+                className="w-full px-4 py-2 bg-[#0a0a0a] text-white rounded-lg text-sm font-medium hover:bg-black/80 transition-colors"
+              >
+                Continue
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* First-time welcome modal */}
       <AnimatePresence>
         {showWelcome && (
           <motion.div

@@ -4,7 +4,7 @@ import { createOrganizationSchema, updateOrgSchema } from "../utils/validators";
 import { generateUniqueSlug } from "../utils/slug";
 import { createAuditLog } from "../utils/audit";
 import { sendEmail } from "../config/email";
-import { welcomeEmailTemplate } from "../emails/templates";
+import { welcomeEmailTemplate, storeStatusEmailTemplate } from "../emails/templates";
 import { AuthRequest } from "../middleware/auth.middleware";
 import { Request } from "express";
 
@@ -84,10 +84,21 @@ export const updateOrganization = async (req: AuthRequest, res: Response): Promi
       return;
     }
 
+    const wasPublished = org.storePublished;
     const updated = await prisma.organization.update({
       where: { id: org.id },
       data: parsed.data,
     });
+
+    if (parsed.data.storePublished !== undefined && parsed.data.storePublished !== wasPublished) {
+      const owner = await prisma.user.findFirst({ where: { organizationId: org.id, role: "OWNER" } });
+      if (owner) {
+        const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+        const storeUrl = `${frontendUrl}/store/${org.slug}`;
+        const dashboardUrl = `${frontendUrl}/dashboard/${org.slug}/store`;
+        await sendEmail(owner.email, `Your store is now ${parsed.data.storePublished ? "live" : "offline"}`, storeStatusEmailTemplate(org.name, parsed.data.storePublished, storeUrl, dashboardUrl)).catch(() => {});
+      }
+    }
 
     await createAuditLog(req.user!.id, org.id, "UPDATE", "Organization", org.id, "Updated organization details", req);
     res.json(updated);
@@ -101,7 +112,7 @@ export const getPublicStore = async (req: Request, res: Response): Promise<void>
     const { slug } = req.params;
     const org = await prisma.organization.findUnique({
       where: { slug },
-      select: { id: true, name: true, slug: true, logoUrl: true, website: true, storePublished: true },
+      select: { id: true, name: true, slug: true, logoUrl: true, website: true, email: true, phone: true, address: true, storePublished: true },
     });
 
     if (!org) {
@@ -119,11 +130,18 @@ export const getPublicStore = async (req: Request, res: Response): Promise<void>
       include: {
         inventory: { select: { quantity: true } },
         variants: true,
+        productCategory: { select: { id: true, name: true, slug: true } },
       },
       orderBy: { createdAt: "desc" },
     });
 
-    res.json({ org, products });
+    const categories = await prisma.productCategory.findMany({
+      where: { organizationId: org.id },
+      select: { id: true, name: true, slug: true },
+      orderBy: { name: "asc" },
+    });
+
+    res.json({ org, products, categories });
   } catch {
     res.status(500).json({ error: "Failed to fetch store." });
   }
