@@ -5,6 +5,39 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.1.0] - 2026-05-08
+
+### Added
+- **Product categories**: backend CRUD (`/api/categories`), admin page (`/dashboard/[slug]/categories`), sidebar nav item
+- **Multi-image products**: up to 4 images per product; first image is cover; all stored in `imageUrls[]` field on Product
+- **Auto-SKU generation**: "Auto-generate" button in product modal derives prefix from product name + random suffix
+- **Product status field**: `published` / `draft` status alongside `isActive` visibility toggle
+- **Store management page**: `/dashboard/[slug]/store` with publish/unpublish toggle, store URL copy, and store capabilities overview
+- **`storePublished` flag**: Organization model; public store routes return 403 when unpublished
+- **Reports redesign**: 6 report type cards (Revenue, Products, Orders, Customers, Inventory, Staff) with PDF download and email modal
+- **Backend PDF generation**: `pdfkit`-powered PDF for each report type via `GET /api/reports/:type/pdf`
+- **Report email**: sends PDF as attachment via `POST /api/reports/:type/email`; new `reportEmailTemplate` in email templates
+- **React phone number input**: international phone selector on register Step 2 (defaulting to NG)
+- **Sidebar**: `Categories` (Tag icon) and `Store` (Globe icon) nav items; fixed Staff icon (`UserCog`)
+- **Pagination on Products page**: 20 per page, category filter dropdown (from API), status filter
+- **Pagination on Customers page**: 25 per page, server-side search
+- **Status filter on Orders page**: server-side filter for PENDING / COMPLETED / CANCELLED
+
+### Changed
+- `getProducts` backend now returns `{ products, total }` with `page`, `limit`, `categoryId`, `isActive` query params
+- `getCustomers` backend now returns `{ customers, total }` with `page`, `limit`, `search` query params
+- `productSchema` validator extended: `categoryId`, `imageUrls`, `status` fields
+- `updateOrgSchema` extended: `name`, `email`, `website`, `storePublished`
+- `sendEmail` config updated to support optional `attachments` array
+- Store public routes: filters `status = "published"` on products; returns `categories` from `ProductCategory` model
+- Inventory and report controllers updated to use `categoryId` (string `category` field removed from schema)
+
+### Fixed
+- Sidebar `Staff` nav item had `Store` icon; now correctly uses `UserCog`
+- Report controller `items` include renamed to `orderItems` matching the Prisma schema
+
+---
+
 ## [1.0.0] - 2025-05-07
 
 ### Added

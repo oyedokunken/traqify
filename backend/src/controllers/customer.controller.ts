@@ -7,24 +7,27 @@ import { AuthRequest } from "../middleware/auth.middleware";
 export const getCustomers = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const orgId = req.user!.organizationId!;
-    const { search } = req.query;
+    const { search, page = "1", limit = "25" } = req.query;
+    const take = parseInt(limit as string);
+    const skip = (parseInt(page as string) - 1) * take;
 
-    const customers = await prisma.customer.findMany({
-      where: {
-        organizationId: orgId,
-        ...(search && {
-          OR: [
-            { name: { contains: search as string, mode: "insensitive" } },
-            { email: { contains: search as string, mode: "insensitive" } },
-            { phone: { contains: search as string, mode: "insensitive" } },
-          ],
-        }),
-      },
-      include: { _count: { select: { orders: true } } },
-      orderBy: { createdAt: "desc" },
-    });
+    const where: any = {
+      organizationId: orgId,
+      ...(search && {
+        OR: [
+          { name: { contains: search as string, mode: "insensitive" } },
+          { email: { contains: search as string, mode: "insensitive" } },
+          { phone: { contains: search as string, mode: "insensitive" } },
+        ],
+      }),
+    };
 
-    res.json(customers);
+    const [customers, total] = await Promise.all([
+      prisma.customer.findMany({ where, include: { _count: { select: { orders: true } } }, orderBy: { createdAt: "desc" }, skip, take }),
+      prisma.customer.count({ where }),
+    ]);
+
+    res.json({ customers, total });
   } catch {
     res.status(500).json({ error: "Failed to fetch customers." });
   }

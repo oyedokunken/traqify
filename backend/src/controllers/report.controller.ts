@@ -1,6 +1,9 @@
 import { Response } from "express";
 import prisma from "../config/database";
 import { AuthRequest } from "../middleware/auth.middleware";
+import PDFDocument from "pdfkit";
+import { sendEmail } from "../config/email";
+import { reportEmailTemplate } from "../emails/templates";
 
 export const getOverview = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -70,14 +73,14 @@ export const getSalesReport = async (req: AuthRequest, res: Response): Promise<v
         createdAt: { gte: startDate, lte: endDate },
       },
       include: {
-        orderItems: { include: { product: { select: { name: true, category: true } } } },
+        orderItems: { include: { product: { select: { name: true, categoryId: true } } } },
         customer: { select: { name: true } },
       },
       orderBy: { createdAt: "desc" },
     });
 
-    const totalRevenue = orders.reduce((sum, o) => sum + o.totalAmount, 0);
-    const totalItems = orders.reduce((sum, o) => sum + o.orderItems.reduce((s, i) => s + i.quantity, 0), 0);
+    const totalRevenue = orders.reduce((sum: number, o: any) => sum + o.totalAmount, 0);
+    const totalItems = orders.reduce((sum: number, o: any) => sum + o.orderItems.reduce((s: number, i: any) => s + i.quantity, 0), 0);
 
     res.json({ orders, totalRevenue, totalItems, orderCount: orders.length });
   } catch {
@@ -101,12 +104,12 @@ export const getTopProducts = async (req: AuthRequest, res: Response): Promise<v
     const productIds = topProducts.map((p) => p.productId);
     const products = await prisma.product.findMany({
       where: { id: { in: productIds } },
-      select: { id: true, name: true, sku: true, category: true, imageUrl: true },
+      select: { id: true, name: true, sku: true, categoryId: true, imageUrl: true },
     });
 
-    const result = topProducts.map((tp) => ({
+    const result = topProducts.map((tp: any) => ({
       ...tp,
-      product: products.find((p) => p.id === tp.productId),
+      product: products.find((p: any) => p.id === tp.productId),
     }));
 
     res.json(result);
@@ -136,8 +139,123 @@ export const getRevenueChart = async (req: AuthRequest, res: Response): Promise<
       ORDER BY date ASC
     `;
 
-    res.json(data.map((d) => ({ ...d, orders: Number(d.orders) })));
+    res.json(data.map((d: any) => ({ ...d, orders: Number(d.orders) })));
   } catch {
     res.status(500).json({ error: "Failed to fetch revenue chart data." });
+  }
+};
+
+const REPORT_LABELS: Record<string, string> = {
+  revenue: "Revenue Report", products: "Products Report", orders: "Orders Report",
+  customers: "Customers Report", inventory: "Inventory Report", staff: "Staff Report",
+};
+
+async function buildReportData(type: string, orgId: string, from: Date, to: Date) {
+  if (type === "revenue") {
+    return prisma.order.findMany({ where: { organizationId: orgId, createdAt: { gte: from, lte: to } }, include: { customer: true, orderItems: { include: { product: true } } }, orderBy: { createdAt: "desc" } });
+  } else if (type === "products") {
+    return prisma.product.findMany({ where: { organizationId: orgId }, include: { inventory: true }, orderBy: { name: "asc" } });
+  } else if (type === "orders") {
+    return prisma.order.findMany({ where: { organizationId: orgId, createdAt: { gte: from, lte: to } }, include: { customer: true }, orderBy: { createdAt: "desc" } });
+  } else if (type === "customers") {
+    return prisma.customer.findMany({ where: { organizationId: orgId }, include: { _count: { select: { orders: true } } }, orderBy: { name: "asc" } });
+  } else if (type === "inventory") {
+    return prisma.inventory.findMany({ where: { product: { organizationId: orgId } }, include: { product: true }, orderBy: { quantity: "asc" } });
+  } else if (type === "staff") {
+    return prisma.user.findMany({ where: { organizationId: orgId }, orderBy: { createdAt: "asc" } });
+  }
+  return [];
+}
+
+function buildPDF(type: string, label: string, orgName: string, from: string, to: string, rows: any[]): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ margin: 50, size: "A4" });
+    const chunks: Buffer[] = [];
+    doc.on("data", (c) => chunks.push(c));
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
+
+    // Header
+    doc.fontSize(20).fillColor("#DE1010").text("Traqify", 50, 50).fillColor("#0a0a0a").fontSize(16).text(label, 50, 75);
+    doc.fontSize(10).fillColor("#6b7280").text(`Organisation: ${orgName}`, 50, 100).text(`Period: ${from} to ${to}`, 50, 115).text(`Generated: ${new Date().toLocaleDateString("en-GB")}`, 50, 130);
+    doc.moveTo(50, 148).lineTo(545, 148).strokeColor("#e5e7eb").stroke();
+
+    let y = 165;
+    const addRow = (cols: string[], widths: number[], bold = false) => {
+      const colors = bold ? "#f9fafb" : "#ffffff";
+      doc.rect(50, y - 5, 495, 20).fillColor(colors).fill();
+      let x = 50;
+      cols.forEach((c, i) => {
+        doc.fillColor(bold ? "#374151" : "#0a0a0a").fontSize(bold ? 9 : 9).text(String(c).slice(0, 40), x + 3, y, { width: widths[i] - 6 });
+        x += widths[i];
+      });
+      y += 22;
+      if (y > 760) { doc.addPage(); y = 60; }
+    };
+
+    if (type === "revenue" || type === "orders") {
+      addRow(["Order ID", "Customer", "Date", "Status", "Amount (NGN)"], [80, 140, 90, 90, 95], true);
+      rows.forEach((r) => addRow([r.id.slice(-8).toUpperCase(), r.customer?.name || "Guest", new Date(r.createdAt).toLocaleDateString("en-GB"), r.status, `${Number(r.totalAmount || 0).toLocaleString()}`], [80, 140, 90, 90, 95]));
+    } else if (type === "products") {
+      addRow(["Name", "SKU", "Price (NGN)", "Stock", "Status"], [160, 90, 95, 70, 80], true);
+      rows.forEach((r) => addRow([r.name, r.sku, Number(r.price).toLocaleString(), String(r.inventory?.quantity ?? 0), r.isActive ? "Active" : "Inactive"], [160, 90, 95, 70, 80]));
+    } else if (type === "customers") {
+      addRow(["Name", "Email", "Phone", "Orders"], [150, 160, 110, 75], true);
+      rows.forEach((r) => addRow([r.name, r.email || "", r.phone || "", String(r._count?.orders || 0)], [150, 160, 110, 75]));
+    } else if (type === "inventory") {
+      addRow(["Product", "SKU", "Quantity", "Low Stock At", "Alert"], [170, 90, 75, 90, 70], true);
+      rows.forEach((r) => addRow([r.product?.name || "", r.product?.sku || "", String(r.quantity), String(r.lowStockAlert), r.quantity <= r.lowStockAlert ? "YES" : "No"], [170, 90, 75, 90, 70]));
+    } else if (type === "staff") {
+      addRow(["Name", "Email", "Role", "Joined", "Status"], [130, 160, 80, 80, 45], true);
+      rows.forEach((r) => addRow([r.name || "Pending", r.email, r.role, new Date(r.createdAt).toLocaleDateString("en-GB"), r.isActive ? "Active" : "Off"], [130, 160, 80, 80, 45]));
+    }
+
+    doc.end();
+  });
+}
+
+export const downloadReport = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { type } = req.params;
+    const { from, to } = req.query as { from: string; to: string };
+    const orgId = req.user!.organizationId!;
+    const label = REPORT_LABELS[type];
+    if (!label) { res.status(400).json({ error: "Invalid report type." }); return; }
+
+    const org = await prisma.organization.findUnique({ where: { id: orgId } });
+    const fromDate = from ? new Date(from) : new Date(Date.now() - 30 * 86400000);
+    const toDate = to ? new Date(to) : new Date();
+    const rows = await buildReportData(type, orgId, fromDate, toDate);
+
+    const pdf = await buildPDF(type, label, org?.name || "", from || "", to || "", rows as any[]);
+    res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${type}-report.pdf"` });
+    res.send(pdf);
+  } catch {
+    res.status(500).json({ error: "Failed to generate PDF." });
+  }
+};
+
+export const emailReport = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { type } = req.params;
+    const { to, from, to_date } = req.body;
+    const orgId = req.user!.organizationId!;
+    const label = REPORT_LABELS[type];
+    if (!label) { res.status(400).json({ error: "Invalid report type." }); return; }
+    if (!to) { res.status(400).json({ error: "Recipient email is required." }); return; }
+
+    const org = await prisma.organization.findUnique({ where: { id: orgId } });
+    const fromDate = from ? new Date(from) : new Date(Date.now() - 30 * 86400000);
+    const toDate = to_date ? new Date(to_date) : new Date();
+    const rows = await buildReportData(type, orgId, fromDate, toDate);
+
+    const pdf = await buildPDF(type, label, org?.name || "", from || "", to_date || "", rows as any[]);
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+    const html = reportEmailTemplate(org?.name || "", label, from || "", to_date || "", frontendUrl);
+
+    await sendEmail(to, `${label} - ${org?.name}`, html, [{ filename: `${type}-report.pdf`, content: pdf, contentType: "application/pdf" }]);
+    res.json({ message: `Report sent to ${to}.` });
+  } catch {
+    res.status(500).json({ error: "Failed to send report email." });
   }
 };

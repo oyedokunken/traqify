@@ -1,166 +1,171 @@
-"use client";
+﻿"use client";
 
-import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
-import { BarChart3, Download } from "lucide-react";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Download, Mail, Users, Package, TrendingUp, ShoppingCart, UserCheck, Warehouse, FileText, X, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Topbar } from "@/components/dashboard/topbar";
+import { ErrorModal } from "@/components/shared/error-modal";
 import api from "@/lib/api";
-import { formatCurrency, formatDate } from "@/lib/utils";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
+import { useAuth } from "@/lib/auth-context";
 
-interface TopProduct {
-  productId: string;
-  _sum: { quantity: number; subtotal: number };
-  product?: { name: string; sku: string; category?: string };
-}
+const reportTypes = [
+  { id: "revenue",   label: "Revenue Report",      sub: "Total sales, revenue breakdown and order trends for any date range.",  icon: TrendingUp,  color: "bg-green-50 text-green-600",  pill: "Finance" },
+  { id: "products",  label: "Products Report",      sub: "Product catalog, pricing, stock levels and performance summary.",      icon: Package,     color: "bg-blue-50 text-blue-600",    pill: "Catalog" },
+  { id: "orders",    label: "Orders Report",        sub: "All orders with status, customer details and item breakdown.",         icon: ShoppingCart,color: "bg-purple-50 text-purple-600", pill: "Operations" },
+  { id: "customers", label: "Customers Report",     sub: "Customer list with contact info, order history and lifetime value.",   icon: Users,       color: "bg-orange-50 text-orange-600", pill: "CRM" },
+  { id: "inventory", label: "Inventory Report",     sub: "Current stock levels, low-stock alerts and reorder recommendations.", icon: Warehouse,   color: "bg-red-50 text-[#DE1010]",    pill: "Stock" },
+  { id: "staff",     label: "Staff Report",         sub: "Team members, roles, access status and activity summary.",            icon: UserCheck,   color: "bg-gray-50 text-gray-600",    pill: "Team" },
+];
 
-interface SalesReport {
-  orders: any[];
-  totalRevenue: number;
-  totalItems: number;
-  orderCount: number;
-}
+type ModalType = "download" | "email" | null;
 
 export default function ReportsPage({ params }: { params: { slug: string } }) {
-  const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
-  const [sales, setSales] = useState<SalesReport | null>(null);
-  const [from, setFrom] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() - 30);
-    return d.toISOString().split("T")[0];
-  });
-  const [to, setTo] = useState(() => new Date().toISOString().split("T")[0]);
-  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const [activeReport, setActiveReport] = useState<string | null>(null);
+  const [modalType, setModalType] = useState<ModalType>(null);
+  const [emailTo, setEmailTo] = useState(user?.email || "");
+  const [dateFrom, setDateFrom] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 30); return d.toISOString().split("T")[0]; });
+  const [dateTo, setDateTo] = useState(() => new Date().toISOString().split("T")[0]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
-  const fetchReports = () => {
+  const openModal = (reportId: string, type: ModalType) => {
+    setActiveReport(reportId);
+    setModalType(type);
+    setError("");
+    setSuccess("");
+  };
+  const closeModal = () => { setActiveReport(null); setModalType(null); };
+
+  const downloadPDF = async () => {
+    if (!activeReport) return;
     setLoading(true);
-    Promise.all([
-      api.get(`/api/reports/sales?from=${from}&to=${to}`),
-      api.get("/api/reports/top-products?limit=10"),
-    ]).then(([s, tp]) => {
-      setSales(s.data);
-      setTopProducts(tp.data);
-    }).catch(() => {}).finally(() => setLoading(false));
+    try {
+      const res = await api.get(`/api/reports/${activeReport}/pdf?from=${dateFrom}&to=${dateTo}`, { responseType: "blob" });
+      const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+      const a = document.createElement("a");
+      a.href = url; a.download = `${activeReport}-report-${dateFrom}-${dateTo}.pdf`; a.click();
+      URL.revokeObjectURL(url);
+      closeModal();
+    } catch { setError("Failed to generate PDF. Please try again."); }
+    finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchReports(); }, []);
+  const emailReport = async () => {
+    if (!activeReport || !emailTo) return;
+    setLoading(true);
+    try {
+      await api.post(`/api/reports/${activeReport}/email`, { to: emailTo, from: dateFrom, to_date: dateTo });
+      setSuccess(`Report sent to ${emailTo}.`);
+      setTimeout(closeModal, 2000);
+    } catch { setError("Failed to send report. Please try again."); }
+    finally { setLoading(false); }
+  };
 
-  const chartData = topProducts.slice(0, 8).map((p) => ({
-    name: p.product?.name?.split(" ").slice(0, 2).join(" ") || "Unknown",
-    revenue: p._sum.subtotal || 0,
-    qty: p._sum.quantity || 0,
-  }));
+  const currentReport = reportTypes.find((r) => r.id === activeReport);
 
   return (
     <div>
       <Topbar title="Reports" slug={params.slug} />
-      <div className="p-6 space-y-6">
-        <div className="flex flex-wrap items-end gap-4">
-          <div>
-            <Label>From</Label>
-            <Input type="date" className="mt-1.5 w-40" value={from} onChange={(e) => setFrom(e.target.value)} />
-          </div>
-          <div>
-            <Label>To</Label>
-            <Input type="date" className="mt-1.5 w-40" value={to} onChange={(e) => setTo(e.target.value)} />
-          </div>
-          <Button onClick={fetchReports}>Apply filter</Button>
+      <div className="p-6">
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold text-[#0a0a0a]">Generate reports</h2>
+          <p className="text-sm text-gray-400 mt-0.5">Download or email any report as a PDF. All reports reflect your current data.</p>
         </div>
 
-        {loading ? (
-          <div className="flex justify-center py-24">
-            <div className="w-7 h-7 border-2 border-[#DE1010] border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <Card>
-                <CardContent className="p-5">
-                  <p className="text-xs text-gray-500 font-medium mb-1">Total revenue</p>
-                  <p className="text-2xl font-bold text-[#0a0a0a]">{formatCurrency(sales?.totalRevenue || 0)}</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-5">
-                  <p className="text-xs text-gray-500 font-medium mb-1">Orders completed</p>
-                  <p className="text-2xl font-bold text-[#0a0a0a]">{sales?.orderCount || 0}</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-5">
-                  <p className="text-xs text-gray-500 font-medium mb-1">Items sold</p>
-                  <p className="text-2xl font-bold text-[#0a0a0a]">{sales?.totalItems || 0}</p>
-                </CardContent>
-              </Card>
-            </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          {reportTypes.map((report, i) => (
+            <motion.div key={report.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
+              className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md transition-shadow flex flex-col gap-4">
+              <div className="flex items-start gap-4">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${report.color}`}>
+                  <report.icon size={20} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-semibold text-[#0a0a0a] text-sm">{report.label}</h3>
+                    <span className="text-[10px] font-semibold uppercase tracking-wide bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{report.pill}</span>
+                  </div>
+                  <p className="text-xs text-gray-400 leading-relaxed">{report.sub}</p>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-auto">
+                <Button size="sm" variant="outline" className="flex-1 gap-1.5 text-xs" onClick={() => openModal(report.id, "download")}>
+                  <Download size={13} /> Download PDF
+                </Button>
+                <Button size="sm" className="flex-1 gap-1.5 text-xs" onClick={() => openModal(report.id, "email")}>
+                  <Mail size={13} /> Email report
+                </Button>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base font-semibold">Top 8 products by revenue</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {chartData.length === 0 ? (
-                  <div className="text-center py-10 text-gray-400 text-sm">No data for this period</div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={260}>
-                    <BarChart data={chartData} margin={{ top: 4, right: 0, left: -20, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} />
-                      <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} tickFormatter={(v) => `₦${(v / 1000).toFixed(0)}k`} />
-                      <Tooltip contentStyle={{ border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 12 }} formatter={(v: number) => [formatCurrency(v), "Revenue"]} />
-                      <Bar dataKey="revenue" fill="#DE1010" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
+      {/* Download / Email modal */}
+      <AnimatePresence>
+        {modalType && currentReport && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
+              className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${currentReport.color}`}>
+                    <currentReport.icon size={16} />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-[#0a0a0a] text-sm">{modalType === "download" ? "Download" : "Email"} {currentReport.label}</h3>
+                    <p className="text-xs text-gray-400">PDF format only</p>
+                  </div>
+                </div>
+                <button onClick={closeModal} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+              </div>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-base font-semibold">Order history</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                {!sales?.orders?.length ? (
-                  <div className="text-center py-8 text-gray-400 text-sm">No orders in this period</div>
-                ) : (
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-gray-100 bg-gray-50">
-                        <th className="text-left text-xs font-semibold text-gray-500 px-5 py-3">Order</th>
-                        <th className="text-left text-xs font-semibold text-gray-500 px-5 py-3 hidden md:table-cell">Customer</th>
-                        <th className="text-left text-xs font-semibold text-gray-500 px-5 py-3 hidden md:table-cell">Date</th>
-                        <th className="text-right text-xs font-semibold text-gray-500 px-5 py-3">Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {sales.orders.map((order: any) => (
-                        <tr key={order.id} className="hover:bg-gray-50">
-                          <td className="px-5 py-3 text-sm font-medium">{order.orderNumber}</td>
-                          <td className="px-5 py-3 text-sm text-gray-600 hidden md:table-cell">{order.customer?.name || "Walk-in"}</td>
-                          <td className="px-5 py-3 text-sm text-gray-500 hidden md:table-cell">{formatDate(order.createdAt)}</td>
-                          <td className="px-5 py-3 text-sm font-semibold text-right">{formatCurrency(order.totalAmount)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </CardContent>
-            </Card>
+              {success ? (
+                <div className="py-6 text-center">
+                  <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-3"><FileText size={20} className="text-green-600" /></div>
+                  <p className="text-sm font-medium text-green-700">{success}</p>
+                </div>
+              ) : (
+                <>
+                  {error && <p className="text-xs text-[#DE1010] bg-red-50 px-3 py-2 rounded-md mb-4">{error}</p>}
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-xs">From date</Label>
+                        <Input type="date" className="mt-1 text-sm" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+                      </div>
+                      <div>
+                        <Label className="text-xs">To date</Label>
+                        <Input type="date" className="mt-1 text-sm" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+                      </div>
+                    </div>
+                    {modalType === "email" && (
+                      <div>
+                        <Label className="text-xs">Recipient email</Label>
+                        <Input type="email" className="mt-1 text-sm" value={emailTo} onChange={(e) => setEmailTo(e.target.value)} placeholder="report@company.com" />
+                      </div>
+                    )}
+                    <div className="flex gap-3 pt-1">
+                      <Button variant="outline" className="flex-1" onClick={closeModal} disabled={loading}>Cancel</Button>
+                      <Button className="flex-1 gap-2" onClick={modalType === "download" ? downloadPDF : emailReport} disabled={loading}>
+                        {loading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : modalType === "download" ? <><Download size={14} /> Download</> : <><Send size={14} /> Send</>}
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </motion.div>
           </motion.div>
         )}
-      </div>
+      </AnimatePresence>
+
+      <ErrorModal isOpen={!!error && !modalType} onClose={() => setError("")} message={error} />
     </div>
   );
 }

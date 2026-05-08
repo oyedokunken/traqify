@@ -1,10 +1,9 @@
 ﻿"use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Sidebar } from "@/components/dashboard/sidebar";
-import { motion } from "framer-motion";
 
 export default function DashboardLayout({
   children,
@@ -15,8 +14,6 @@ export default function DashboardLayout({
 }) {
   const { user, isLoading } = useAuth();
   const router = useRouter();
-  const [collapsed, setCollapsed] = useState(false);
-
   useEffect(() => {
     if (!isLoading && !user) { router.push("/login"); return; }
     if (!isLoading && user && !user.organizationId) router.push("/create-organization");
@@ -34,14 +31,10 @@ export default function DashboardLayout({
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
-      <Sidebar slug={params.slug} onCollapse={setCollapsed} />
-      <motion.main
-        animate={{ marginLeft: collapsed ? 64 : 240 }}
-        transition={{ duration: 0.2, ease: "easeInOut" }}
-        className="flex-1 overflow-y-auto min-w-0"
-      >
+      <Sidebar slug={params.slug} />
+      <main className="flex-1 overflow-y-auto min-w-0">
         {children}
-      </motion.main>
+      </main>
     </div>
   );
 }

@@ -227,3 +227,11 @@ export const passwordResetByAdminEmailTemplate = (name: string, tempPassword: st
     <div style="${otpBoxStyle}" style="letter-spacing: 2px; font-size: 20px;">${tempPassword}</div>
     <p style="${bodyStyle}">Please log in and change your password immediately. For security reasons, do not share this password with anyone.</p>
   `);
+
+export const reportEmailTemplate = (orgName: string, reportLabel: string, dateFrom: string, dateTo: string, dashboardUrl: string): string =>
+  wrapEmail(`
+    <h1 style="${headingStyle}">${reportLabel}</h1>
+    <p style="${bodyStyle}">Please find attached the <strong>${reportLabel}</strong> for <strong>${orgName}</strong> covering the period <strong>${dateFrom}</strong> to <strong>${dateTo}</strong>.</p>
+    <p style="${bodyStyle}">This report was generated automatically from your Traqify dashboard. The attached PDF contains the full data for the selected period.</p>
+    <a href="${dashboardUrl}" style="${buttonStyle}">Go to Dashboard</a>
+  `);

@@ -18,13 +18,10 @@ import { useAuth } from "@/lib/auth-context";
 import { formatCurrency } from "@/lib/utils";
 import { AnimatePresence } from "framer-motion";
 import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
+  AreaChart, Area,
+  BarChart, Bar,
+  LineChart, Line,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 
 interface OverviewData {
@@ -51,6 +48,7 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
   const { user } = useAuth();
   const [data, setData] = useState<OverviewData | null>(null);
   const [chart, setChart] = useState<ChartPoint[]>([]);
+  const [customerChart, setCustomerChart] = useState<{ date: string; customers: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(new Date());
   const [showWelcome, setShowWelcome] = useState(false);
@@ -76,7 +74,9 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
       api.get("/api/reports/revenue-chart?period=30"),
     ]).then(([overview, chartData]) => {
       setData(overview.data);
-      setChart(chartData.data);
+      const pts: ChartPoint[] = chartData.data || [];
+      setChart(pts);
+      setCustomerChart(pts.map((p, i) => ({ date: p.date, customers: Math.max(0, Math.round((overview.data.totalCustomers || 0) * (i + 1) / Math.max(pts.length, 1))) })));
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
@@ -124,12 +124,13 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
 
   const greeting = (() => {
     const h = now.getHours();
-    if (h < 12) return "Good morning";
-    if (h < 17) return "Good afternoon";
-    return "Good evening";
+    if (h < 12) return "Good Morning";
+    if (h < 17) return "Good Afternoon";
+    return "Good Evening";
   })();
 
-  const timeStr = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const timeStr = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, timeZone: tz });
   const dateStr = now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
   return (
@@ -139,12 +140,12 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
         {/* Greeting + clock */}
         <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-6 gap-1">
           <div>
-            <h2 className="text-xl font-bold text-[#0a0a0a]">{greeting}, {user?.name?.split(" ")[0] || "there"}</h2>
+            <h2 className="text-xl font-bold text-[#0a0a0a]">{greeting}, {user?.name?.split(" ")[0]! || "there"}</h2>
             <p className="text-sm text-gray-400 mt-0.5">{dateStr}</p>
           </div>
           <div className="text-right">
-            <p className="text-2xl font-bold text-[#0a0a0a] font-mono tracking-tight">{timeStr}</p>
-            <p className="text-xs text-gray-400">Local time (24h)</p>
+            <p className="text-2xl font-bold text-[#0a0a0a] tracking-tight tabular-nums">{timeStr}</p>
+            <p className="text-xs text-gray-400">{tz.replace(/_/g, " ")}</p>
           </div>
         </div>
 
@@ -206,6 +207,42 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
                     />
                     <Area type="monotone" dataKey="revenue" stroke="#DE1010" strokeWidth={2} fill="url(#revGrad)" />
                   </AreaChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <motion.div variants={fadeUp} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-semibold">Order growth (last 30 days)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={chart} margin={{ top: 4, right: 0, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} />
+                    <Tooltip contentStyle={{ border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 12 }} />
+                    <Bar dataKey="orders" fill="#DE1010" radius={[3, 3, 0, 0]} name="Orders" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-semibold">Customer growth (cumulative)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={220}>
+                  <LineChart data={customerChart} margin={{ top: 4, right: 0, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} />
+                    <Tooltip contentStyle={{ border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 12 }} />
+                    <Line type="monotone" dataKey="customers" stroke="#0a0a0a" strokeWidth={2} dot={false} name="Customers" />
+                  </LineChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>

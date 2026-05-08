@@ -19,6 +19,7 @@ import reportRoutes from "./routes/report.routes";
 import auditRoutes from "./routes/audit.routes";
 import newsletterRoutes from "./routes/newsletter.routes";
 import storeRoutes from "./routes/store.routes";
+import categoryRoutes from "./routes/category.routes";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -70,6 +71,7 @@ app.use("/api/staff", staffRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/audit", auditRoutes);
 app.use("/api/audit-logs", auditRoutes);
+app.use("/api/categories", categoryRoutes);
 app.use("/api/newsletter", newsletterRoutes);
 app.use("/api/store", storeRoutes);
 
