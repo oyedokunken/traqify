@@ -182,12 +182,12 @@ export const storeCheckout = async (req: Request, res: Response): Promise<void> 
       });
     }
 
-    createAuditLog(orgOwner.id, org.id, "CREATE", "Order", order.id, `Store order ${orderNumber} placed by ${name} (${email}) — ₦${totalAmount.toLocaleString()}`, req).catch(() => {});
+    createAuditLog(orgOwner.id, org.id, "CREATE", "Order", order.id, `Store order ${orderNumber} placed by ${name} (${email}) - NGN ${totalAmount.toLocaleString()}`, req).catch(() => {});
 
     // Notify org owner by email
     sendEmail(
       orgOwner.email,
-      `New store order received — ${org.name}`,
+      `New store order received: ${org.name}`,
       newOrderEmailTemplate(org.name, order.id, name, totalAmount, orderItemsData.length, `${process.env.FRONTEND_URL || "http://localhost:3000"}/dashboard/${org.slug}/orders`)
     ).catch((e) => console.error("[Email] Store order notification failed:", e.message));
 

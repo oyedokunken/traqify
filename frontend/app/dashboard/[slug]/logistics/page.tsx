@@ -11,6 +11,7 @@ import { ErrorModal } from "@/components/shared/error-modal";
 import api from "@/lib/api";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
+import { useRoleGuard } from "@/lib/use-role-guard";
 
 interface Order {
   id: string;
@@ -26,6 +27,7 @@ interface Order {
 
 export default function LogisticsPage({ params }: { params: { slug: string } }) {
   const { user } = useAuth();
+  const { blocked } = useRoleGuard(["OWNER", "MANAGER"], `/dashboard/${params.slug}/overview`);
   const [orders, setOrders] = useState<Order[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -63,6 +65,8 @@ export default function LogisticsPage({ params }: { params: { slug: string } }) 
     o.customer?.name?.toLowerCase().includes(search.toLowerCase()) ||
     o.customer?.address?.toLowerCase().includes(search.toLowerCase())
   );
+
+  if (blocked) return null;
 
   return (
     <div>

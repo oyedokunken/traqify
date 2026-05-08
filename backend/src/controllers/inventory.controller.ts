@@ -102,7 +102,7 @@ export const updateStock = async (req: AuthRequest, res: Response): Promise<void
         const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
         sendEmail(
           owner.email,
-          `Low stock alert — ${product.name} (${org.name})`,
+          `Low stock alert: ${product.name} (${org.name})`,
           lowStockAlertEmailTemplate(org.name, [{ name: product.name, sku: product.sku, quantity: parsed.data.quantity, threshold: alertThreshold }], `${frontendUrl}/dashboard/${org.slug}/inventory`)
         ).catch((e) => console.error("[Email] Low stock alert failed:", e.message));
       }

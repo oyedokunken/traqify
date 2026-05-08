@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Topbar } from "@/components/dashboard/topbar";
 import api from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
+import { useRoleGuard } from "@/lib/use-role-guard";
 
 interface Subscriber {
   id: string;
@@ -20,6 +22,8 @@ const fmt = (d: string) =>
   new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
 export default function NewsletterPage({ params }: { params: { slug: string } }) {
+  const { user: _user } = useAuth();
+  const { blocked } = useRoleGuard(["OWNER", "MANAGER"], `/dashboard/${params.slug}/overview`);
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -45,11 +49,19 @@ export default function NewsletterPage({ params }: { params: { slug: string } })
   const exportCsv = () => {
     const header = "Name,Email,Subscribed On\n";
     const rows = subscribers.map((s) => `"${s.name || ""}","${s.email}","${fmt(s.createdAt)}"`).join("\n");
-    const blob = new Blob([header + rows], { type: "text/csv" });
+    const bom = "\uFEFF";
+    const blob = new Blob([bom + header + rows], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = "newsletter-subscribers.csv"; a.click();
-    URL.revokeObjectURL(url);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "newsletter-subscribers.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 200);
   };
+
+  if (blocked) return null;
 
   return (
     <div>

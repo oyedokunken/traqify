@@ -12,6 +12,7 @@ import { ErrorModal } from "@/components/shared/error-modal";
 import api from "@/lib/api";
 import { formatDate, getInitials, ROLE_LABELS } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
+import { useRoleGuard } from "@/lib/use-role-guard";
 import { useForm } from "react-hook-form";
 
 interface StaffMember {
@@ -24,6 +25,7 @@ type ConfirmAction = { type: "access" | "remove" | "reset"; memberId: string; na
 
 export default function StaffPage({ params }: { params: { slug: string } }) {
   const { user } = useAuth();
+  const { blocked } = useRoleGuard(["OWNER", "MANAGER"], `/dashboard/${params.slug}/overview`);
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -69,6 +71,8 @@ export default function StaffPage({ params }: { params: { slug: string } }) {
     remove: { title: "Remove staff member?", msg: `${confirmAction?.name} will be removed from the organization permanently.`, btn: "Remove" },
     reset: { title: "Reset password?", msg: `A temporary password will be sent to ${confirmAction?.name} by email.`, btn: "Reset password" },
   };
+
+  if (blocked) return null;
 
   return (
     <div>

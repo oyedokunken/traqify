@@ -2,14 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Globe, Copy, Eye, EyeOff, ExternalLink, CheckCircle, ImagePlus, Package, Tag, ShoppingBag, Mail, Phone, MapPin, Link2 } from "lucide-react";
+import { Globe, Copy, Eye, EyeOff, ExternalLink, CheckCircle, ImagePlus, Package, Tag, ShoppingBag, Mail, Phone, MapPin, Link2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Topbar } from "@/components/dashboard/topbar";
 import api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { useRoleGuard } from "@/lib/use-role-guard";
 
 export default function StorePage({ params }: { params: { slug: string } }) {
   const { user } = useAuth();
+  const { blocked } = useRoleGuard(["OWNER", "MANAGER"], `/dashboard/${params.slug}/overview`);
   const [storeData, setStoreData] = useState<any>(null);
   const [productCount, setProductCount] = useState(0);
   const [categoryCount, setCategoryCount] = useState(0);
@@ -17,13 +19,14 @@ export default function StorePage({ params }: { params: { slug: string } }) {
   const [toggling, setToggling] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successMsg, setSuccessMsg] = useState("");
   const [logoUploading, setLogoUploading] = useState(false);
   const [logoError, setLogoError] = useState("");
   const storeUrl = `${typeof window !== "undefined" ? window.location.origin : "http://localhost:3000"}/store/${params.slug}`;
 
-  const fetchStore = () => {
+  const fetchStore = () =>
     api.get(`/api/organizations/${params.slug}`).then((r) => setStoreData(r.data)).catch(() => {}).finally(() => setLoading(false));
-  };
   useEffect(() => {
     fetchStore();
     api.get(`/api/products?status=published&limit=1`).then((r) => setProductCount(r.data.total ?? 0)).catch(() => {});
@@ -33,10 +36,13 @@ export default function StorePage({ params }: { params: { slug: string } }) {
   const isPublished = storeData?.storePublished ?? false;
 
   const togglePublish = async () => {
-    setToggling(true);
+    setToggling(true); setError("");
     try {
-      await api.patch(`/api/organizations/${params.slug}`, { storePublished: !isPublished });
+      const publishing = !isPublished;
+      await api.patch(`/api/organizations/${params.slug}`, { storePublished: publishing });
       fetchStore();
+      setSuccessMsg(publishing ? "Your store is now live and accepting orders." : "Your store has been taken offline.");
+      setShowSuccess(true);
     } catch { setError("Failed to update store status."); }
     finally { setToggling(false); }
   };
@@ -61,7 +67,10 @@ export default function StorePage({ params }: { params: { slug: string } }) {
     finally { setLogoUploading(false); e.target.value = ''; }
   };
 
+  if (blocked) return null;
+
   return (
+    <>
     <div>
       <Topbar title="Store" slug={params.slug} />
       <div className="p-6">
@@ -176,8 +185,9 @@ export default function StorePage({ params }: { params: { slug: string } }) {
                   )}
                 </div>
                 <div className="min-w-0">
-                  <p className="font-semibold text-[#0a0a0a] truncate">{storeData?.name || "—"}</p>
+                  <p className="font-semibold text-[#0a0a0a] truncate">{storeData?.name || "-"}</p>
                   <p className="text-xs text-gray-400 truncate">{storeData?.industry || "No industry set"}</p>
+                  {storeData?.description && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{storeData.description}</p>}
                 </div>
               </div>
               {/* Stats */}
@@ -217,6 +227,14 @@ export default function StorePage({ params }: { params: { slug: string } }) {
             </div>
           </div>
 
+          {/* Description card */}
+          {storeData?.description && (
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <h3 className="font-semibold text-[#0a0a0a] mb-2 text-sm">Store description</h3>
+              <p className="text-sm text-gray-500 leading-relaxed">{storeData.description}</p>
+            </div>
+          )}
+
           {/* Quick link to settings */}
           <p className="text-xs text-gray-400 text-center">
             Update contact details in{" "}
@@ -227,5 +245,32 @@ export default function StorePage({ params }: { params: { slug: string } }) {
         </div>{/* end grid */}
       </div>
     </div>
+
+      {/* Store toggle success modal */}
+      <AnimatePresence>
+        {showSuccess && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
+              className="bg-white rounded-xl p-6 w-full max-w-sm shadow-xl">
+              <div className="flex items-start justify-between mb-3">
+                <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                  <CheckCircle size={20} className="text-green-600" />
+                </div>
+                <button onClick={() => setShowSuccess(false)} className="p-1 rounded-lg text-gray-400 hover:bg-gray-100">
+                  <X size={16} />
+                </button>
+              </div>
+              <h3 className="font-bold text-[#0a0a0a] mb-1">Store updated</h3>
+              <p className="text-gray-500 text-sm mb-5">{successMsg}</p>
+              <button onClick={() => setShowSuccess(false)}
+                className="w-full px-4 py-2 bg-[#0a0a0a] text-white rounded-lg text-sm font-medium hover:bg-black/80 transition-colors">
+                Got it
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }

@@ -179,6 +179,7 @@ export const getCustomerChart = async (req: AuthRequest, res: Response): Promise
 const REPORT_LABELS: Record<string, string> = {
   revenue: "Revenue Report", products: "Products Report", orders: "Orders Report",
   customers: "Customers Report", inventory: "Inventory Report", staff: "Staff Report",
+  newsletter: "Newsletter Subscribers Report",
 };
 
 const DATE_RANGE_TYPES = ["revenue", "orders"];
@@ -196,6 +197,8 @@ async function buildReportData(type: string, orgId: string, from: Date, to: Date
     return prisma.inventory.findMany({ where: { product: { organizationId: orgId } }, include: { product: true }, orderBy: { quantity: "asc" } });
   } else if (type === "staff") {
     return prisma.user.findMany({ where: { organizationId: orgId }, orderBy: { createdAt: "asc" } });
+  } else if (type === "newsletter") {
+    return prisma.newsletterSubscriber.findMany({ orderBy: { createdAt: "desc" } });
   }
   return [];
 }
@@ -238,7 +241,7 @@ function buildPDF(type: string, label: string, org: any, from: string, to: strin
     // Period / date info on the right of the name strip
     const usesDateRange = DATE_RANGE_TYPES.includes(type);
     const periodText = usesDateRange && from && to
-      ? `Period: ${fmt(from)} — ${fmt(to)}`
+      ? `Period: ${fmt(from)} to ${fmt(to)}`
       : `As of ${fmt(new Date())}`;
     doc.fontSize(8).fillColor("#6b7280").font("Helvetica").text(periodText, 0, 66, { width: PAGE_W - 16, align: "right" });
 
@@ -299,6 +302,10 @@ function buildPDF(type: string, label: string, org: any, from: string, to: strin
       const w = [Math.round(totalW*0.22), Math.round(totalW*0.28), Math.round(totalW*0.14), Math.round(totalW*0.14), Math.round(totalW*0.12), Math.round(totalW*0.10)];
       addRow(["Name", "Email", "Role", "Joined", "Last Login", "Active"], w, true);
       rows.forEach((r) => addRow([safe(r.name, "Pending"), safe(r.email), safe(r.role), fmt(r.createdAt), fmt(r.lastLoginAt), r.isActive ? "Yes" : "No"], w));
+    } else if (type === "newsletter") {
+      const w = [Math.round(totalW*0.30), Math.round(totalW*0.45), Math.round(totalW*0.25)];
+      addRow(["Name", "Email", "Subscribed On"], w, true);
+      rows.forEach((r) => addRow([safe(r.name, "Anonymous"), safe(r.email), fmt(r.createdAt)], w));
     }
 
     // Footer

@@ -159,7 +159,7 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
       const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
       sendEmail(
         orgOwner.email,
-        `New order received — ${org?.name}`,
+        `New order received: ${org?.name}`,
         newOrderEmailTemplate(org?.name || "", order.id, order.customer?.name || "Walk-in", order.totalAmount, order.orderItems.length, `${frontendUrl}/dashboard/${org?.slug || ""}/orders`)
       ).catch((e) => console.error("[Email] New order notification failed:", e.message));
     }
@@ -208,13 +208,13 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
       if (status === "APPROVED") {
         sendEmail(
           updated.customer.email,
-          `Order ${updated.orderNumber} approved — ${updated.organization?.name}`,
+          `Order ${updated.orderNumber} approved: ${updated.organization?.name}`,
           orderApprovedEmailTemplate(updated.customer.name, updated.orderNumber, updated.organization?.name || "", updated.totalAmount, items, updated.organization?.logoUrl)
         ).catch((e) => console.error("[Email] Order approved email failed:", e.message));
       } else if (status === "COMPLETED") {
         sendEmail(
           updated.customer.email,
-          `Order ${updated.orderNumber} delivered — ${updated.organization?.name}`,
+          `Order ${updated.orderNumber} delivered: ${updated.organization?.name}`,
           orderCompletedEmailTemplate(updated.customer.name, updated.orderNumber, updated.organization?.name || "", updated.totalAmount, updated.organization?.logoUrl)
         ).catch((e) => console.error("[Email] Order completed email failed:", e.message));
       }

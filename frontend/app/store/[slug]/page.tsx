@@ -237,17 +237,23 @@ export default function PublicStorePage({ params }: { params: { slug: string } }
           <ShoppingBag size={28} className="text-gray-300" />
         </div>
         <h1 className="text-xl font-bold text-[#0a0a0a] mb-2">Store is offline</h1>
-        <p className="text-gray-500 text-sm">This store is currently not accepting orders. Please check back later.</p>
+        <p className="text-gray-500 text-sm mb-5">This store is currently not accepting orders. Please check back later.</p>
+        <a href="/" className="inline-flex items-center gap-2 px-4 py-2 bg-[#DE1010] text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors">
+          Go to Traqify homepage
+        </a>
       </div>
     </div>
   );
 
   if (notFound) return (
     <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center">
+      <div className="text-center px-4">
         <ShoppingBag size={48} className="text-gray-300 mx-auto mb-4" />
         <h1 className="text-xl font-bold text-[#0a0a0a] mb-2">Store not found</h1>
-        <p className="text-gray-500 text-sm">This store does not exist or is no longer available.</p>
+        <p className="text-gray-500 text-sm mb-5">This store does not exist or is no longer available.</p>
+        <a href="/" className="inline-flex items-center gap-2 px-4 py-2 bg-[#DE1010] text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors">
+          Go to Traqify homepage
+        </a>
       </div>
     </div>
   );

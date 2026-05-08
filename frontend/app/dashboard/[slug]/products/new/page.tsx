@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { ImagePlus, AlertCircle, Wand2, ArrowLeft, GripVertical, X, Plus, Upload, Link as LinkIcon, Tag } from "lucide-react";
+import { ImagePlus, AlertCircle, Wand2, ArrowLeft, GripVertical, X, Plus, Upload, Link as LinkIcon, Tag, CheckCircle2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -42,17 +42,19 @@ function generateSKU(name: string): string {
 export default function NewProductPage({ params }: { params: { slug: string } }) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [imageError, setImageError] = useState("");
   const [uploadProgress, setUploadProgress] = useState(false);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
-  const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [downloadMode, setDownloadMode] = useState<"url" | "upload">("url");
   const [downloadFile, setDownloadFile] = useState<File | null>(null);
   const [attributes, setAttributes] = useState<{ name: string; values: string; id: number }[]>([]);
+  const [resultModal, setResultModal] = useState<{ open: boolean; type: "success" | "error"; title: string; body: string }>({ open: false, type: "error", title: "", body: "" });
+  const closeModal = () => setResultModal((m) => ({ ...m, open: false }));
+  const showError = (title: string, body: string) => setResultModal({ open: true, type: "error", title, body });
+  const showSuccess = (title: string, body: string) => setResultModal({ open: true, type: "success", title, body });
   const fileRef = useRef<HTMLInputElement>(null);
   const downloadFileRef = useRef<HTMLInputElement>(null);
 
@@ -108,16 +110,17 @@ export default function NewProductPage({ params }: { params: { slug: string } })
 
   const onFormError = (errs: any) => {
     const msgs = Object.values(errs).map((e: any) => e?.message).filter(Boolean) as string[];
-    setValidationErrors(msgs);
+    showError("Please fix the following", msgs.join("\n"));
   };
 
   const onSubmit = async (data: any) => {
-    setIsLoading(true); setError(""); setValidationErrors([]);
+    setIsLoading(true);
     try {
       const uploadedUrls: string[] = [];
       if (imageFiles.length > 0) {
         setUploadProgress(true);
         for (const file of imageFiles) {
+          if (file.size > 2 * 1024 * 1024) { setImageError(`"${file.name}" exceeds 2 MB.`); continue; }
           const fd = new FormData(); fd.append("image", file);
           try {
             const r = await api.post("/api/products/upload-image", fd, { headers: { "Content-Type": "multipart/form-data" } });
@@ -132,11 +135,18 @@ export default function NewProductPage({ params }: { params: { slug: string } })
 
       let downloadUrl = data.downloadUrl || undefined;
       if (data.productType === "DOWNLOADABLE" && downloadMode === "upload" && downloadFile) {
+        if (downloadFile.size > 4 * 1024 * 1024) {
+          showError("File too large", "Downloadable files must be under 4 MB. Please compress your file or host it externally and use a download URL instead.");
+          setIsLoading(false); return;
+        }
         const fd = new FormData(); fd.append("image", downloadFile);
         try {
           const r = await api.post("/api/products/upload-image", fd, { headers: { "Content-Type": "multipart/form-data" } });
           downloadUrl = r.data.url;
-        } catch { setError("Failed to upload downloadable file."); setIsLoading(false); return; }
+        } catch (err: any) {
+          showError("Upload failed", err.response?.data?.error || "Failed to upload the downloadable file. Please check your internet connection or try using a URL instead.");
+          setIsLoading(false); return;
+        }
       }
 
       const variants = data.productType === "VARIABLE"
@@ -158,8 +168,9 @@ export default function NewProductPage({ params }: { params: { slug: string } })
         downloadUrl: data.productType === "DOWNLOADABLE" ? downloadUrl : undefined,
         variants,
       });
-      router.push(`/dashboard/${params.slug}/products`);
-    } catch (err: any) { setError(err.response?.data?.error || "Failed to save product."); }
+      showSuccess("Product saved", "Your product has been created and is now visible in your catalog.");
+      setTimeout(() => router.push(`/dashboard/${params.slug}/products`), 1800);
+    } catch (err: any) { showError("Failed to save product", err.response?.data?.error || "Something went wrong. Please try again."); }
     finally { setIsLoading(false); }
   };
 
@@ -178,11 +189,6 @@ export default function NewProductPage({ params }: { params: { slug: string } })
         </div>
 
         <form onSubmit={handleSubmit(onSubmit, onFormError)}>
-          {error && (
-            <div className="flex items-start gap-2 text-sm text-[#DE1010] bg-red-50 px-4 py-3 rounded-lg mb-6 border border-red-200">
-              <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />{error}
-            </div>
-          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left/main column */}
@@ -401,35 +407,36 @@ export default function NewProductPage({ params }: { params: { slug: string } })
         </form>
       </motion.div>
 
-      {/* Validation error modal */}
+      {/* Result modal (success / error) */}
       <AnimatePresence>
-        {validationErrors.length > 0 && (
+        {resultModal.open && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4"
-            onClick={() => setValidationErrors([])}>
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4"
+            onClick={closeModal}>
             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
               className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl"
               onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center flex-shrink-0">
-                  <AlertCircle size={18} className="text-[#DE1010]" />
+              <div className="flex items-start justify-between mb-3">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                  resultModal.type === "success" ? "bg-green-100" : "bg-red-50"
+                }`}>
+                  {resultModal.type === "success"
+                    ? <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                    : <AlertCircle size={20} className="text-[#DE1010]" />}
                 </div>
-                <div>
-                  <p className="font-semibold text-[#0a0a0a] text-sm">Fix the following errors</p>
-                  <p className="text-xs text-gray-400">Please correct all fields before saving.</p>
-                </div>
+                <button onClick={closeModal} className="p-1 rounded-lg text-gray-400 hover:bg-gray-100 transition-colors">
+                  <X size={16} />
+                </button>
               </div>
-              <ul className="space-y-1.5 mb-5">
-                {validationErrors.map((msg, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#DE1010] mt-1.5 flex-shrink-0" />
-                    {msg}
-                  </li>
-                ))}
-              </ul>
-              <button onClick={() => setValidationErrors([])}
-                className="w-full py-2.5 bg-[#0a0a0a] text-white rounded-xl text-sm font-medium hover:bg-black/80 transition-colors">
-                Got it, fix errors
+              <h3 className="font-bold text-[#0a0a0a] text-base mb-1">{resultModal.title}</h3>
+              <p className="text-sm text-gray-500 whitespace-pre-line mb-5">{resultModal.body}</p>
+              <button onClick={closeModal}
+                className={`w-full py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                  resultModal.type === "success"
+                    ? "bg-[#0a0a0a] text-white hover:bg-black/80"
+                    : "bg-[#DE1010] text-white hover:bg-red-700"
+                }`}>
+                {resultModal.type === "success" ? "Redirecting..." : "Got it, fix errors"}
               </button>
             </motion.div>
           </motion.div>

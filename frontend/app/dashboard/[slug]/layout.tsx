@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Sidebar } from "@/components/dashboard/sidebar";
+import { SidebarProvider } from "@/lib/sidebar-context";
 
 export default function DashboardLayout({
   children,
@@ -31,14 +32,13 @@ export default function DashboardLayout({
   if (!user) return null;
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
-      <Sidebar slug={params.slug} collapsed={collapsed} onCollapse={setCollapsed} />
-      <main
-        className="overflow-y-auto min-w-0 flex-1 transition-all duration-200"
-        style={{ width: `calc(100% - ${collapsed ? 64 : 240}px)` }}
-      >
-        {children}
-      </main>
-    </div>
+    <SidebarProvider>
+      <div className="flex h-screen bg-gray-50 overflow-hidden">
+        <Sidebar slug={params.slug} collapsed={collapsed} onCollapse={setCollapsed} />
+        <main className="overflow-y-auto min-w-0 flex-1 transition-all duration-200">
+          {children}
+        </main>
+      </div>
+    </SidebarProvider>
   );
 }
