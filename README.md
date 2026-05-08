@@ -601,10 +601,10 @@ Start the backend dev server:
 npm run dev
 ```
 
-The API will be available at **http://localhost:5000**. You can verify it is running:
+The API will be available at **http://localhost:5000** (local) or **https://traqify-api.vercel.app/** (production). You can verify it is running:
 
 ```bash
-curl http://localhost:5000/health
+curl https://traqify-api.vercel.app/health
 # { "status": "ok", ... }
 ```
 
@@ -634,7 +634,7 @@ Start the frontend:
 npm run dev
 ```
 
-The app will be available at **http://localhost:3000**.
+The app will be available at **http://localhost:3000** (local) or **https://traqify.vercel.app/** (production).
 
 ---
 
@@ -654,15 +654,16 @@ The app will be available at **http://localhost:3000**.
 
 | URL | Description |
 |-----|-------------|
-| http://localhost:3000 | Landing page |
-| http://localhost:3000/register | Create an account |
-| http://localhost:3000/login | Sign in |
-| http://localhost:3000/create-organization | Org setup (post-registration) |
-| http://localhost:3000/dashboard/[slug]/overview | Dashboard home |
-| http://localhost:3000/dashboard/[slug]/products | Products |
-| http://localhost:3000/dashboard/[slug]/orders | Orders |
-| http://localhost:3000/dashboard/[slug]/staff | Staff management |
-| http://localhost:3000/store/[slug] | Public store page |
+| https://traqify.vercel.app | Landing page (production) |
+| https://traqify.vercel.app/register | Create an account |
+| https://traqify.vercel.app/login | Sign in |
+| https://traqify.vercel.app/create-organization | Org setup (post-registration) |
+| https://traqify.vercel.app/dashboard/[slug]/overview | Dashboard home |
+| https://traqify.vercel.app/dashboard/[slug]/products | Products |
+| https://traqify.vercel.app/dashboard/[slug]/orders | Orders |
+| https://traqify.vercel.app/dashboard/[slug]/staff | Staff management |
+| https://traqify.vercel.app/store/[slug] | Public store page |
+| http://localhost:3000 | Landing page (local) |
 
 ---
 
@@ -721,15 +722,15 @@ http://localhost:3000
 5. Under **Authorized Redirect URIs**, add:
 
 ```
-http://localhost:5000/api/auth/google-callback
+https://traqify-api.vercel.app/api/auth/google-callback
 ```
 
 6. Save and copy the **Client ID** and **Client Secret** into `backend/.env`
 7. Wait up to 5 minutes for changes to propagate
 
 For production, also add:
-- `https://your-frontend.vercel.app` to JavaScript Origins
-- `https://your-backend.vercel.app/api/auth/google-callback` to Redirect URIs
+- `https://traqify.vercel.app` to JavaScript Origins
+- `https://traqify-api.vercel.app/api/auth/google-callback` to Redirect URIs
 
 ---
 
