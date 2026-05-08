@@ -670,3 +670,13 @@ See the step-by-step guides:
 ## License
 
 MIT. See [LICENSE](LICENSE).
+---
+
+## Author
+
+**Oyedokun Kehinde**
+Software Engineer
+
+- Email: [oyedokunken@gmail.com](mailto:oyedokunken@gmail.com)
+- WhatsApp: [+2348028134942](https://wa.link/nv875h)
+- GitHub: [@oyedokunken](https://github.com/oyedokunken)

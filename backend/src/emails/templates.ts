@@ -88,7 +88,7 @@ const wrapEmail = (content: string) => `
     ${content}
     <div style="${footerStyle}">
       <p>This email was sent by Traqify. If you did not request this, you can safely ignore it.</p>
-      <p style="margin-top: 8px;">Traqify &mdash; Store Management Platform</p>
+      <p style="margin-top: 8px;">Traqify - Store Management Platform</p>
     </div>
   </div>
 </body>
@@ -98,9 +98,9 @@ const wrapEmail = (content: string) => `
 export const otpEmailTemplate = (name: string, otp: string): string =>
   wrapEmail(`
     <h1 style="${headingStyle}">Verify your email address</h1>
-    <p style="${bodyStyle}">Hi ${name}, welcome to Traqify. Use the code below to verify your email address. It expires in 10 minutes.</p>
+    <p style="${bodyStyle}">Hi ${name}, thanks for signing up for Traqify. Enter the code below to verify your email address. This code expires in 10 minutes and can only be used once.</p>
     <div style="${otpBoxStyle}">${otp}</div>
-    <p style="${bodyStyle}">If you did not sign up for Traqify, please disregard this email.</p>
+    <p style="${bodyStyle}">If you did not create a Traqify account, you can safely ignore this email. No action is required on your part.</p>
   `);
 
 export const passwordResetEmailTemplate = (name: string, resetUrl: string): string =>
@@ -124,12 +124,94 @@ export const staffInviteEmailTemplate = (
     <p style="${bodyStyle}">If you were not expecting this invitation, you can safely ignore it.</p>
   `);
 
-export const welcomeEmailTemplate = (name: string, orgName: string, dashboardUrl: string): string =>
+export const welcomeUserEmailTemplate = (name: string, orgName: string, dashboardUrl: string): string =>
   wrapEmail(`
-    <h1 style="${headingStyle}">Welcome to Traqify, ${name}!</h1>
-    <p style="${bodyStyle}">Your organization <strong>${orgName}</strong> is now set up on Traqify. You can start adding products, inviting your team, and managing your store right away.</p>
+    <h1 style="${headingStyle}">Welcome to Traqify, ${name}</h1>
+    <p style="${bodyStyle}">Your account is verified and your organization <strong>${orgName}</strong> is ready to go. You can now start adding products, inviting team members, and managing your store from your dashboard.</p>
     <a href="${dashboardUrl}" style="${buttonStyle}">Go to Dashboard</a>
-    <p style="${bodyStyle}">If you have any questions, our support team is always happy to help.</p>
+    <p style="${bodyStyle}">Here is what you can do right away:</p>
+    <ul style="${bodyStyle}; padding-left: 20px; margin-top: 0;">
+      <li>Add your products and set up inventory alerts</li>
+      <li>Invite your team with the right roles</li>
+      <li>Share your public store page with customers</li>
+    </ul>
+    <p style="${bodyStyle}">If you have any questions, reply to this email and we will help you get sorted.</p>
+  `);
+
+export const welcomeCompanyEmailTemplate = (orgName: string, ownerName: string, dashboardUrl: string): string =>
+  wrapEmail(`
+    <h1 style="${headingStyle}">${orgName} is now live on Traqify</h1>
+    <p style="${bodyStyle}">Hi ${ownerName}, your organization has been successfully created and your workspace is ready. This is a confirmation that your account setup is complete.</p>
+    <table style="width: 100%; background: #f4f4f5; border-radius: 8px; padding: 20px; margin: 24px 0; border-collapse: collapse;">
+      <tr><td style="padding: 6px 0; font-size: 14px; color: #52525b;"><strong>Organization:</strong></td><td style="padding: 6px 0; font-size: 14px; color: #0a0a0a;">${orgName}</td></tr>
+      <tr><td style="padding: 6px 0; font-size: 14px; color: #52525b;"><strong>Account owner:</strong></td><td style="padding: 6px 0; font-size: 14px; color: #0a0a0a;">${ownerName}</td></tr>
+      <tr><td style="padding: 6px 0; font-size: 14px; color: #52525b;"><strong>Role:</strong></td><td style="padding: 6px 0; font-size: 14px; color: #0a0a0a;">Owner</td></tr>
+    </table>
+    <a href="${dashboardUrl}" style="${buttonStyle}">Open Dashboard</a>
+    <p style="${bodyStyle}">Keep this email for your records. You can manage your subscription, team, and store settings from your dashboard at any time.</p>
+  `);
+
+// Keep old name as alias for backward compat
+export const welcomeEmailTemplate = welcomeUserEmailTemplate;
+
+export const newProductEmailTemplate = (orgName: string, productName: string, sku: string, price: number, dashboardUrl: string): string =>
+  wrapEmail(`
+    <h1 style="${headingStyle}">New product added to ${orgName}</h1>
+    <p style="${bodyStyle}">A new product has been added to your Traqify catalog. Here are the details:</p>
+    <table style="width: 100%; background: #f4f4f5; border-radius: 8px; padding: 20px; margin: 24px 0; border-collapse: collapse;">
+      <tr><td style="padding: 6px 0; font-size: 14px; color: #52525b;"><strong>Product name:</strong></td><td style="padding: 6px 0; font-size: 14px; color: #0a0a0a;">${productName}</td></tr>
+      <tr><td style="padding: 6px 0; font-size: 14px; color: #52525b;"><strong>SKU:</strong></td><td style="padding: 6px 0; font-size: 14px; color: #0a0a0a;">${sku}</td></tr>
+      <tr><td style="padding: 6px 0; font-size: 14px; color: #52525b;"><strong>Price:</strong></td><td style="padding: 6px 0; font-size: 14px; color: #0a0a0a;">NGN ${price.toLocaleString()}</td></tr>
+    </table>
+    <a href="${dashboardUrl}" style="${buttonStyle}">View in Dashboard</a>
+  `);
+
+export const newOrderEmailTemplate = (
+  orgName: string,
+  orderId: string,
+  customerName: string,
+  totalAmount: number,
+  itemCount: number,
+  dashboardUrl: string
+): string =>
+  wrapEmail(`
+    <h1 style="${headingStyle}">New order received</h1>
+    <p style="${bodyStyle}">A new order has been placed on ${orgName}. Here is a summary:</p>
+    <table style="width: 100%; background: #f4f4f5; border-radius: 8px; padding: 20px; margin: 24px 0; border-collapse: collapse;">
+      <tr><td style="padding: 6px 0; font-size: 14px; color: #52525b;"><strong>Order ID:</strong></td><td style="padding: 6px 0; font-size: 14px; color: #0a0a0a;">#${orderId.slice(-8).toUpperCase()}</td></tr>
+      <tr><td style="padding: 6px 0; font-size: 14px; color: #52525b;"><strong>Customer:</strong></td><td style="padding: 6px 0; font-size: 14px; color: #0a0a0a;">${customerName}</td></tr>
+      <tr><td style="padding: 6px 0; font-size: 14px; color: #52525b;"><strong>Items:</strong></td><td style="padding: 6px 0; font-size: 14px; color: #0a0a0a;">${itemCount}</td></tr>
+      <tr><td style="padding: 6px 0; font-size: 14px; color: #52525b;"><strong>Total:</strong></td><td style="padding: 6px 0; font-size: 14px; color: #DE1010; font-weight: 700;">NGN ${totalAmount.toLocaleString()}</td></tr>
+    </table>
+    <a href="${dashboardUrl}" style="${buttonStyle}">View Order</a>
+    <p style="${bodyStyle}">Log in to your dashboard to review, process, or update the order status.</p>
+  `);
+
+export const lowStockAlertEmailTemplate = (orgName: string, products: { name: string; sku: string; quantity: number; threshold: number }[], dashboardUrl: string): string =>
+  wrapEmail(`
+    <h1 style="${headingStyle}">Low stock alert for ${orgName}</h1>
+    <p style="${bodyStyle}">The following products in your Traqify inventory have fallen at or below their low-stock threshold. Please restock soon to avoid running out.</p>
+    <table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+      <thead>
+        <tr style="background: #f4f4f5;">
+          <th style="padding: 10px 12px; text-align: left; font-size: 13px; color: #52525b;">Product</th>
+          <th style="padding: 10px 12px; text-align: left; font-size: 13px; color: #52525b;">SKU</th>
+          <th style="padding: 10px 12px; text-align: right; font-size: 13px; color: #52525b;">In stock</th>
+          <th style="padding: 10px 12px; text-align: right; font-size: 13px; color: #52525b;">Threshold</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${products.map((p) => `
+          <tr style="border-bottom: 1px solid #f4f4f5;">
+            <td style="padding: 10px 12px; font-size: 14px; color: #0a0a0a;">${p.name}</td>
+            <td style="padding: 10px 12px; font-size: 14px; color: #52525b;">${p.sku}</td>
+            <td style="padding: 10px 12px; font-size: 14px; color: #DE1010; text-align: right; font-weight: 600;">${p.quantity}</td>
+            <td style="padding: 10px 12px; font-size: 14px; color: #52525b; text-align: right;">${p.threshold}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+    <a href="${dashboardUrl}" style="${buttonStyle}">Review Inventory</a>
   `);
 
 export const accountRestrictedEmailTemplate = (name: string): string =>

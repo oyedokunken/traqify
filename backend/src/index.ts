@@ -69,6 +69,7 @@ app.use("/api/customers", customerRoutes);
 app.use("/api/staff", staffRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/audit", auditRoutes);
+app.use("/api/audit-logs", auditRoutes);
 app.use("/api/newsletter", newsletterRoutes);
 app.use("/api/store", storeRoutes);
 

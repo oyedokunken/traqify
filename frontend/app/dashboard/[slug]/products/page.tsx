@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Search, Edit, Trash2, MoreHorizontal, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,11 +47,16 @@ export default function ProductsPage({ params }: { params: { slug: string } }) {
 
   useEffect(() => { fetchProducts(); }, [search]);
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+
+  const handleDelete = (id: string, name: string) => setDeleteTarget({ id, name });
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      await api.delete(`/api/products/${id}`);
-      setProducts((p) => p.filter((x) => x.id !== id));
+      await api.delete(`/api/products/${deleteTarget.id}`);
+      setProducts((p) => p.filter((x) => x.id !== deleteTarget.id));
+      setDeleteTarget(null);
     } catch { setError("Failed to delete product."); }
   };
 
@@ -159,6 +164,24 @@ export default function ProductsPage({ params }: { params: { slug: string } }) {
           onSaved={() => { setShowModal(false); fetchProducts(); }}
         />
       )}
+      <AnimatePresence>
+        {deleteTarget && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
+              className="bg-white rounded-xl p-6 w-full max-w-sm shadow-xl">
+              <h3 className="font-bold text-[#0a0a0a] mb-2">Delete product?</h3>
+              <p className="text-gray-500 text-sm mb-5">
+                This will permanently delete <span className="font-medium text-[#0a0a0a]">{deleteTarget.name}</span>. This action cannot be undone.
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setDeleteTarget(null)} className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+                <button onClick={confirmDelete} className="flex-1 px-4 py-2 bg-[#DE1010] text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors">Delete</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <ErrorModal isOpen={!!error} onClose={() => setError("")} message={error} />
     </div>
   );
