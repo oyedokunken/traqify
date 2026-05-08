@@ -3,6 +3,8 @@ import prisma from "../config/database";
 import { inventoryUpdateSchema } from "../utils/validators";
 import { createAuditLog } from "../utils/audit";
 import { AuthRequest } from "../middleware/auth.middleware";
+import { sendEmail } from "../config/email";
+import { lowStockAlertEmailTemplate } from "../emails/templates";
 
 export const getInventory = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -12,7 +14,7 @@ export const getInventory = async (req: AuthRequest, res: Response): Promise<voi
       where: { product: { organizationId: orgId } },
       include: {
         product: {
-          select: { id: true, name: true, sku: true, categoryId: true, imageUrl: true, isActive: true },
+          select: { id: true, name: true, sku: true, isActive: true, productCategory: { select: { name: true } } },
         },
       },
       orderBy: { product: { name: "asc" } },
@@ -82,9 +84,29 @@ export const updateStock = async (req: AuthRequest, res: Response): Promise<void
       "UPDATE",
       "Inventory",
       productId,
-      `Updated stock for ${product.name}: quantity=${parsed.data.quantity}`,
+      `Updated stock for ${product.name}: quantity=${parsed.data.quantity}, alert=${parsed.data.lowStockAlert ?? inventory.lowStockAlert}`,
       req
     );
+
+    const alertThreshold = parsed.data.lowStockAlert ?? inventory.lowStockAlert;
+    if (parsed.data.quantity !== undefined && parsed.data.quantity <= alertThreshold) {
+      const owner = await prisma.user.findFirst({
+        where: { organizationId: orgId, role: "OWNER" },
+        select: { email: true, name: true },
+      });
+      const org = await prisma.organization.findUnique({
+        where: { id: orgId },
+        select: { name: true, slug: true },
+      });
+      if (owner && org) {
+        const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+        sendEmail(
+          owner.email,
+          `Low stock alert — ${product.name} (${org.name})`,
+          lowStockAlertEmailTemplate(org.name, [{ name: product.name, sku: product.sku, quantity: parsed.data.quantity, threshold: alertThreshold }], `${frontendUrl}/dashboard/${org.slug}/inventory`)
+        ).catch((e) => console.error("[Email] Low stock alert failed:", e.message));
+      }
+    }
 
     res.json(inventory);
   } catch {
