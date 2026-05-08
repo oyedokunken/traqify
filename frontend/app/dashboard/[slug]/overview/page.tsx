@@ -19,9 +19,8 @@ import { formatCurrency } from "@/lib/utils";
 import { AnimatePresence } from "framer-motion";
 import {
   AreaChart, Area,
-  BarChart, Bar,
   LineChart, Line,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 
 interface OverviewData {
@@ -78,11 +77,11 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
     Promise.all([
       api.get("/api/reports/overview"),
       api.get("/api/reports/revenue-chart?period=30"),
-    ]).then(([overview, chartData]) => {
+      api.get("/api/reports/customer-chart?period=30"),
+    ]).then(([overview, chartData, customerData]) => {
       setData(overview.data);
-      const pts: ChartPoint[] = chartData.data || [];
-      setChart(pts);
-      setCustomerChart(pts.map((p, i) => ({ date: p.date, customers: Math.max(0, Math.round((overview.data.totalCustomers || 0) * (i + 1) / Math.max(pts.length, 1))) })));
+      setChart(chartData.data || []);
+      setCustomerChart(customerData.data || []);
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
@@ -225,13 +224,19 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={chart} margin={{ top: 4, right: 0, left: -20, bottom: 0 }}>
+                  <AreaChart data={chart} margin={{ top: 4, right: 0, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="ordGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#DE1010" stopOpacity={0.12} />
+                        <stop offset="95%" stopColor="#DE1010" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} />
                     <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} />
-                    <Tooltip contentStyle={{ border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 12 }} />
-                    <Bar dataKey="orders" fill="#DE1010" radius={[3, 3, 0, 0]} name="Orders" />
-                  </BarChart>
+                    <Tooltip contentStyle={{ border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 12 }} formatter={(v: number) => [v, "Orders"]} />
+                    <Area type="monotone" dataKey="orders" stroke="#DE1010" strokeWidth={2} fill="url(#ordGrad)" name="Orders" dot={false} />
+                  </AreaChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>

@@ -145,6 +145,32 @@ export const getRevenueChart = async (req: AuthRequest, res: Response): Promise<
   }
 };
 
+export const getCustomerChart = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const orgId = req.user!.organizationId!;
+    const { period = "30" } = req.query;
+    const days = parseInt(period as string);
+    const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+    const data = await prisma.$queryRaw<{ date: Date; count: bigint }[]>`
+      SELECT DATE(c."createdAt") as date, COUNT(*) as count
+      FROM customers c
+      WHERE c."organizationId" = ${orgId}
+        AND c."createdAt" >= ${startDate}
+      GROUP BY DATE(c."createdAt")
+      ORDER BY date ASC
+    `;
+
+    let cumulative = 0;
+    res.json(data.map((d: any) => {
+      cumulative += Number(d.count);
+      return { date: String(d.date).substring(0, 10), customers: cumulative };
+    }));
+  } catch {
+    res.status(500).json({ error: "Failed to fetch customer chart data." });
+  }
+};
+
 const REPORT_LABELS: Record<string, string> = {
   revenue: "Revenue Report", products: "Products Report", orders: "Orders Report",
   customers: "Customers Report", inventory: "Inventory Report", staff: "Staff Report",

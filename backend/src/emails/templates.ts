@@ -264,6 +264,39 @@ export const wishlistReminderTemplate = (
     <p style="font-size:11px;color:#9ca3af;text-align:center;margin-top:24px">Powered by <strong style="color:#DE1010">Traqify</strong></p>
   `);
 
+export const orderApprovedEmailTemplate = (
+  customerName: string, orderNumber: string, orgName: string, totalAmount: number,
+  items: { name: string; qty: number; subtotal: number }[], orgLogoUrl?: string | null
+): string =>
+  wrapEmail(`
+    <div style="text-align:center;margin-bottom:24px">
+      ${orgLogoUrl ? `<img src="${orgLogoUrl}" alt="${orgName}" style="width:48px;height:48px;border-radius:12px;object-fit:cover;margin-bottom:10px">` : ""}
+      <p style="margin:0;font-size:13px;color:#6b7280">from <strong>${orgName}</strong></p>
+    </div>
+    <h1 style="${headingStyle}">Your order has been approved! ✓</h1>
+    <p style="${bodyStyle}">Hi ${customerName}, great news! Your order <strong>${orderNumber}</strong> has been approved and is now being processed. We will notify you once it is on its way.</p>
+    <table style="width:100%;border-collapse:collapse;font-size:14px;margin:20px 0">
+      <tr style="background:#f4f4f5"><th style="text-align:left;padding:10px 12px;font-size:12px;color:#52525b">Item</th><th style="text-align:right;padding:10px 12px;font-size:12px;color:#52525b">Amount</th></tr>
+      ${items.map((i) => `<tr style="border-bottom:1px solid #f4f4f5"><td style="padding:10px 12px;color:#0a0a0a">${i.name} × ${i.qty}</td><td style="padding:10px 12px;text-align:right;font-weight:600;color:#0a0a0a">&#8358;${i.subtotal.toLocaleString()}</td></tr>`).join("")}
+      <tr><td style="padding:12px;font-weight:700;border-top:2px solid #f0f0f0">Total</td><td style="padding:12px;font-weight:700;text-align:right;color:#DE1010;border-top:2px solid #f0f0f0">&#8358;${totalAmount.toLocaleString()}</td></tr>
+    </table>
+    <p style="${bodyStyle}">Order reference: <strong>${orderNumber}</strong></p>
+  `);
+
+export const orderCompletedEmailTemplate = (
+  customerName: string, orderNumber: string, orgName: string, totalAmount: number, orgLogoUrl?: string | null
+): string =>
+  wrapEmail(`
+    <div style="text-align:center;margin-bottom:24px">
+      ${orgLogoUrl ? `<img src="${orgLogoUrl}" alt="${orgName}" style="width:48px;height:48px;border-radius:12px;object-fit:cover;margin-bottom:10px">` : ""}
+      <p style="margin:0;font-size:13px;color:#6b7280">from <strong>${orgName}</strong></p>
+    </div>
+    <h1 style="${headingStyle}">Your order has been delivered! 🎉</h1>
+    <p style="${bodyStyle}">Hi ${customerName}, your order <strong>${orderNumber}</strong> (&#8358;${totalAmount.toLocaleString()}) has been marked as delivered. Thank you for shopping with <strong>${orgName}</strong>!</p>
+    <p style="${bodyStyle}">If you have any questions or concerns about your order, please don't hesitate to reach out to us directly.</p>
+    <p style="${bodyStyle}">We hope to see you again soon.</p>
+  `);
+
 export const reportEmailTemplate = (orgName: string, reportLabel: string, dateFrom: string, dateTo: string, dashboardUrl: string): string =>
   wrapEmail(`
     <h1 style="${headingStyle}">${reportLabel}</h1>

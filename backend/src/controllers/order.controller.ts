@@ -3,6 +3,8 @@ import prisma from "../config/database";
 import { orderSchema } from "../utils/validators";
 import { createAuditLog } from "../utils/audit";
 import { AuthRequest } from "../middleware/auth.middleware";
+import { sendEmail } from "../config/email";
+import { orderApprovedEmailTemplate, orderCompletedEmailTemplate } from "../emails/templates";
 
 const generateOrderNumber = (): string => {
   const timestamp = Date.now().toString(36).toUpperCase();
@@ -175,9 +177,36 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
     const updated = await prisma.order.update({
       where: { id },
       data: { status },
-    });
+      include: {
+        customer: true,
+        orderItems: { include: { product: { select: { name: true } } } },
+        organization: { select: { name: true, logoUrl: true } },
+      },
+    }) as any;
 
     await createAuditLog(req.user!.id, orgId, "UPDATE", "Order", id, `Updated order ${order.orderNumber} status to ${status}`, req);
+
+    if (updated.customer?.email) {
+      const items = updated.orderItems.map((i: any) => ({
+        name: i.product?.name || "Item",
+        qty: i.quantity,
+        subtotal: i.subtotal,
+      }));
+      if (status === "APPROVED") {
+        sendEmail(
+          updated.customer.email,
+          `Order ${updated.orderNumber} approved — ${updated.organization?.name}`,
+          orderApprovedEmailTemplate(updated.customer.name, updated.orderNumber, updated.organization?.name || "", updated.totalAmount, items, updated.organization?.logoUrl)
+        ).catch((e) => console.error("[Email] Order approved email failed:", e.message));
+      } else if (status === "COMPLETED") {
+        sendEmail(
+          updated.customer.email,
+          `Order ${updated.orderNumber} delivered — ${updated.organization?.name}`,
+          orderCompletedEmailTemplate(updated.customer.name, updated.orderNumber, updated.organization?.name || "", updated.totalAmount, updated.organization?.logoUrl)
+        ).catch((e) => console.error("[Email] Order completed email failed:", e.message));
+      }
+    }
+
     res.json(updated);
   } catch {
     res.status(500).json({ error: "Failed to update order status." });
