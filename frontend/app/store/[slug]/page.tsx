@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Package, Search, ShoppingBag, ShoppingCart, X, Plus, Minus, ChevronLeft, ChevronRight, Heart, MapPin, Phone, Mail, Globe, Star, SlidersHorizontal } from "lucide-react";
+import { Package, Search, ShoppingCart, X, Plus, Minus, ChevronLeft, ChevronRight, Heart, MapPin, Phone, Mail, Globe, Star, SlidersHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollToTop } from "@/components/shared/scroll-to-top";
@@ -48,9 +48,9 @@ interface Category {
 const fadeUp = { hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } };
 const stagger = { visible: { transition: { staggerChildren: 0.06 } } };
 
-function ProductCard({ product, images, inStock, inWishlist, slug, onAddToCart, onToggleWishlist, onView }: {
+function ProductCard({ product, images, inStock, inWishlist, slug, onAddToCart, onToggleWishlist }: {
   product: Product; images: string[]; inStock: boolean; inWishlist: boolean; slug: string;
-  onAddToCart: () => void; onToggleWishlist: () => void; onView: () => void;
+  onAddToCart: () => void; onToggleWishlist: () => void;
 }) {
   const [imgIdx, setImgIdx] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -71,9 +71,10 @@ function ProductCard({ product, images, inStock, inWishlist, slug, onAddToCart, 
   return (
     <motion.div variants={fadeUp} className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow group"
       onMouseEnter={startCycle} onMouseLeave={stopCycle}>
-      <div className="relative h-44 bg-gray-100 flex items-center justify-center overflow-hidden cursor-pointer" onClick={onView}>
+      <Link href={`/store/${slug}/products/${product.id}`} className="block">
+      <div className="relative h-48 bg-gray-50 flex items-center justify-center overflow-hidden cursor-pointer">
         {images.length > 0 ? (
-          <img src={images[imgIdx]} alt={product.name} className="w-full h-full object-cover transition-opacity duration-300" />
+          <img src={images[imgIdx]} alt={product.name} className="w-full h-full object-contain transition-opacity duration-300 p-1" />
         ) : (
           <Package size={32} className="text-gray-300" />
         )}
@@ -83,44 +84,35 @@ function ProductCard({ product, images, inStock, inWishlist, slug, onAddToCart, 
             {images.map((_, i) => <span key={i} className={`w-1.5 h-1.5 rounded-full transition-colors ${i === imgIdx ? "bg-white" : "bg-white/50"}`} />)}
           </div>
         )}
-        <div className="absolute top-2 right-2 flex flex-col gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={(e) => { e.stopPropagation(); onToggleWishlist(); }}
-            className={`w-7 h-7 rounded-full flex items-center justify-center shadow-md transition-colors ${inWishlist ? "bg-[#DE1010] text-white" : "bg-white/90 text-gray-500 hover:bg-[#DE1010] hover:text-white"}`}>
-            <Heart size={13} className={inWishlist ? "fill-white" : ""} />
-          </button>
-        </div>
         {product.comparePrice && product.comparePrice > product.price && (
           <div className="absolute top-2 left-2 bg-[#DE1010] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md">
             -{Math.round((1 - product.price / product.comparePrice) * 100)}%
           </div>
         )}
       </div>
+      </Link>
       <div className="p-3">
         <p className="font-semibold text-[#0a0a0a] text-sm truncate">{product.name}</p>
         {product.productCategory && <p className="text-[10px] text-gray-400 mt-0.5">{product.productCategory.name}</p>}
-        <div className="flex items-center justify-between mt-1.5">
+        <div className="flex items-center justify-between mt-1.5 mb-2.5">
           <div>
             <p className="font-bold text-[#0a0a0a] text-sm">{formatCurrency(product.price)}</p>
             {product.comparePrice && product.comparePrice > product.price && <p className="text-[10px] text-gray-400 line-through">{formatCurrency(product.comparePrice)}</p>}
           </div>
         </div>
-        {/* 4 action buttons */}
-        <div className="mt-2.5 grid grid-cols-4 gap-1.5">
+        {/* View + cart icon + wishlist icon */}
+        <div className="flex items-center gap-1.5">
           <Link href={`/store/${slug}/products/${product.id}`}
-            className="col-span-2 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors flex items-center justify-center gap-1">
-            View
+            className="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-[#0a0a0a] text-white hover:bg-black/80 transition-colors flex items-center justify-center">
+            View product
           </Link>
-          <button onClick={(e) => { e.stopPropagation(); if (inStock) onAddToCart(); }} disabled={!inStock}
-            className={`col-span-2 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1 ${inStock ? "bg-[#0a0a0a] text-white hover:bg-black/80" : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}>
-            <ShoppingCart size={11} /> Add
+          <button onClick={(e) => { e.stopPropagation(); if (inStock) onAddToCart(); }} disabled={!inStock} title="Add to cart"
+            className={`p-1.5 rounded-lg border transition-colors ${inStock ? "border-gray-200 hover:border-gray-400 text-gray-600 hover:bg-gray-50" : "border-gray-100 text-gray-300 cursor-not-allowed"}`}>
+            <ShoppingCart size={14} />
           </button>
-          <button onClick={(e) => { e.stopPropagation(); onToggleWishlist(); }}
-            className={`col-span-1 py-1.5 rounded-lg border transition-colors flex items-center justify-center ${inWishlist ? "border-[#DE1010] bg-red-50" : "border-gray-200 hover:border-gray-300"}`}>
-            <Heart size={12} className={inWishlist ? "fill-[#DE1010] text-[#DE1010]" : "text-gray-400"} />
-          </button>
-          <button onClick={(e) => { e.stopPropagation(); if (inStock) { onAddToCart(); } }} disabled={!inStock}
-            className={`col-span-1 py-1.5 rounded-lg border transition-colors flex items-center justify-center ${inStock ? "border-gray-200 hover:border-gray-300 text-gray-600" : "border-gray-100 text-gray-300 cursor-not-allowed"}`}>
-            <ShoppingBag size={12} />
+          <button onClick={(e) => { e.stopPropagation(); onToggleWishlist(); }} title="Wishlist"
+            className={`p-1.5 rounded-lg border transition-colors ${inWishlist ? "border-[#DE1010] bg-red-50" : "border-gray-200 hover:border-gray-300"}`}>
+            <Heart size={14} className={inWishlist ? "fill-[#DE1010] text-[#DE1010]" : "text-gray-400"} />
           </button>
         </div>
       </div>
@@ -134,7 +126,8 @@ export default function PublicStorePage({ params }: { params: { slug: string } }
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
-  const [priceMax, setPriceMax] = useState<number | "">("");
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 0]);
+  const [sliderReady, setSliderReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [offline, setOffline] = useState(false);
@@ -182,10 +175,20 @@ export default function PublicStorePage({ params }: { params: { slug: string } }
     });
   };
 
+  const absoluteMin = products.length ? Math.min(...products.map((p) => p.price)) : 0;
+  const absoluteMax = products.length ? Math.max(...products.map((p) => p.price)) : 100000;
+
+  useEffect(() => {
+    if (products.length && !sliderReady) {
+      setPriceRange([Math.min(...products.map((p) => p.price)), Math.max(...products.map((p) => p.price))]);
+      setSliderReady(true);
+    }
+  }, [products, sliderReady]);
+
   const filtered = products.filter((p) => {
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase());
     const matchCategory = !category || p.productCategory?.name === category;
-    const matchPrice = priceMax === "" || p.price <= Number(priceMax);
+    const matchPrice = !sliderReady || (p.price >= priceRange[0] && p.price <= priceRange[1]);
     return matchSearch && matchCategory && matchPrice;
   });
 
@@ -354,10 +357,27 @@ export default function PublicStorePage({ params }: { params: { slug: string } }
                   ))}
                 </div>
               )}
+              {/* Price range slider */}
               <div>
-                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Max price</p>
-                <input type="number" min={0} placeholder="Any price" value={priceMax} onChange={(e) => { setPriceMax(e.target.value === "" ? "" : Number(e.target.value)); setPage(1); }} className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#DE1010]/20" />
-                {(category || priceMax !== "") && <button onClick={() => { setCategory(""); setPriceMax(""); setPage(1); }} className="mt-2 text-[10px] text-[#DE1010] hover:underline">Clear filters</button>}
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Price range</p>
+                  <span className="text-[10px] text-gray-500">{formatCurrency(priceRange[0])} – {formatCurrency(priceRange[1])}</span>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] text-gray-400 w-6">Min</span>
+                    <input type="range" min={absoluteMin} max={absoluteMax} step={100} value={priceRange[0]}
+                      onChange={(e) => { const v = Number(e.target.value); if (v < priceRange[1]) { setPriceRange([v, priceRange[1]]); setPage(1); } }}
+                      className="flex-1 accent-[#DE1010] h-1" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] text-gray-400 w-6">Max</span>
+                    <input type="range" min={absoluteMin} max={absoluteMax} step={100} value={priceRange[1]}
+                      onChange={(e) => { const v = Number(e.target.value); if (v > priceRange[0]) { setPriceRange([priceRange[0], v]); setPage(1); } }}
+                      className="flex-1 accent-[#DE1010] h-1" />
+                  </div>
+                </div>
+                {category && <button onClick={() => { setCategory(""); setPage(1); }} className="mt-2 text-[10px] text-[#DE1010] hover:underline">Clear filters</button>}
               </div>
             </div>
           </aside>
@@ -382,11 +402,28 @@ export default function PublicStorePage({ params }: { params: { slug: string } }
                     </div>
                   </div>
                 )}
+                {/* Price range slider (mobile) */}
                 <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase mb-2">Max price</p>
-                  <input type="number" min={0} placeholder="Any price" value={priceMax} onChange={(e) => { setPriceMax(e.target.value === "" ? "" : Number(e.target.value)); setPage(1); }} className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg bg-gray-50 focus:outline-none" />
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase">Price range</p>
+                    <span className="text-[10px] text-gray-500">{formatCurrency(priceRange[0])} – {formatCurrency(priceRange[1])}</span>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] text-gray-400 w-6">Min</span>
+                      <input type="range" min={absoluteMin} max={absoluteMax} step={100} value={priceRange[0]}
+                        onChange={(e) => { const v = Number(e.target.value); if (v < priceRange[1]) { setPriceRange([v, priceRange[1]]); setPage(1); } }}
+                        className="flex-1 accent-[#DE1010] h-1" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] text-gray-400 w-6">Max</span>
+                      <input type="range" min={absoluteMin} max={absoluteMax} step={100} value={priceRange[1]}
+                        onChange={(e) => { const v = Number(e.target.value); if (v > priceRange[0]) { setPriceRange([priceRange[0], v]); setPage(1); } }}
+                        className="flex-1 accent-[#DE1010] h-1" />
+                    </div>
+                  </div>
                 </div>
-                {(category || priceMax !== "") && <button onClick={() => { setCategory(""); setPriceMax(""); setPage(1); }} className="mt-3 text-xs text-[#DE1010] hover:underline">Clear filters</button>}
+                {category && <button onClick={() => { setCategory(""); setPage(1); }} className="mt-3 text-xs text-[#DE1010] hover:underline">Clear filters</button>}
               </div>
             </div>
 
@@ -409,7 +446,6 @@ export default function PublicStorePage({ params }: { params: { slug: string } }
                         slug={params.slug}
                         onAddToCart={() => addToCart(product)}
                         onToggleWishlist={() => toggleWishlist(product.id)}
-                        onView={() => setDetailProduct(product)}
                       />
                     );
                   })}
@@ -587,7 +623,7 @@ export default function PublicStorePage({ params }: { params: { slug: string } }
               >
                 <div className="relative">
                   {detailImages.length > 0 ? (
-                    <img src={detailImages[activeDetailImg]} alt={detailProduct.name} className="w-full h-56 sm:h-64 object-cover" />
+                    <img src={detailImages[activeDetailImg]} alt={detailProduct.name} className="w-full h-56 sm:h-64 object-contain bg-gray-50 p-2" />
                   ) : (
                     <div className="w-full h-56 sm:h-64 bg-gray-100 flex items-center justify-center"><Package size={48} className="text-gray-300" /></div>
                   )}
@@ -607,7 +643,7 @@ export default function PublicStorePage({ params }: { params: { slug: string } }
                     {detailImages.map((img, i) => (
                       <button key={i} onClick={() => setActiveDetailImg(i)}
                         className={`flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden border-2 transition-colors ${i === activeDetailImg ? "border-[#DE1010]" : "border-transparent"}`}>
-                        <img src={img} alt="" className="w-full h-full object-cover" />
+                        <img src={img} alt="" className="w-full h-full object-contain p-0.5" />
                       </button>
                     ))}
                   </div>
@@ -676,6 +712,8 @@ export default function PublicStorePage({ params }: { params: { slug: string } }
           </motion.div>
         )}
       </AnimatePresence>
+
+      <ScrollToTop />
     </div>
   );
 }

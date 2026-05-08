@@ -1,7 +1,9 @@
 import { Request, Response } from "express";
+import { OrderStatus } from "@prisma/client";
 import prisma from "../config/database";
 import { sendEmail } from "../config/email";
 import { wishlistReminderTemplate } from "../emails/templates";
+import https from "https";
 
 export const getStoreProducts = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -58,7 +60,7 @@ export const getStoreProducts = async (req: Request, res: Response): Promise<voi
 export const storeCheckout = async (req: Request, res: Response): Promise<void> => {
   try {
     const { slug } = req.params;
-    const { name, email, phone, address, items, paymentMethod, notes } = req.body;
+    const { name, email, phone, address, items, paymentMethod, notes, paystackReference } = req.body;
 
     if (!name || !email || !items || !Array.isArray(items) || items.length === 0) {
       res.status(400).json({ error: "Name, email, and at least one item are required." });
@@ -112,6 +114,37 @@ export const storeCheckout = async (req: Request, res: Response): Promise<void> 
       });
     }
 
+    // Verify Paystack payment if reference provided
+    let verifiedAmount: number | null = null;
+    if (paystackReference && paymentMethod === "PAYSTACK") {
+      try {
+        const paystackData: any = await new Promise((resolve, reject) => {
+          const options = {
+            hostname: "api.paystack.co",
+            port: 443,
+            path: `/transaction/verify/${paystackReference}`,
+            method: "GET",
+            headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` },
+          };
+          const req2 = https.request(options, (r) => {
+            let data = "";
+            r.on("data", (c) => { data += c; });
+            r.on("end", () => resolve(JSON.parse(data)));
+          });
+          req2.on("error", reject);
+          req2.end();
+        });
+        if (!paystackData.status || paystackData.data?.status !== "success") {
+          res.status(402).json({ error: "Payment not verified. Please complete payment before placing order." });
+          return;
+        }
+        verifiedAmount = paystackData.data.amount / 100;
+      } catch {
+        res.status(500).json({ error: "Payment verification failed. Please contact support." });
+        return;
+      }
+    }
+
     const orderNumber = `STR-${Date.now().toString(36).toUpperCase()}`;
 
     const orgOwner = await prisma.user.findFirst({
@@ -130,7 +163,7 @@ export const storeCheckout = async (req: Request, res: Response): Promise<void> 
         customerId: customer.id,
         createdById: orgOwner.id,
         totalAmount,
-        status: "PENDING",
+        status: paystackReference && verifiedAmount !== null ? OrderStatus.APPROVED : OrderStatus.PENDING,
         paymentMethod: paymentMethod || "TRANSFER",
         notes: notes || null,
         orderItems: { create: orderItemsData },

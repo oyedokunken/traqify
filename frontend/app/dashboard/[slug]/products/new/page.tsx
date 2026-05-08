@@ -5,11 +5,29 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { ImagePlus, AlertCircle, Wand2, ArrowLeft, GripVertical, X } from "lucide-react";
 import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Topbar } from "@/components/dashboard/topbar";
 import api from "@/lib/api";
+
+const productSchema = z.object({
+  name: z.string().min(2, "Product name must be at least 2 characters"),
+  sku: z.string().min(2, "SKU is required"),
+  description: z.string().min(10, "Description must be at least 10 characters"),
+  price: z.string().min(1, "Price is required").refine((v) => !isNaN(Number(v)) && Number(v) > 0, "Price must be a positive number"),
+  comparePrice: z.string().optional(),
+  categoryId: z.string().min(1, "Category is required"),
+  status: z.enum(["published", "draft"]),
+  productType: z.enum(["SIMPLE", "DOWNLOADABLE", "VARIABLE"]),
+  downloadUrl: z.string().optional(),
+  isActive: z.boolean(),
+  initialStock: z.number().min(0),
+  lowStockAlert: z.number().min(0),
+});
+type ProductFormData = z.infer<typeof productSchema>;
 
 const MAX_FILE_SIZE_MB = 2;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -37,7 +55,8 @@ export default function NewProductPage({ params }: { params: { slug: string } })
     api.get("/api/categories").then((r) => setCategories(r.data)).catch(() => {});
   }, []);
 
-  const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm({
+  const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm<ProductFormData>({
+    resolver: zodResolver(productSchema),
     defaultValues: {
       name: "", sku: "", description: "", price: "", comparePrice: "",
       categoryId: "", status: "published", productType: "SIMPLE",

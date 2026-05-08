@@ -184,35 +184,35 @@ function buildPDF(type: string, label: string, org: any, from: string, to: strin
     const PAGE_W = doc.page.width;
     const CONTENT_W = PAGE_W - 80;
 
-    // Header band
-    doc.rect(0, 0, PAGE_W, 70).fillColor("#0a0a0a").fill();
-    doc.fontSize(18).fillColor("#DE1010").text("Traqify", 40, 18);
-    doc.fontSize(14).fillColor("#ffffff").text(label, 110, 20);
-    doc.fontSize(8).fillColor("#9ca3af")
-      .text(safe(org?.name, "Unknown Organisation"), 40, 42)
-      .text(`Generated: ${new Date().toLocaleString("en-GB")}`, 40, 53);
+    // ── Header band (dark bar) ──────────────────────────────────────────────
+    doc.rect(0, 0, PAGE_W, 56).fillColor("#0a0a0a").fill();
 
-    // Org contact info on the right
-    const rightX = PAGE_W - 280;
-    const orgLines = [
-      org?.address,
-      org?.phone,
-      org?.email,
-      org?.website,
-    ].filter(Boolean);
-    orgLines.forEach((line, i) => doc.fontSize(8).fillColor("#9ca3af").text(safe(line), rightX, 18 + i * 13, { width: 240, align: "right" }));
+    // Left: red square logo mark + brand name
+    doc.rect(40, 14, 28, 28).fillColor("#DE1010").fill();
+    doc.fontSize(16).fillColor("#ffffff").font("Helvetica-Bold").text("T", 40, 18, { width: 28, align: "center" });
+    doc.fontSize(13).fillColor("#ffffff").font("Helvetica-Bold").text("TRAQIFY", 74, 20);
+    doc.fontSize(7).fillColor("#6b7280").font("Helvetica").text("Business Management Platform", 74, 34);
 
-    // Period sub-header
-    let y = 82;
+    // Right: org name + contact (email · phone on one line)
+    const contactParts = [org?.email, org?.phone].filter(Boolean).join("  ·  ");
+    doc.fontSize(9).fillColor("#ffffff").font("Helvetica-Bold").text(safe(org?.name, "Unknown Organisation"), 0, 16, { width: PAGE_W - 44, align: "right" });
+    if (contactParts) doc.fontSize(7.5).fillColor("#9ca3af").font("Helvetica").text(contactParts, 0, 28, { width: PAGE_W - 44, align: "right" });
+    if (org?.address) doc.fontSize(7).fillColor("#6b7280").text(safe(org.address), 0, 38, { width: PAGE_W - 44, align: "right" });
+
+    // ── Report name strip (below header) ──────────────────────────────────
+    doc.rect(0, 56, PAGE_W, 28).fillColor("#f9fafb").fill();
+    doc.rect(0, 56, 4, 28).fillColor("#DE1010").fill();
+    doc.fontSize(12).fillColor("#0a0a0a").font("Helvetica-Bold").text(label, 16, 63);
+
+    // Period / date info on the right of the name strip
     const usesDateRange = DATE_RANGE_TYPES.includes(type);
-    if (usesDateRange && from && to) {
-      doc.fontSize(9).fillColor("#374151").text(`Period: ${fmt(from)} to ${fmt(to)}`, 40, y);
-      y += 18;
-    } else if (!usesDateRange) {
-      doc.fontSize(9).fillColor("#374151").text(`As of ${fmt(new Date())}`, 40, y);
-      y += 18;
-    }
+    const periodText = usesDateRange && from && to
+      ? `Period: ${fmt(from)} — ${fmt(to)}`
+      : `As of ${fmt(new Date())}`;
+    doc.fontSize(8).fillColor("#6b7280").font("Helvetica").text(periodText, 0, 66, { width: PAGE_W - 16, align: "right" });
 
+    // Separator
+    let y = 92;
     doc.moveTo(40, y).lineTo(PAGE_W - 40, y).strokeColor("#e5e7eb").lineWidth(0.5).stroke();
     y += 10;
 
@@ -235,9 +235,11 @@ function buildPDF(type: string, label: string, org: any, from: string, to: strin
       y += ROW_H;
       if (y > doc.page.height - 50) {
         doc.addPage();
-        y = 40;
-        doc.rect(0, 0, PAGE_W, 8).fillColor("#DE1010").fill();
-        y = 20;
+        doc.rect(0, 0, PAGE_W, 20).fillColor("#0a0a0a").fill();
+        doc.rect(0, 0, 4, 20).fillColor("#DE1010").fill();
+        doc.fontSize(8).fillColor("#9ca3af").font("Helvetica").text(`${label} (continued)`, 10, 6);
+        doc.fontSize(8).fillColor("#9ca3af").text(safe(org?.name), 0, 6, { width: PAGE_W - 10, align: "right" });
+        y = 28;
       }
     };
 
@@ -268,8 +270,10 @@ function buildPDF(type: string, label: string, org: any, from: string, to: strin
       rows.forEach((r) => addRow([safe(r.name, "Pending"), safe(r.email), safe(r.role), fmt(r.createdAt), fmt(r.lastLoginAt), r.isActive ? "Yes" : "No"], w));
     }
 
-    // Row count footer
-    doc.fontSize(8).fillColor("#9ca3af").text(`Total records: ${rows.length}`, 40, doc.page.height - 28);
+    // Footer
+    doc.moveTo(40, doc.page.height - 36).lineTo(PAGE_W - 40, doc.page.height - 36).strokeColor("#e5e7eb").lineWidth(0.5).stroke();
+    doc.fontSize(7).fillColor("#9ca3af").font("Helvetica").text(`Total records: ${rows.length}  ·  Generated ${new Date().toLocaleString("en-GB")}`, 40, doc.page.height - 26);
+    doc.fontSize(7).fillColor("#9ca3af").text("Powered by Traqify", 0, doc.page.height - 26, { width: PAGE_W - 40, align: "right" });
 
     doc.end();
   });

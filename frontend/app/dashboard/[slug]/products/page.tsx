@@ -134,7 +134,7 @@ export default function ProductsPage({ params }: { params: { slug: string } }) {
                 <Card key={product.id} className="overflow-hidden hover:shadow-md transition-shadow group">
                   <div className="h-40 bg-gray-100 flex items-center justify-center relative">
                     {product.imageUrl ? (
-                      <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+                      <img src={product.imageUrl} alt={product.name} className="w-full h-full object-contain p-2" />
                     ) : (
                       <Package size={36} className="text-gray-300" />
                     )}

@@ -185,12 +185,13 @@ Four roles with granular middleware enforcement:
 - **Responsive**: mobile off-canvas drawer menu with category nav, cart/wishlist counts
 - **Store navbar**: full-width logo (or text fallback), cart badge, wishlist badge, category tabs (desktop)
 - **Store info section** below products: org contact details linkable via `#store-info`
-- Filters: keyword search, category (left sidebar), max price
-- **Product cards**: hover image cycling, wishlist heart overlay, discount % badge
+- Filters: keyword search, category (left sidebar), **dual price range slider** (min/max derived from actual product prices)
+- **Product cards**: hover image cycling, wishlist heart overlay, discount % badge; separate View / Add-to-cart / Wishlist actions; `object-contain` images
 - **Product detail drawer**: image gallery with thumbnail strip, wishlist toggle, Add to cart
 - **Wishlist**: localStorage + backend sync; email capture; reminder emails at 30min/2hr/1day/3days
-- Cart with quantity controls
-- Guest checkout: name, email, phone, address, payment method, notes
+- Cart with quantity controls; scroll-to-top button
+- **Checkout**: breadcrumb navigation, arithmetic CAPTCHA security check, Paystack payment popup, `Secured by Paystack` badge
+- **Paystack payment**: inline popup (no redirect), backend verification before order creation; successful payments create orders as `APPROVED`
 - Confirmation email to customer on order placement
 
 ### Analytics Dashboard
@@ -205,6 +206,7 @@ Four roles with granular middleware enforcement:
 - Date-range filtering
 - **PDF download**: `GET /api/reports/:type/pdf` — PDFKit, landscape A4
 - **Email report**: `POST /api/reports/:type/email` — sends PDF as attachment
+- **PDF layout**: Traqify logo mark + brand name in dark header; org name + email·phone on one line; report name in coloured strip below header; period/date on same strip; clean footer with record count + generation time + "Powered by Traqify"
 
 ### Audit Logs
 - Every create / update / delete / login event logged with user, entity, and timestamp
@@ -500,11 +502,14 @@ traqify/
     |   |   +-- terms/page.tsx
     |   +-- create-organization/page.tsx  # Post-registration org setup
     |   +-- invite/[token]/page.tsx       # Accept staff invitation
-    |   +-- store/[slug]/page.tsx         # Public catalog + cart + checkout
+    |   +-- store/[slug]/page.tsx         # Public catalog + cart + dual price range slider
+    |   +-- store/[slug]/checkout/page.tsx # Paystack checkout + CAPTCHA + breadcrumb
+    |   +-- store/[slug]/products/[id]/page.tsx # Individual product page with upsells
     |   +-- dashboard/[slug]/
     |       +-- layout.tsx               # Auth guard + sidebar layout
     |       +-- overview/page.tsx        # Role-based Recharts dashboard
     |       +-- products/page.tsx
+    |       +-- products/new/page.tsx      # Full-page product creation with Zod validation
     |       +-- inventory/page.tsx
     |       +-- orders/page.tsx
     |       +-- customers/page.tsx
@@ -686,6 +691,8 @@ The app will be available at **http://localhost:3000**.
 | `SMTP_FROM` | Yes | From header, e.g. `"Traqify <you@gmail.com>"` |
 | `GOOGLE_CLIENT_ID` | Yes | OAuth 2.0 client ID from Google Console |
 | `GOOGLE_CLIENT_SECRET` | Yes | OAuth 2.0 client secret |
+| `PAYSTACK_SECRET_KEY` | Yes | Paystack secret key (verify payments server-side) |
+| `PAYSTACK_PUBLIC_KEY` | No | Paystack public key (also set in frontend env) |
 
 ### `frontend/.env.local`
 
@@ -694,6 +701,7 @@ The app will be available at **http://localhost:3000**.
 | `NEXT_PUBLIC_API_URL` | Yes | Backend API base URL |
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anon key |
+| `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY` | Yes | Paystack public key (used by inline popup) |
 
 ---
 
