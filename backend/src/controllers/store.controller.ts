@@ -162,7 +162,7 @@ export const storeCheckout = async (req: Request, res: Response): Promise<void> 
       orgFull?.website ? `Website: ${orgFull.website}` : null,
     ].filter(Boolean).map((l) => `<p style="margin:2px 0;color:#6b7280;font-size:12px">${l}</p>`).join("");
 
-    await sendEmail(
+    try { await sendEmail(
       email,
       `Order ${orderNumber} confirmed - ${org.name}`,
       `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
@@ -199,7 +199,7 @@ export const storeCheckout = async (req: Request, res: Response): Promise<void> 
         <hr style="border:none;border-top:1px solid #f0f0f0;margin:24px 0">
         <p style="color:#9ca3af;font-size:11px;text-align:center;margin:0">Powered by <strong style="color:#DE1010">Traqify</strong></p>
       </div>`
-    );
+    ); } catch (emailErr) { console.error("Order confirmation email failed:", emailErr); }
 
     res.status(201).json({
       orderNumber: order.orderNumber,

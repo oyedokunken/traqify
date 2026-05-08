@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, CheckCircle, Package, ShoppingBag } from "lucide-react";
+import { ArrowLeft, CheckCircle, Package, ShoppingCart, Heart } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -30,11 +30,14 @@ export default function CheckoutPage({ params }: { params: { slug: string } }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState<{ orderNumber: string; total: number } | null>(null);
+  const [org, setOrg] = useState<{ name: string; logoUrl?: string } | null>(null);
+  const cartCount = cart.reduce((s, i) => s + i.qty, 0);
 
   useEffect(() => {
     const stored = localStorage.getItem(`traqify_cart_${params.slug}`);
     if (!stored) { router.replace(`/store/${params.slug}`); return; }
     try { setCart(JSON.parse(stored)); } catch { router.replace(`/store/${params.slug}`); }
+    api.get(`/api/organizations/${params.slug}/store`).then((r) => setOrg(r.data.org)).catch(() => {});
   }, [params.slug, router]);
 
   const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
@@ -83,14 +86,28 @@ export default function CheckoutPage({ params }: { params: { slug: string } }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-3">
-          <Link href={`/store/${params.slug}`} className="text-gray-400 hover:text-gray-600 transition-colors">
-            <ArrowLeft size={18} />
+      <header className="bg-white border-b border-gray-100 sticky top-0 z-30 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+          {/* Logo */}
+          <Link href={`/store/${params.slug}`} className="flex items-center gap-2 flex-shrink-0">
+            {org?.logoUrl ? (
+              <img src={org.logoUrl} alt={org.name} className="h-10 w-auto max-w-[180px] object-contain" />
+            ) : (
+              <span className="font-bold text-lg text-[#0a0a0a] truncate max-w-[180px]">{org?.name || params.slug}</span>
+            )}
           </Link>
-          <div className="flex items-center gap-2">
-            <ShoppingBag size={16} className="text-[#DE1010]" />
-            <h1 className="font-bold text-[#0a0a0a] text-sm">Checkout</h1>
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-2 text-sm text-gray-400">
+            <Link href={`/store/${params.slug}`} className="hover:text-gray-600 flex items-center gap-1.5 transition-colors">
+              <ArrowLeft size={14} /> Back to store
+            </Link>
+            <span className="text-gray-200">|</span>
+            <span className="text-[#0a0a0a] font-medium">Checkout</span>
+          </div>
+          {/* Cart count (read-only) */}
+          <div className="relative p-2">
+            <ShoppingCart size={20} className="text-gray-700" />
+            {cartCount > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 bg-[#DE1010] text-white text-[9px] font-bold rounded-full flex items-center justify-center">{cartCount}</span>}
           </div>
         </div>
       </header>
@@ -182,8 +199,17 @@ export default function CheckoutPage({ params }: { params: { slug: string } }) {
         </div>
       </main>
 
-      <footer className="border-t border-gray-200 mt-12 py-6 text-center text-xs text-gray-400">
-        Powered by <Link href="/" className="text-gray-600 hover:text-[#0a0a0a]">Traqify</Link>
+      <footer className="border-t border-gray-200 mt-12 py-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs text-gray-400">
+          <span>{org?.name} &copy; {new Date().getFullYear()}</span>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <Link href="/privacy" className="hover:text-gray-600 transition-colors">Privacy Policy</Link>
+            <span className="text-gray-300">·</span>
+            <Link href="/terms" className="hover:text-gray-600 transition-colors">Terms of Service</Link>
+            <span className="text-gray-300">·</span>
+            <Link href="/" className="hover:text-gray-600 transition-colors">Powered by Traqify</Link>
+          </div>
+        </div>
       </footer>
     </div>
   );

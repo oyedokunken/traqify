@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Globe, Copy, Eye, EyeOff, ExternalLink, CheckCircle, ImagePlus, X } from "lucide-react";
+import { Globe, Copy, Eye, EyeOff, ExternalLink, CheckCircle, ImagePlus, Package, Tag, ShoppingBag, Mail, Phone, MapPin, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Topbar } from "@/components/dashboard/topbar";
 import api from "@/lib/api";
@@ -11,6 +11,8 @@ import { useAuth } from "@/lib/auth-context";
 export default function StorePage({ params }: { params: { slug: string } }) {
   const { user } = useAuth();
   const [storeData, setStoreData] = useState<any>(null);
+  const [productCount, setProductCount] = useState(0);
+  const [categoryCount, setCategoryCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -22,7 +24,11 @@ export default function StorePage({ params }: { params: { slug: string } }) {
   const fetchStore = () => {
     api.get(`/api/organizations/${params.slug}`).then((r) => setStoreData(r.data)).catch(() => {}).finally(() => setLoading(false));
   };
-  useEffect(() => { fetchStore(); }, []);
+  useEffect(() => {
+    fetchStore();
+    api.get(`/api/products?status=published&limit=1`).then((r) => setProductCount(r.data.total ?? 0)).catch(() => {});
+    api.get(`/api/categories`).then((r) => setCategoryCount(Array.isArray(r.data) ? r.data.length : 0)).catch(() => {});
+  }, []);
 
   const isPublished = storeData?.storePublished ?? false;
 
@@ -58,7 +64,10 @@ export default function StorePage({ params }: { params: { slug: string } }) {
   return (
     <div>
       <Topbar title="Store" slug={params.slug} />
-      <div className="p-6 max-w-2xl">
+      <div className="p-6">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {/* Left column: controls */}
+        <div className="xl:col-span-2">
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
 
           {/* Status card */}
@@ -150,6 +159,72 @@ export default function StorePage({ params }: { params: { slug: string } }) {
           </div>
 
         </motion.div>
+        </div>{/* end left col */}
+
+        {/* Right column: store info */}
+        <motion.div initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }} className="space-y-4">
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <h3 className="font-semibold text-[#0a0a0a] mb-4">Store overview</h3>
+            <div className="space-y-4">
+              {/* Logo preview */}
+              <div className="flex items-center gap-3 pb-4 border-b border-gray-100">
+                <div className="w-12 h-12 rounded-xl border border-gray-200 flex items-center justify-center overflow-hidden bg-gray-50 flex-shrink-0">
+                  {storeData?.logoUrl ? (
+                    <img src={storeData.logoUrl} alt="Logo" className="w-full h-full object-contain" />
+                  ) : (
+                    <Globe size={18} className="text-gray-300" />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="font-semibold text-[#0a0a0a] truncate">{storeData?.name || "—"}</p>
+                  <p className="text-xs text-gray-400 truncate">{storeData?.industry || "No industry set"}</p>
+                </div>
+              </div>
+              {/* Stats */}
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { icon: Package, label: "Published products", value: productCount },
+                  { icon: Tag, label: "Categories", value: categoryCount },
+                ].map(({ icon: Icon, label, value }) => (
+                  <div key={label} className="bg-gray-50 rounded-lg p-3 text-center">
+                    <Icon size={16} className="text-gray-400 mx-auto mb-1" />
+                    <p className="text-xl font-bold text-[#0a0a0a]">{value}</p>
+                    <p className="text-[10px] text-gray-400 leading-tight">{label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Contact info */}
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <h3 className="font-semibold text-[#0a0a0a] mb-4">Contact details</h3>
+            <div className="space-y-3">
+              {[
+                { icon: Mail, label: "Email", value: storeData?.email },
+                { icon: Phone, label: "Phone", value: storeData?.phone },
+                { icon: MapPin, label: "Address", value: storeData?.address },
+                { icon: Link2, label: "Website", value: storeData?.website },
+              ].map(({ icon: Icon, label, value }) => (
+                <div key={label} className="flex items-start gap-2.5">
+                  <Icon size={13} className="text-gray-400 mt-0.5 flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-[10px] text-gray-400">{label}</p>
+                    <p className="text-sm text-[#0a0a0a] truncate">{value || <span className="text-gray-300 italic">Not set</span>}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Quick link to settings */}
+          <p className="text-xs text-gray-400 text-center">
+            Update contact details in{" "}
+            <a href={`/dashboard/${params.slug}/settings`} className="text-[#DE1010] hover:underline">Settings</a>
+          </p>
+        </motion.div>
+
+        </div>{/* end grid */}
       </div>
     </div>
   );

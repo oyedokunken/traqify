@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Package, Search, ShoppingBag, X, Plus, Minus, ChevronLeft, ChevronRight, Heart, MapPin, Phone, Mail, Globe, Star, SlidersHorizontal } from "lucide-react";
+import { Package, Search, ShoppingBag, ShoppingCart, X, Plus, Minus, ChevronLeft, ChevronRight, Heart, MapPin, Phone, Mail, Globe, Star, SlidersHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollToTop } from "@/components/shared/scroll-to-top";
@@ -48,8 +48,8 @@ interface Category {
 const fadeUp = { hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } };
 const stagger = { visible: { transition: { staggerChildren: 0.06 } } };
 
-function ProductCard({ product, images, inStock, inWishlist, onAddToCart, onToggleWishlist, onView }: {
-  product: Product; images: string[]; inStock: boolean; inWishlist: boolean;
+function ProductCard({ product, images, inStock, inWishlist, slug, onAddToCart, onToggleWishlist, onView }: {
+  product: Product; images: string[]; inStock: boolean; inWishlist: boolean; slug: string;
   onAddToCart: () => void; onToggleWishlist: () => void; onView: () => void;
 }) {
   const [imgIdx, setImgIdx] = useState(0);
@@ -69,9 +69,9 @@ function ProductCard({ product, images, inStock, inWishlist, onAddToCart, onTogg
   };
 
   return (
-    <motion.div variants={fadeUp} className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer group"
+    <motion.div variants={fadeUp} className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow group"
       onMouseEnter={startCycle} onMouseLeave={stopCycle}>
-      <div className="relative h-44 bg-gray-100 flex items-center justify-center overflow-hidden" onClick={onView}>
+      <div className="relative h-44 bg-gray-100 flex items-center justify-center overflow-hidden cursor-pointer" onClick={onView}>
         {images.length > 0 ? (
           <img src={images[imgIdx]} alt={product.name} className="w-full h-full object-cover transition-opacity duration-300" />
         ) : (
@@ -104,12 +104,25 @@ function ProductCard({ product, images, inStock, inWishlist, onAddToCart, onTogg
             {product.comparePrice && product.comparePrice > product.price && <p className="text-[10px] text-gray-400 line-through">{formatCurrency(product.comparePrice)}</p>}
           </div>
         </div>
-        <button onClick={(e) => { e.stopPropagation(); if (inStock) onAddToCart(); }}
-          disabled={!inStock}
-          className={`mt-2.5 w-full py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1.5 ${inStock ? "bg-[#0a0a0a] text-white hover:bg-black/80" : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}>
-          <ShoppingBag size={11} />
-          {inStock ? "Add to cart" : "Out of stock"}
-        </button>
+        {/* 4 action buttons */}
+        <div className="mt-2.5 grid grid-cols-4 gap-1.5">
+          <Link href={`/store/${slug}/products/${product.id}`}
+            className="col-span-2 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors flex items-center justify-center gap-1">
+            View
+          </Link>
+          <button onClick={(e) => { e.stopPropagation(); if (inStock) onAddToCart(); }} disabled={!inStock}
+            className={`col-span-2 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1 ${inStock ? "bg-[#0a0a0a] text-white hover:bg-black/80" : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}>
+            <ShoppingCart size={11} /> Add
+          </button>
+          <button onClick={(e) => { e.stopPropagation(); onToggleWishlist(); }}
+            className={`col-span-1 py-1.5 rounded-lg border transition-colors flex items-center justify-center ${inWishlist ? "border-[#DE1010] bg-red-50" : "border-gray-200 hover:border-gray-300"}`}>
+            <Heart size={12} className={inWishlist ? "fill-[#DE1010] text-[#DE1010]" : "text-gray-400"} />
+          </button>
+          <button onClick={(e) => { e.stopPropagation(); if (inStock) { onAddToCart(); } }} disabled={!inStock}
+            className={`col-span-1 py-1.5 rounded-lg border transition-colors flex items-center justify-center ${inStock ? "border-gray-200 hover:border-gray-300 text-gray-600" : "border-gray-100 text-gray-300 cursor-not-allowed"}`}>
+            <ShoppingBag size={12} />
+          </button>
+        </div>
       </div>
     </motion.div>
   );
@@ -131,7 +144,7 @@ export default function PublicStorePage({ params }: { params: { slug: string } }
   const [wishlistEmail, setWishlistEmail] = useState("");
   const [showWishlistEmailPrompt, setShowWishlistEmailPrompt] = useState(false);
   const [showCart, setShowCart] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
   const [showMenu, setShowMenu] = useState(false);
   const [detailProduct, setDetailProduct] = useState<Product | null>(null);
   const [activeDetailImg, setActiveDetailImg] = useState(0);
@@ -238,7 +251,7 @@ export default function PublicStorePage({ params }: { params: { slug: string } }
           </div>
 
           {/* Desktop category nav */}
-          <nav className="hidden md:flex items-center gap-1 flex-1 overflow-x-auto no-scrollbar">
+          <nav className="hidden lg:flex items-center gap-1 flex-1 overflow-x-auto no-scrollbar">
             <button onClick={() => { setCategory(""); setPage(1); }}
               className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${!category ? "bg-[#0a0a0a] text-white" : "text-gray-600 hover:bg-gray-100"}`}>All</button>
             {categories.map((cat) => (
@@ -250,20 +263,19 @@ export default function PublicStorePage({ params }: { params: { slug: string } }
 
           {/* Right actions */}
           <div className="flex items-center gap-2 flex-shrink-0">
-            <Link href="/" className="hidden md:block text-[10px] text-gray-400 hover:text-gray-600 mr-1">Powered by Traqify</Link>
             {/* Wishlist */}
-            <button onClick={() => {}} className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors">
-              <Heart size={18} className={`${wishlist.length > 0 ? "text-[#DE1010] fill-[#DE1010]" : "text-gray-500"}`} />
-              {wishlist.length > 0 && <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-[#DE1010] text-white text-[9px] font-bold rounded-full flex items-center justify-center">{wishlist.length}</span>}
+            <button onClick={() => {}} className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors" title="Wishlist">
+              <Heart size={20} className={`${wishlist.length > 0 ? "fill-[#DE1010] text-[#DE1010]" : "text-gray-500"}`} />
+              {wishlist.length > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 bg-[#DE1010] text-white text-[9px] font-bold rounded-full flex items-center justify-center">{wishlist.length}</span>}
             </button>
             {/* Cart */}
-            <button onClick={() => setShowCart(true)} className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors">
-              <ShoppingBag size={18} className="text-gray-700" />
-              {cartCount > 0 && <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-[#DE1010] text-white text-[9px] font-bold rounded-full flex items-center justify-center">{cartCount}</span>}
+            <button onClick={() => setShowCart(true)} className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors" title="Cart">
+              <ShoppingCart size={20} className="text-gray-700" />
+              {cartCount > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 bg-[#DE1010] text-white text-[9px] font-bold rounded-full flex items-center justify-center">{cartCount}</span>}
             </button>
-            {/* Mobile hamburger */}
-            <button onClick={() => setShowMenu(true)} className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors">
-              <SlidersHorizontal size={18} className="text-gray-700" />
+            {/* Mobile + tablet hamburger */}
+            <button onClick={() => setShowMenu(true)} className="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors">
+              <SlidersHorizontal size={20} className="text-gray-700" />
             </button>
           </div>
         </div>
@@ -274,10 +286,10 @@ export default function PublicStorePage({ params }: { params: { slug: string } }
         {showMenu && (
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={() => setShowMenu(false)} />
+              className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setShowMenu(false)} />
             <motion.div initial={{ x: "-100%" }} animate={{ x: 0 }} exit={{ x: "-100%" }}
               transition={{ type: "tween", duration: 0.25 }}
-              className="fixed top-0 left-0 h-full w-72 bg-white z-50 md:hidden flex flex-col shadow-2xl">
+              className="fixed top-0 left-0 h-full w-72 bg-white z-50 lg:hidden flex flex-col shadow-2xl">
               {/* Drawer header */}
               <div className="flex items-center justify-between px-5 h-16 border-b border-gray-100">
                 <div className="flex items-center gap-2.5">
@@ -323,7 +335,7 @@ export default function PublicStorePage({ params }: { params: { slug: string } }
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         <div className="flex gap-6">
 
-          {/* Left filter sidebar — desktop */}
+          {/* Left filter sidebar — desktop only */}
           <aside className="hidden lg:block w-52 flex-shrink-0">
             <div className="bg-white rounded-xl border border-gray-200 p-4 sticky top-20">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Filters</p>
@@ -352,41 +364,31 @@ export default function PublicStorePage({ params }: { params: { slug: string } }
 
           {/* Center: products */}
           <div className="flex-1 min-w-0">
-            {/* Mobile top bar */}
-            <div className="flex lg:hidden gap-2 mb-4">
-              <div className="relative flex-1">
+            {/* Mobile/tablet top bar + filter panel */}
+            <div className="lg:hidden mb-4 space-y-3">
+              <div className="relative">
                 <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <Input placeholder="Search..." className="pl-8 bg-white text-sm" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
+                <Input placeholder="Search products..." className="pl-8 bg-white text-sm" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
               </div>
-              <button onClick={() => setShowFilters(!showFilters)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 bg-white text-xs font-medium text-gray-600">
-                <SlidersHorizontal size={13} /> Filters
-              </button>
-            </div>
-            {/* Mobile filter panel */}
-            <AnimatePresence>
-              {showFilters && (
-                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden mb-4 lg:hidden">
-                  <div className="bg-white rounded-xl border border-gray-200 p-4">
-                    {categories.length > 0 && (
-                      <div className="mb-3">
-                        <p className="text-[10px] font-semibold text-gray-400 uppercase mb-2">Category</p>
-                        <div className="flex flex-wrap gap-2">
-                          <button onClick={() => { setCategory(""); setPage(1); }} className={`px-3 py-1 rounded-full text-xs font-medium ${!category ? "bg-[#0a0a0a] text-white" : "border border-gray-200 text-gray-600"}`}>All</button>
-                          {categories.map((cat) => (
-                            <button key={cat.id} onClick={() => { setCategory(cat.name === category ? "" : cat.name); setPage(1); }} className={`px-3 py-1 rounded-full text-xs font-medium ${cat.name === category ? "bg-[#0a0a0a] text-white" : "border border-gray-200 text-gray-600"}`}>{cat.name}</button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    <div>
-                      <p className="text-[10px] font-semibold text-gray-400 uppercase mb-2">Max price</p>
-                      <input type="number" min={0} placeholder="Any price" value={priceMax} onChange={(e) => { setPriceMax(e.target.value === "" ? "" : Number(e.target.value)); setPage(1); }} className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg bg-gray-50 focus:outline-none" />
+              <div className="bg-white rounded-xl border border-gray-200 p-4">
+                {categories.length > 0 && (
+                  <div className="mb-3">
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase mb-2">Category</p>
+                    <div className="flex flex-wrap gap-2">
+                      <button onClick={() => { setCategory(""); setPage(1); }} className={`px-3 py-1 rounded-full text-xs font-medium ${!category ? "bg-[#0a0a0a] text-white" : "border border-gray-200 text-gray-600"}`}>All</button>
+                      {categories.map((cat) => (
+                        <button key={cat.id} onClick={() => { setCategory(cat.name === category ? "" : cat.name); setPage(1); }} className={`px-3 py-1 rounded-full text-xs font-medium ${cat.name === category ? "bg-[#0a0a0a] text-white" : "border border-gray-200 text-gray-600"}`}>{cat.name}</button>
+                      ))}
                     </div>
-                    {(category || priceMax !== "") && <button onClick={() => { setCategory(""); setPriceMax(""); setPage(1); }} className="mt-3 text-xs text-[#DE1010] hover:underline">Clear filters</button>}
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                )}
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase mb-2">Max price</p>
+                  <input type="number" min={0} placeholder="Any price" value={priceMax} onChange={(e) => { setPriceMax(e.target.value === "" ? "" : Number(e.target.value)); setPage(1); }} className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg bg-gray-50 focus:outline-none" />
+                </div>
+                {(category || priceMax !== "") && <button onClick={() => { setCategory(""); setPriceMax(""); setPage(1); }} className="mt-3 text-xs text-[#DE1010] hover:underline">Clear filters</button>}
+              </div>
+            </div>
 
             {filtered.length === 0 ? (
               <div className="text-center py-24"><Package size={40} className="text-gray-300 mx-auto mb-3" /><p className="text-gray-500 font-medium">No products found</p></div>
@@ -404,6 +406,7 @@ export default function PublicStorePage({ params }: { params: { slug: string } }
                         images={images}
                         inStock={inStock}
                         inWishlist={wishlist.includes(product.id)}
+                        slug={params.slug}
                         onAddToCart={() => addToCart(product)}
                         onToggleWishlist={() => toggleWishlist(product.id)}
                         onView={() => setDetailProduct(product)}
@@ -508,8 +511,17 @@ export default function PublicStorePage({ params }: { params: { slug: string } }
         </section>
       </main>
 
-      <footer className="border-t border-gray-200 mt-12 py-8 text-center text-xs text-gray-400">
-        <p>{org?.name} &bull; Powered by <Link href="/" className="text-gray-600 hover:text-[#0a0a0a]">Traqify</Link></p>
+      <footer className="border-t border-gray-200 mt-12 py-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs text-gray-400">
+          <span>{org?.name} &copy; {new Date().getFullYear()}</span>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <Link href="/privacy" className="hover:text-gray-600 transition-colors">Privacy Policy</Link>
+            <span className="text-gray-300">·</span>
+            <Link href="/terms" className="hover:text-gray-600 transition-colors">Terms of Service</Link>
+            <span className="text-gray-300">·</span>
+            <Link href="/" className="hover:text-gray-600 transition-colors">Powered by Traqify</Link>
+          </div>
+        </div>
       </footer>
 
       {/* Cart drawer */}
