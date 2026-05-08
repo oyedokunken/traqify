@@ -7,7 +7,7 @@ import { AuthRequest } from "../middleware/auth.middleware";
 export const getProducts = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const orgId = req.user!.organizationId!;
-    const { search, categoryId, isActive, status, page, limit } = req.query;
+    const { search, categoryId, isActive, status, productType, page, limit } = req.query;
     const take = parseInt((limit as string) || "50");
     const skip = (parseInt((page as string) || "1") - 1) * take;
 
@@ -17,6 +17,7 @@ export const getProducts = async (req: AuthRequest, res: Response): Promise<void
       ...(categoryId && { categoryId: categoryId as string }),
       ...(isActive !== undefined && isActive !== "" && { isActive: isActive === "true" }),
       ...(status && status !== "" && { status: status as string }),
+      ...(productType && productType !== "" && { productType: productType as string }),
     };
 
     const [products, total] = await Promise.all([

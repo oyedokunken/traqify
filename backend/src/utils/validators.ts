@@ -42,6 +42,7 @@ export const createOrganizationSchema = z.object({
   address: z.string().optional(),
   industry: z.string().optional(),
   size: z.string().optional(),
+  description: z.string().max(500).optional(),
   website: z.string().url("Please enter a valid URL.").optional().or(z.literal("")),
 });
 
@@ -153,4 +154,7 @@ export const updateOrgSchema = z.object({
   website: z.string().url().optional().or(z.literal("")),
   logoUrl: z.string().url().optional().or(z.literal("")),
   storePublished: z.boolean().optional(),
+  industry: z.string().optional(),
+  size: z.string().optional(),
+  description: z.string().max(500).optional(),
 });

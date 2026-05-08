@@ -10,6 +10,8 @@ import {
   Users,
   AlertTriangle,
   DollarSign,
+  ExternalLink,
+  XCircle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Topbar } from "@/components/dashboard/topbar";
@@ -32,6 +34,8 @@ interface OverviewData {
   totalProducts: number;
   totalCustomers: number;
   lowStockCount: number;
+  storePublished: boolean;
+  orgSlug: string;
 }
 
 interface ChartPoint {
@@ -49,9 +53,12 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
   const [chart, setChart] = useState<ChartPoint[]>([]);
   const [customerChart, setCustomerChart] = useState<{ date: string; customers: number }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [chartLoading, setChartLoading] = useState(false);
+  const [period, setPeriod] = useState(30);
   const [now, setNow] = useState(new Date());
   const [showWelcome, setShowWelcome] = useState(false);
   const [showWelcomeBack, setShowWelcomeBack] = useState(false);
+  const [storeError, setStoreError] = useState(false);
 
   // Live clock
   useEffect(() => {
@@ -76,14 +83,33 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
   useEffect(() => {
     Promise.all([
       api.get("/api/reports/overview"),
-      api.get("/api/reports/revenue-chart?period=30"),
-      api.get("/api/reports/customer-chart?period=30"),
+      api.get(`/api/reports/revenue-chart?period=${period}`),
+      api.get(`/api/reports/customer-chart?period=${period}`),
     ]).then(([overview, chartData, customerData]) => {
       setData(overview.data);
       setChart(chartData.data || []);
       setCustomerChart(customerData.data || []);
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
+
+  const changePeriod = async (p: number) => {
+    setPeriod(p);
+    setChartLoading(true);
+    try {
+      const [chartData, customerData] = await Promise.all([
+        api.get(`/api/reports/revenue-chart?period=${p}`),
+        api.get(`/api/reports/customer-chart?period=${p}`),
+      ]);
+      setChart(chartData.data || []);
+      setCustomerChart(customerData.data || []);
+    } catch {} finally { setChartLoading(false); }
+  };
+
+  const openStorefront = () => {
+    if (!data?.storePublished) { setStoreError(true); return; }
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
+    window.open(`${siteUrl}/store/${params.slug}`, "_blank");
+  };
 
   if (loading) {
     return (
@@ -142,15 +168,21 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
     <div>
       <Topbar title="Overview" slug={params.slug} />
       <div className="p-6">
-        {/* Greeting + clock */}
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-6 gap-1">
+        {/* Greeting + clock + Storefront button */}
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-6 gap-3">
           <div>
             <h2 className="text-xl font-bold text-[#0a0a0a]">{greeting}, {user?.name?.split(" ")[0]! || "there"}</h2>
             <p className="text-sm text-gray-400 mt-0.5">{dateStr}</p>
           </div>
-          <div className="text-right">
-            <p className="text-2xl font-bold text-[#0a0a0a] tracking-tight tabular-nums">{timeStr}</p>
-            <p className="text-xs text-gray-400">{tz.replace(/_/g, " ")}</p>
+          <div className="flex flex-col sm:items-end gap-2">
+            <div className="text-right">
+              <p className="text-2xl font-bold text-[#0a0a0a] tracking-tight tabular-nums">{timeStr}</p>
+              <p className="text-xs text-gray-400">{tz.replace(/_/g, " ")}</p>
+            </div>
+            <button onClick={openStorefront}
+              className="flex items-center gap-2 px-4 py-2 bg-[#0a0a0a] hover:bg-black/80 text-white text-sm font-medium rounded-lg transition-colors">
+              <ExternalLink size={14} /> Open Storefront
+            </button>
           </div>
         </div>
 
@@ -189,10 +221,24 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
             </motion.div>
           )}
 
+          {/* Period filter */}
+          <motion.div variants={fadeUp} className="flex items-center gap-2 mb-4">
+            <span className="text-xs text-gray-500 font-medium">Period:</span>
+            {[{ label: "7 days", value: 7 }, { label: "30 days", value: 30 }, { label: "90 days", value: 90 }].map((opt) => (
+              <button key={opt.value} onClick={() => changePeriod(opt.value)}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                  period === opt.value ? "bg-[#0a0a0a] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                }`}>
+                {opt.label}
+              </button>
+            ))}
+            {chartLoading && <span className="w-4 h-4 border-2 border-[#DE1010] border-t-transparent rounded-full animate-spin" />}
+          </motion.div>
+
           <motion.div variants={fadeUp}>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base font-semibold">Revenue (last 30 days)</CardTitle>
+                <CardTitle className="text-base font-semibold">Revenue (last {period} days)</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={280}>
@@ -220,7 +266,7 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
           <motion.div variants={fadeUp} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base font-semibold">Order growth (last 30 days)</CardTitle>
+                <CardTitle className="text-base font-semibold">Order growth (last {period} days)</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={220}>
@@ -243,7 +289,7 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base font-semibold">Customer growth (cumulative)</CardTitle>
+                <CardTitle className="text-base font-semibold">Customer growth (last {period} days)</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={220}>
@@ -260,6 +306,31 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
           </motion.div>
         </motion.div>
       </div>
+
+      {/* Store not published error modal */}
+      <AnimatePresence>
+        {storeError && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4"
+            onClick={() => setStoreError(false)}>
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
+              className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl"
+              onClick={(e) => e.stopPropagation()}>
+              <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+                <XCircle size={24} className="text-[#DE1010]" />
+              </div>
+              <h3 className="font-bold text-[#0a0a0a] text-center mb-2">Storefront not published</h3>
+              <p className="text-gray-500 text-sm text-center mb-5">Your storefront is currently offline. Go to the Storefront page to publish it before sharing with customers.</p>
+              <div className="flex gap-3">
+                <button onClick={() => setStoreError(false)}
+                  className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors">Close</button>
+                <a href={`/dashboard/${params.slug}/store`}
+                  className="flex-1 py-2.5 bg-[#DE1010] text-white rounded-xl text-sm font-medium text-center hover:bg-red-700 transition-colors">Go to Storefront</a>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Welcome back modal (every login) */}
       <AnimatePresence>

@@ -15,9 +15,13 @@ import { formatCurrency, truncate } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import { ProductModal } from "@/components/dashboard/product-modal";
 
+const TYPE_LABELS: Record<string, string> = { SIMPLE: "Simple", DOWNLOADABLE: "Downloadable", VARIABLE: "Variable" };
+const TYPE_VARIANTS: Record<string, "default" | "secondary" | "info" | "warning" | "outline"> = { SIMPLE: "secondary", DOWNLOADABLE: "info", VARIABLE: "warning" };
+
 interface Product {
   id: string; name: string; sku: string; price: number; comparePrice?: number;
   category?: string; imageUrl?: string; imageUrls?: string[]; isActive: boolean; status?: string;
+  productType?: string;
   productCategory?: { id: string; name: string };
   inventory?: { quantity: number; lowStockAlert: number }; _count?: { orderItems: number };
 }
@@ -29,6 +33,7 @@ export default function ProductsPage({ params }: { params: { slug: string } }) {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -48,6 +53,7 @@ export default function ProductsPage({ params }: { params: { slug: string } }) {
     if (search) params.set("search", search);
     if (categoryFilter) params.set("categoryId", categoryFilter);
     if (statusFilter) params.set("status", statusFilter);
+    if (typeFilter) params.set("productType", typeFilter);
     params.set("page", String(page));
     params.set("limit", String(LIMIT));
     api.get(`/api/products?${params}`)
@@ -56,8 +62,8 @@ export default function ProductsPage({ params }: { params: { slug: string } }) {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { setPage(1); }, [search, categoryFilter, statusFilter]);
-  useEffect(() => { fetchProducts(); }, [search, categoryFilter, statusFilter, page]);
+  useEffect(() => { setPage(1); }, [search, categoryFilter, statusFilter, typeFilter]);
+  useEffect(() => { fetchProducts(); }, [search, categoryFilter, statusFilter, typeFilter, page]);
 
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
@@ -92,6 +98,13 @@ export default function ProductsPage({ params }: { params: { slug: string } }) {
               <option value="">All statuses</option>
               <option value="published">Published</option>
               <option value="draft">Draft</option>
+            </select>
+            <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}
+              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <option value="">All types</option>
+              <option value="SIMPLE">Simple</option>
+              <option value="DOWNLOADABLE">Downloadable</option>
+              <option value="VARIABLE">Variable</option>
             </select>
           </div>
           {canEdit && (
@@ -174,10 +187,15 @@ export default function ProductsPage({ params }: { params: { slug: string } }) {
                         {product.inventory?.quantity ?? 0} in stock
                       </Badge>
                     </div>
-                    <div className="mt-2">
+                    <div className="mt-2 flex items-center gap-1.5 flex-wrap">
                       <Badge variant={product.status === "published" ? "success" : "secondary"} className="text-[10px]">
                         {product.status === "published" ? "Published" : "Draft"}
                       </Badge>
+                      {product.productType && (
+                        <Badge variant={TYPE_VARIANTS[product.productType] || "outline"} className="text-[10px]">
+                          {TYPE_LABELS[product.productType] || product.productType}
+                        </Badge>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

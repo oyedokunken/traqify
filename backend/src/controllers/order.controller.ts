@@ -4,7 +4,7 @@ import { orderSchema } from "../utils/validators";
 import { createAuditLog } from "../utils/audit";
 import { AuthRequest } from "../middleware/auth.middleware";
 import { sendEmail } from "../config/email";
-import { orderApprovedEmailTemplate, orderCompletedEmailTemplate } from "../emails/templates";
+import { orderApprovedEmailTemplate, orderCompletedEmailTemplate, newOrderEmailTemplate } from "../emails/templates";
 
 const generateOrderNumber = (): string => {
   const timestamp = Date.now().toString(36).toUpperCase();
@@ -38,7 +38,7 @@ export const getOrders = async (req: AuthRequest, res: Response): Promise<void> 
         skip,
         take: parseInt(limit as string),
       }),
-      prisma.order.count({ where: { organizationId: orgId } }),
+      prisma.order.count({ where: { organizationId: orgId, ...(status && { status: status as any }), ...(customerId && { customerId: customerId as string }) } }),
     ]);
 
     res.json({ orders, total, page: parseInt(page as string), limit: parseInt(limit as string) });
@@ -151,6 +151,19 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
     });
 
     await createAuditLog(req.user!.id, orgId, "CREATE", "Order", order.id, `Created order ${order.orderNumber}`, req);
+
+    // Notify org owner
+    const orgOwner = await prisma.user.findFirst({ where: { organizationId: orgId, role: "OWNER" } });
+    if (orgOwner) {
+      const org = await prisma.organization.findUnique({ where: { id: orgId } });
+      const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+      sendEmail(
+        orgOwner.email,
+        `New order received — ${org?.name}`,
+        newOrderEmailTemplate(org?.name || "", order.id, order.customer?.name || "Walk-in", order.totalAmount, order.orderItems.length, `${frontendUrl}/dashboard/${org?.slug || ""}/orders`)
+      ).catch((e) => console.error("[Email] New order notification failed:", e.message));
+    }
+
     res.status(201).json(order);
   } catch {
     res.status(500).json({ error: "Failed to create order." });

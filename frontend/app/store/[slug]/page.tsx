@@ -37,6 +37,8 @@ interface Org {
   email?: string;
   phone?: string;
   address?: string;
+  description?: string;
+  industry?: string;
 }
 
 interface Category {
@@ -138,6 +140,7 @@ export default function PublicStorePage({ params }: { params: { slug: string } }
   const [showWishlistEmailPrompt, setShowWishlistEmailPrompt] = useState(false);
   const [showCart, setShowCart] = useState(false);
   const [showFilters, setShowFilters] = useState(true);
+  const [sort, setSort] = useState("");
   const [showMenu, setShowMenu] = useState(false);
   const [detailProduct, setDetailProduct] = useState<Product | null>(null);
   const [activeDetailImg, setActiveDetailImg] = useState(0);
@@ -185,12 +188,21 @@ export default function PublicStorePage({ params }: { params: { slug: string } }
     }
   }, [products, sliderReady]);
 
-  const filtered = products.filter((p) => {
-    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase());
-    const matchCategory = !category || p.productCategory?.name === category;
-    const matchPrice = !sliderReady || (p.price >= priceRange[0] && p.price <= priceRange[1]);
-    return matchSearch && matchCategory && matchPrice;
-  });
+  const filtered = products
+    .filter((p) => {
+      const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase());
+      const matchCategory = !category || p.productCategory?.name === category;
+      const matchPrice = !sliderReady || (p.price >= priceRange[0] && p.price <= priceRange[1]);
+      return matchSearch && matchCategory && matchPrice;
+    })
+    .slice()
+    .sort((a, b) => {
+      if (sort === "price_asc") return a.price - b.price;
+      if (sort === "price_desc") return b.price - a.price;
+      if (sort === "name") return a.name.localeCompare(b.name);
+      if (sort === "oldest") return 0;
+      return 0;
+    });
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -427,6 +439,19 @@ export default function PublicStorePage({ params }: { params: { slug: string } }
               </div>
             </div>
 
+            {/* Sort bar */}
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-sm text-gray-500">{filtered.length} product{filtered.length !== 1 ? "s" : ""}</p>
+              <select value={sort} onChange={(e) => { setSort(e.target.value); setPage(1); }}
+                className="h-9 rounded-lg border border-gray-200 bg-white px-3 py-1 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#DE1010]/30">
+                <option value="">Newest first</option>
+                <option value="oldest">Oldest first</option>
+                <option value="price_asc">Price: low to high</option>
+                <option value="price_desc">Price: high to low</option>
+                <option value="name">Name: A–Z</option>
+              </select>
+            </div>
+
             {filtered.length === 0 ? (
               <div className="text-center py-24"><Package size={40} className="text-gray-300 mx-auto mb-3" /><p className="text-gray-500 font-medium">No products found</p></div>
             ) : (
@@ -480,7 +505,8 @@ export default function PublicStorePage({ params }: { params: { slug: string } }
                 )}
                 <div>
                   <h2 className="font-bold text-white text-lg">{org?.name}</h2>
-                  <div className="flex items-center gap-1 mt-0.5">
+                  {org?.description && <p className="text-xs text-gray-400 mt-0.5 max-w-xs line-clamp-2">{org.description}</p>}
+                  <div className="flex items-center gap-1 mt-1">
                     {[1,2,3,4,5].map((s) => <Star key={s} size={11} className="text-amber-400 fill-amber-400" />)}
                     <span className="text-xs text-gray-400 ml-1">Verified store</span>
                   </div>

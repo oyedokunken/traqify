@@ -137,7 +137,8 @@ export default function OrdersPage({ params }: { params: { slug: string } }) {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {filtered.map((order) => (
-                  <tr key={order.id} className="hover:bg-gray-50 transition-colors">
+                  <tr key={order.id} onClick={() => setSelectedOrder(order)}
+                    className="hover:bg-gray-50 transition-colors cursor-pointer">
                     <td className="px-5 py-3.5 text-sm font-medium text-[#0a0a0a]">{order.orderNumber}</td>
                     <td className="px-5 py-3.5 text-sm text-gray-600">{order.customer?.name || <span className="text-gray-400 italic">Walk-in</span>}</td>
                     <td className="px-5 py-3.5 text-sm text-gray-500 hidden md:table-cell">{formatDateTime(order.createdAt)}</td>
@@ -148,14 +149,14 @@ export default function OrdersPage({ params }: { params: { slug: string } }) {
                       </Badge>
                     </td>
                     <td className="px-5 py-3.5">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                         {order.status === "PENDING" && canManage && (
                           <button onClick={() => setApproveTarget(order)} title="Approve order"
                             className="text-gray-400 hover:text-green-600 transition-colors">
                             <CheckCircle size={16} />
                           </button>
                         )}
-                        <button onClick={() => setSelectedOrder(order)} className="text-gray-400 hover:text-[#0a0a0a] transition-colors">
+                        <button onClick={() => setSelectedOrder(order)} className="text-gray-400 hover:text-[#0a0a0a] transition-colors" title="View order">
                           <Eye size={16} />
                         </button>
                         {canManage && (

@@ -61,7 +61,7 @@ export default function AcceptInvitePage({ params }: { params: { token: string }
       setAuthTokens(res.data.token, res.data.refreshToken, res.data.user);
       setUser(res.data.user);
       setSuccess(true);
-      setTimeout(() => router.push(`/dashboard/${res.data.user.organization?.slug || ""}/overview`), 1500);
+      setTimeout(() => router.push(`/dashboard/${res.data.orgSlug || ""}/overview`), 1500);
     } catch (err: any) {
       setError(err.response?.data?.error || "Failed to accept invitation.");
     }

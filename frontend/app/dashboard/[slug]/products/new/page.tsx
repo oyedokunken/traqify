@@ -285,11 +285,11 @@ export default function NewProductPage({ params }: { params: { slug: string } })
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>Initial stock</Label>
-                    <Input className="mt-1.5" type="number" min="0" placeholder="0" {...register("initialStock")} />
+                    <Input className="mt-1.5" type="number" min="0" placeholder="0" {...register("initialStock", { valueAsNumber: true })} />
                   </div>
                   <div>
                     <Label>Low stock alert at</Label>
-                    <Input className="mt-1.5" type="number" min="0" placeholder="10" {...register("lowStockAlert")} />
+                    <Input className="mt-1.5" type="number" min="0" placeholder="10" {...register("lowStockAlert", { valueAsNumber: true })} />
                   </div>
                 </div>
               </div>
@@ -341,7 +341,7 @@ export default function NewProductPage({ params }: { params: { slug: string } })
                         </button>
                         <input ref={downloadFileRef} type="file" className="hidden"
                           onChange={(e) => setDownloadFile(e.target.files?.[0] || null)} />
-                        <p className="text-xs text-gray-400">Max 2MB. Hosted on Supabase.</p>
+                        <p className="text-xs text-gray-400">Max file size is 2MB.</p>
                       </>
                     )}
                   </div>

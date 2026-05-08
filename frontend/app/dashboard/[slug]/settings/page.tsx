@@ -31,7 +31,7 @@ export default function SettingsPage({ params }: { params: { slug: string } }) {
   const [avatarUploading, setAvatarUploading] = useState(false);
   const profileForm = useForm({ defaultValues: { name: user?.name || "", email: user?.email || "" } });
   const pwForm = useForm<{ currentPassword: string; newPassword: string; confirmPassword: string }>();
-  const orgForm = useForm({ defaultValues: { phone: "", address: "", website: "", industry: "", size: "" } });
+  const orgForm = useForm({ defaultValues: { phone: "", address: "", website: "", industry: "", size: "", description: "" } });
 
   // Fetch org details once
   useEffect(() => {
@@ -39,7 +39,7 @@ export default function SettingsPage({ params }: { params: { slug: string } }) {
     api.get(`/api/organizations/${params.slug}`).then((r) => {
       const o = r.data;
       setOrgData(o);
-      orgForm.reset({ phone: o.phone || "", address: o.address || "", website: o.website || "", industry: o.industry || "", size: o.size || "" });
+      orgForm.reset({ phone: o.phone || "", address: o.address || "", website: o.website || "", industry: o.industry || "", size: o.size || "", description: o.description || "" });
     }).catch(() => {});
   }, [params.slug, user?.organizationId]);
 
@@ -201,6 +201,16 @@ export default function SettingsPage({ params }: { params: { slug: string } }) {
                 <div>
                   <Label>Website</Label>
                   <Input className="mt-1.5" placeholder="https://yoursite.com" {...orgForm.register("website")} />
+                </div>
+                <div>
+                  <Label>Store description</Label>
+                  <textarea
+                    className="mt-1.5 flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
+                    placeholder="A short description of your store that appears on your public storefront..."
+                    maxLength={500}
+                    {...orgForm.register("description")}
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Max 500 characters</p>
                 </div>
                 <Button type="submit" size="sm" className="gap-2 mt-2" disabled={orgForm.formState.isSubmitting}>
                   <Save size={14} />{orgForm.formState.isSubmitting ? "Saving..." : "Save changes"}
