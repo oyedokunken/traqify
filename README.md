@@ -23,9 +23,49 @@
 
 ## What is Traqify?
 
-Traqify is a production-grade, multi-tenant store management platform designed for retail businesses that need structure and clarity across their operations. Built as a full-stack TypeScript monorepo, it handles everything from product management and order processing to staff permissions, customer records, public-facing storefronts, and real-time analytics.
+Traqify is a **production-deployed, multi-tenant enterprise store management platform** built for retail businesses that need structure, auditability, and role-based control across their operations.
 
-The system follows a clean **separation of concerns** between a Next.js 14 App Router frontend and a RESTful Express.js backend, connected via a JWT-authenticated Axios client with automatic token refresh.
+It is a full-stack TypeScript monorepo — a Next.js 14 App Router frontend + RESTful Express.js backend — covering the complete retail lifecycle: product catalogue, POS order creation, inventory control, customer records, payment tracking, staff access management, public storefronts with Paystack checkout, financial reports, and a real-time analytics dashboard.
+
+The system is live at **[https://traqify.vercel.app](https://traqify.vercel.app)** and its API at **[https://traqify-api.vercel.app](https://traqify-api.vercel.app)**.
+
+---
+
+## Evaluator Quick Start
+
+> For hackathon facilitators and reviewers: the fastest path to seeing everything working.
+
+### Option A: Use the live demo
+
+| URL | Purpose |
+|-----|---------|
+| [https://traqify.vercel.app/login](https://traqify.vercel.app/login) | Sign in |
+| [https://traqify.vercel.app/register](https://traqify.vercel.app/register) | Create a new organization |
+| [https://traqify.vercel.app/store/rexta-technologies](https://traqify.vercel.app/store/rexta-technologies) | Live public storefront |
+| [https://traqify-api.vercel.app/health](https://traqify-api.vercel.app/health) | API health check |
+
+### Option B: Test the full staff invite flow
+
+1. Register an account and create an organization
+2. Go to **Staff** and invite a new email address as Manager
+3. Check that email for the invitation link (expires in 3 days)
+4. Accept the invite in a different browser / incognito window
+5. Observe the invited user's role-specific welcome modal and read-only company details in Settings
+6. Back in the owner account, observe the **Pending** row in the Staff table
+
+### Option C: Test the public checkout flow
+
+1. Visit any live store: `https://traqify.vercel.app/store/[slug]`
+2. Add a product to cart
+3. Checkout with a test Paystack card: `4084 0840 8408 4081`, exp `01/25`, CVV `408`
+4. Watch the order appear in the dashboard under Orders
+
+### What to look for
+
+- **RBAC enforcement**: try accessing `/dashboard/[slug]/staff` as a Cashier — you will be redirected
+- **Audit trail**: every action (login, product create, order approve, invite send) is logged under Audit Logs
+- **PDF reports**: go to Reports, pick a type and date range, click Download
+- **Multi-tenancy**: two organizations cannot see each other's data — enforced at the API layer on every query
 
 ---
 
@@ -129,7 +169,8 @@ The system follows a clean **separation of concerns** between a Next.js 14 App R
 ## Features
 
 ### Multi-tenancy
-Each organization is completely isolated. Users belong to one organization (or none), and all data queries are scoped by `organizationId`. The system supports creating separate organizations per branch.
+
+Every database query — products, orders, customers, staff, payments, audit logs — is scoped by `organizationId`. No query runs without it. There is no global admin view; isolation is enforced at the ORM layer, not in frontend logic alone. The system supports creating multiple separate organizations (e.g., separate branches) under different slugs.
 
 ### Role-Based Access Control (RBAC)
 Four roles with granular middleware enforcement:
@@ -180,11 +221,15 @@ Four roles with granular middleware enforcement:
 - Search by name or email
 
 ### Staff Management
-- Email invitation with 48-hour secure token
-- Role assignment on invite (MANAGER, CASHIER, AUDITOR); OWNER role cannot be assigned via invite
+- Email invitation with **3-day (72-hour) secure token**; cryptographically random 64-char hex token
+- Role assignment on invite: MANAGER, CASHIER, or AUDITOR; OWNER is protected and cannot be assigned via invite
+- **Pending invites** visible in the Staff table with amber badge; re-inviting a pending address is blocked at the API level (409 Conflict)
+- **Cancel invite** action removes the pending invite and logs the cancellation in the audit trail
+- **Lazy expiry**: when invites are fetched, newly-expired entries are auto-marked `EXPIRED` and logged
+- Invite accept page: branded card UI with left-aligned content and eye icons on both password fields
+- **Role-specific welcome modal** on first login: invited members see their role name and access scope; org owners see workspace setup instructions
 - Account restriction / unrestriction with email notification; OWNER account cannot be restricted
 - Admin-initiated password reset; OWNER password cannot be reset via staff tools
-- Staff invite accept: redirect to dashboard uses `orgSlug` from API response (bug fix)
 
 ### Public Store
 - Each org gets `/store/[slug]` as a public product catalog
@@ -202,11 +247,13 @@ Four roles with granular middleware enforcement:
 - Confirmation email to customer on order placement
 
 ### Analytics Dashboard
-- Live 12h clock + greeting on overview
-- **Period filter** on charts: 7 / 30 / 90 days (applies to revenue, orders, and customer growth charts)
-- **Open Storefront** button — opens the public store in a new tab; shows an error modal if the store is unpublished
+- **Live clock** (HH:MM:SS) and timezone displayed next to the greeting and date — updates every second
+- **Period filter** on charts: 7 / 30 / 90 days (applies to revenue, orders, and customer growth charts simultaneously)
+- **Open Storefront** button — opens the public store in a new tab; shows a modal if the store is unpublished with a direct link to publish
 - Revenue area chart, order growth area chart, customer growth line chart — all powered by live API data
 - Low-stock alert banner when any product is at or below alert threshold
+- **First-time welcome modal**: role-aware — owners see setup instructions; invited members see their role and access scope
+- **Welcome-back modal** on every new session (sessionStorage-gated)
 
 ### Newsletter
 - `/dashboard/[slug]/newsletter` — OWNER/MANAGER only
@@ -216,16 +263,34 @@ Four roles with granular middleware enforcement:
 - Refresh button for live updates
 
 ### Reports
-- 6 report types: Revenue, Products, Orders, Customers, Inventory, Staff
-- Date-range filtering
-- **PDF download**: `GET /api/reports/:type/pdf` — PDFKit, landscape A4
-- **Email report**: `POST /api/reports/:type/email` — sends PDF as attachment
-- **PDF layout**: Traqify logo mark + brand name in dark header; org name + email·phone on one line; report name in coloured strip below header; period/date on same strip; clean footer with record count + generation time + "Powered by Traqify"
+- **7 report types**: Revenue, Products, Orders, Customers, Inventory, Staff, **Payments** (new)
+- Date-range filtering with empty-report guard (400 if no data in range)
+- **PDF download**: landscape A4 via PDFKit; branded header (Traqify logo + org name + contact); coloured strip with report title and period; footer with record count + generation timestamp
+- **Email report**: sends PDF as attachment via Nodemailer to the requesting user's email
+- All report types accessible to AUDITOR and above; download/email restricted to OWNER/MANAGER
+- PDF tagline: "Enterprise Store Management System"
 
 ### Audit Logs
-- Every create / update / delete / login event logged with user, entity, and timestamp
-- Searchable and paginated
+- Every create / update / delete / login event logged with: user ID, organization ID, action type, entity name, entity ID, human-readable detail, IP address, user agent, and timestamp
+- Captures: product creates/edits, order status changes, customer updates, staff invites sent/accepted/cancelled/expired, password changes, account restrictions, report exports
+- Searchable and paginated; clickable rows navigate to a full detail page
+- **Read/unread state** per log entry; bulk mark-read with confirmation modal
+- **Notification bell** in topbar: shows latest 3 unread audit events; click navigates to detail
 - Visible to OWNER and AUDITOR only
+
+### Payment Tracking
+- Record and track payments against orders with status flow: `PENDING` -> `COMPLETED` / `FAILED` / `REFUNDED`
+- Payment fields: amount (NGN), method (cash, transfer, Paystack, etc.), reference, notes, order link
+- Dashboard summary: total received, pending, failed, refunded — all with count badges
+- Status filter; records paginated
+- Inline update: click a payment to change its status with confirmation
+- Fully audited: all payment creates and updates are logged
+
+### Customer Records
+- Full customer profiles: name, email, phone, address
+- Source tracking: `MANUAL` (staff-created) vs `PURCHASE` (auto-created at checkout)
+- Per-customer order history
+- Search by name or email; add customer via modal overlay (no page navigation)
 
 ### Email System
 Branded HTML templates for:
@@ -242,72 +307,139 @@ Branded HTML templates for:
 
 ---
 
+## Security Model
+
+### Authentication layers
+
+1. **OTP email verification** — every new account must verify their email before gaining access; the OTP is a 6-digit code with a 10-minute expiry and single-use enforcement
+2. **bcrypt password hashing** — cost factor 12; no plain-text passwords stored anywhere
+3. **JWT access token** — 7-day default lifetime; signed with `JWT_SECRET`; carries `userId`, `email`, `organizationId`, `role`
+4. **JWT refresh token** — separate secret (`JWT_REFRESH_SECRET`); used by Axios interceptor to silently re-issue access tokens on 401
+5. **Google OAuth 2.0** — redirect-based flow (server-side code exchange); Google accounts cannot log in with password and vice versa
+
+### Authorization layers
+
+- **`authenticate` middleware** — verifies the JWT on every protected route; attaches `req.user`
+- **`requireOrg` middleware** — enforces that `req.user.organizationId` is set; prevents cross-org access
+- **RBAC middleware** — four guards: `isOwnerOnly`, `isOwnerOrManager`, `isAtLeastAuditor`, `isAtLeastCashier`; applied per-route, not per-controller
+- **Data-layer isolation** — all Prisma queries include `organizationId` in the `where` clause; no query trusts the frontend to scope data
+
+### Rate limiting
+
+Auth endpoints (`/api/auth/*`) are rate-limited via `express-rate-limit`:
+- 10 requests per 15 minutes per IP on sensitive routes (login, register, OTP send)
+
+### HTTP security headers
+
+- `helmet` is applied globally: sets `X-Content-Type-Options`, `X-Frame-Options`, `Strict-Transport-Security`, `X-XSS-Protection`, and Content Security Policy headers
+
+### File upload security
+
+- Only `image/jpeg`, `image/png`, `image/webp` MIME types accepted (validated server-side)
+- Max file size: 5 MB (enforced by Multer before the handler runs)
+- Files stored in Supabase Storage (not the server filesystem); server never persists files to disk
+
+### Password change policy (Settings)
+
+- Requires the current password to be verified before accepting a new one
+- New password cannot contain the user's email address (or email local part)
+- New password cannot contain any segment of the user's display name (>2 chars)
+
+### Staff invite security
+
+- Invite tokens are 64-character cryptographically random hex strings (`crypto.randomBytes(32)`)
+- Tokens expire after **3 days** (72 hours)
+- Re-inviting a pending email address is blocked at the API level (409 Conflict)
+- OWNER role cannot be assigned via invite; only MANAGER, CASHIER, AUDITOR
+- Invite cancellation hard-deletes the token from the database; old links become immediately invalid
+
+---
+
 ## Database Schema
 
 ```
 User
-  id, email, name, password (bcrypt), avatarUrl
-  emailVerified, signInMethod (EMAIL|GOOGLE)
-  role (OWNER|MANAGER|CASHIER|AUDITOR)
-  organizationId (FK -> Organization)
-  lastLoginAt, isRestricted
+  id, email, name, password (bcrypt), phone, avatarUrl
+  emailVerified, signInMethod (EMAIL | GOOGLE)
+  role (OWNER | MANAGER | CASHIER | AUDITOR)
+  isActive Boolean                         -- account restriction flag
+  organizationId (FK -> Organization)?
+  invitedById (FK -> User)?                -- set when joined via invite
+  lastLoginAt, createdAt
 
 Organization
   id, name, slug (unique), email, phone, address, website
-  industry, size, description String?
-  logoUrl
+  industry, size, description?
+  logoUrl?
   storePublished Boolean
   ownerId (FK -> User)
 
 Product
   id, name, sku (unique per org)
-  price, comparePrice, description
-  imageUrl, imageUrls String[]
-  productType (SIMPLE|DOWNLOADABLE|VARIABLE)
-  downloadUrl
-  status (published|draft), isActive
+  price, comparePrice?, description?
+  imageUrl?, imageUrls String[]
+  productType (SIMPLE | DOWNLOADABLE | VARIABLE)
+  downloadUrl?
+  status (published | draft), isActive Boolean
   categoryId (FK -> ProductCategory)
   organizationId
 
 Inventory
-  id, quantity, lowStockAlert
+  id, quantity Int, lowStockAlert Int
   productId (1:1 -> Product)
 
 Order
-  id, status, totalAmount, paymentMethod, notes
-  customerId, organizationId, createdByUserId
+  id, status (PENDING|APPROVED|COMPLETED|CANCELLED)
+  totalAmount, paymentMethod?, notes?
+  customerId?, organizationId, createdByUserId?
 
 OrderItem
   id, productId, quantity, unitPrice, subtotal
   orderId
 
+Payment                                    -- v1.9.0+
+  id, amount Float, currency (default NGN)
+  status (PENDING|COMPLETED|FAILED|REFUNDED)
+  method?, reference?, notes?
+  organizationId, orderId?
+
 Customer
-  id, name, email, phone, address
+  id, name, email?, phone?, address?
+  source (MANUAL | PURCHASE)
   organizationId
 
 StaffInvite
-  id, email, role, token (unique), accepted
-  expiresAt, organizationId, invitedByUserId
+  id, email, role, token (unique)
+  status (PENDING | ACCEPTED | EXPIRED)
+  expiresAt, organizationId, invitedById
+
+Review
+  id, orderId, productId, organizationId
+  rating Int (1-5), comment?
+  customerName, customerEmail?
+  status (PENDING | APPROVED | REJECTED)
+  @@unique([orderId, productId])
+
+ProductCategory
+  id, name, slug, description?
+  organizationId
 
 OTPCode
-  id, email, code, expiresAt, used
+  id, email, code, expiresAt, used Boolean
 
 PasswordResetToken
-  id, email, token, expiresAt, used
+  id, email, token, expiresAt, used Boolean
 
 AuditLog
   id, userId, organizationId
-  action (CREATE|UPDATE|DELETE|LOGIN)
-  entity, entityId, details
-  ipAddress, userAgent
+  action (CREATE | UPDATE | DELETE | LOGIN)
+  entity String, entityId String, details String
+  ipAddress?, userAgent?
+  isRead Boolean (default false)
   createdAt
 
-ProductCategory
-  id, name, slug, description
-  organizationId
-
 Wishlist
-  id, sessionId, email, productIds String[]
+  id, sessionId, email?, productIds String[]
   slug, organizationId
   sent30min, sent2hr, sentDay1, sentDay3 Boolean
   createdAt
@@ -405,31 +537,58 @@ All protected endpoints require `Authorization: Bearer <token>`.
 ### Staff (`/api/staff`)
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/` | Auth | List staff members |
-| POST | `/invite` | MANAGER+ | Send staff invitation |
-| POST | `/accept-invite` | Public | Accept invitation via token |
-| PATCH | `/:id/restrict` | OWNER only | Restrict / unrestrict account |
-| POST | `/:id/reset-password` | OWNER only | Admin password reset |
+| GET | `/` | Auth + OrgMember | List staff members |
+| GET | `/invites` | MANAGER+ | List all pending/expired invites |
+| POST | `/invite` | MANAGER+ | Send staff invitation (3-day token) |
+| DELETE | `/invites/:inviteId` | MANAGER+ | Cancel a pending invite |
+| GET | `/invite/:token` | Public | Fetch invite details (for accept page) |
+| PATCH | `/:userId/role` | OWNER only | Change a staff member's role |
+| PATCH | `/:userId/access` | MANAGER+ | Toggle account restriction |
+| DELETE | `/:userId` | OWNER only | Remove staff member from org |
+| POST | `/:userId/reset-password` | MANAGER+ | Admin-initiated password reset email |
+
+### Payments (`/api/payments`)
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/` | AUDITOR+ | List payments (filterable by status) |
+| GET | `/:id` | AUDITOR+ | Get single payment record |
+| POST | `/` | MANAGER+ | Record a payment |
+| PATCH | `/:id` | MANAGER+ | Update payment status |
+
+### Reviews (`/api/reviews`)
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/` | Public | Submit a review (post-purchase) |
+| GET | `/product/:productId` | Public | List approved reviews for a product |
+| GET | `/` | MANAGER+ | Dashboard: list all reviews for org |
+| PATCH | `/:id/moderate` | MANAGER+ | Approve or reject a review |
+| DELETE | `/:id` | MANAGER+ | Delete a review |
 
 ### Reports (`/api/reports`)
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/overview` | Auth | KPI summary (revenue, orders, products) |
-| GET | `/revenue-chart` | Auth | Daily revenue for last N days |
-| GET | `/top-products` | Auth | Top products by revenue |
-| GET | `/order-status` | Auth | Order count by status |
-| GET | `/sales` | AUDITOR+ | Date-range sales report |
+| GET | `/overview` | AUDITOR+ | KPI summary (revenue, orders, products, customers, low-stock) |
+| GET | `/revenue-chart` | AUDITOR+ | Daily revenue for last N days |
+| GET | `/customer-chart` | AUDITOR+ | Daily new customers for last N days |
+| GET | `/top-products` | AUDITOR+ | Top products by revenue |
+| GET | `/sales` | AUDITOR+ | Date-range sales tabular data |
+| GET | `/download` | MANAGER+ | Stream PDF report (type + date range) |
+| POST | `/email` | MANAGER+ | Email PDF report as attachment |
 
-### Audit Logs (`/api/audit`)
+### Audit Logs (`/api/audit` or `/api/audit-logs`)
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/` | OWNER / AUDITOR | Paginated audit log with search |
+| GET | `/` | AUDITOR+ | Paginated audit log with search |
+| GET | `/unread-count` | AUDITOR+ | Count of unread log entries |
+| GET | `/:id` | AUDITOR+ | Single log entry (marks it read) |
+| PATCH | `/mark-read` | AUDITOR+ | Bulk mark read/unread (`ids[]`, `all`, `isRead`) |
 
 ### Public Store (`/api/store`)
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | GET | `/:slug` | Public | Store info + product catalog |
-| POST | `/:slug/checkout` | Public | Place guest order |
+| POST | `/:slug/checkout` | Public | Place guest order + Paystack verification |
+| POST | `/:slug/wishlist` | Public | Sync wishlist (sessionId + productIds + email) |
 
 ### Newsletter (`/api/newsletter`)
 | Method | Path | Auth | Description |
@@ -759,9 +918,47 @@ See the step-by-step guides:
 
 ---
 
+## Enterprise Readiness Assessment
+
+Traqify is purpose-built with enterprise patterns. Here is an honest assessment of where it stands and where it can grow.
+
+### Strengths
+
+| Concern | Implementation |
+|---------|----------------|
+| **Multi-tenancy** | All queries scoped by `organizationId` at the ORM layer; no cross-org data leakage possible |
+| **RBAC** | 4-tier role hierarchy enforced via dedicated Express middleware per route; not just UI-level hiding |
+| **Audit trail** | Every state-changing action generates an `AuditLog` row with actor, entity, IP, user agent, and timestamp |
+| **Auth security** | bcrypt (cost 12) + OTP verification + JWT access/refresh pair + Google OAuth; rate-limited auth endpoints |
+| **HTTP hardening** | Helmet headers + per-route rate limiting via `express-rate-limit` |
+| **File security** | MIME-type validation + size caps + Supabase Storage (not local disk) |
+| **Type safety** | 100% TypeScript (strict) across frontend and backend; Prisma ORM for compile-time query safety |
+| **Email reliability** | Nodemailer with branded templates; transactional emails for OTP, invites, orders, reports, restrictions |
+| **Structured reports** | Downloadable and emailable PDF reports (7 types) with org branding |
+| **Public storefront** | Separate customer-facing catalog with Paystack checkout, wishlist reminders, and product reviews |
+| **Staff lifecycle** | Invite → accept → restrict → remove; full audit log at every step |
+
+### Known Limitations
+
+| Area | Current State | Enterprise Upgrade Path |
+|------|--------------|-------------------------|
+| **Password history** | Not enforced (current vs new password checked, but no history log) | Add `PasswordHistory` model; hash-compare last N passwords |
+| **MFA / 2FA** | Not implemented | TOTP (Google Authenticator) or SMS via Twilio |
+| **Session management** | Stateless JWT; no server-side session store | Add Redis for token blocklisting on logout/restriction |
+| **Background jobs** | Wishlist reminders use a simulated delay model; invite expiry is lazy (on-read) | Proper cron/queue (BullMQ + Redis) for scheduled tasks |
+| **Horizontal scaling** | Single Express instance per Vercel function | Stateless architecture already; add Redis for shared state |
+| **Webhook events** | No outbound webhooks | Add a `WebhookEndpoint` model + `POST` delivery queue |
+| **API versioning** | No `/v1/` prefix | Add version prefix before any public API consumers |
+| **Unit / integration tests** | Not yet written | Jest + Supertest for backend; Playwright for E2E |
+| **Database migrations** | Uses `prisma db push` (schema-level diff) | Switch to `prisma migrate deploy` for CI/CD controlled migrations |
+| **Observability** | `console.error` logging only | Add structured logging (Pino) + error tracking (Sentry) |
+
+---
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
 ---
 
 ## Author
