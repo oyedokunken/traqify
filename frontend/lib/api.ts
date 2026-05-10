@@ -29,11 +29,14 @@ api.interceptors.response.use(
           localStorage.setItem("traqify_token", data.token);
           error.config.headers.Authorization = `Bearer ${data.token}`;
           return api.request(error.config);
-        } catch {
-          localStorage.removeItem("traqify_token");
-          localStorage.removeItem("traqify_refresh");
-          localStorage.removeItem("traqify_user");
-          window.location.href = "/login";
+        } catch (refreshErr: any) {
+          const status = refreshErr?.response?.status;
+          if (!status || status === 401 || status === 403) {
+            localStorage.removeItem("traqify_token");
+            localStorage.removeItem("traqify_refresh");
+            localStorage.removeItem("traqify_user");
+            window.location.href = "/login";
+          }
         }
       }
     }
