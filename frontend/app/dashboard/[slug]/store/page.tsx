@@ -42,11 +42,11 @@ export default function StorePage({ params }: { params: { slug: string } }) {
     const publishing = !isPublished;
     if (publishing) {
       const issues: string[] = [];
-      if (!storeData?.logoUrl) issues.push("No store logo uploaded — upload a logo to represent your brand.");
-      if (!storeData?.description) issues.push("No store description set — add a description in Settings.");
-      if (!storeData?.email) issues.push("No business email configured — set it in Settings.");
-      if (productCount === 0) issues.push("No published products — add at least one published product.");
-      if (categoryCount === 0) issues.push("No product categories — create at least one category.");
+      if (!storeData?.logoUrl) issues.push("No store logo uploaded  -  upload a logo to represent your brand.");
+      if (!storeData?.description) issues.push("No store description set  -  add a description in Settings.");
+      if (!storeData?.email) issues.push("No business email configured  -  set it in Settings.");
+      if (productCount === 0) issues.push("No published products  -  add at least one published product.");
+      if (categoryCount === 0) issues.push("No product categories  -  create at least one category.");
       if (issues.length > 0) {
         setPublishErrors(issues);
         setShowPublishError(true);
@@ -191,7 +191,7 @@ export default function StorePage({ params }: { params: { slug: string } }) {
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <h3 className="font-semibold text-[#0a0a0a] mb-4">Store overview</h3>
             <div className="space-y-4">
-              {/* Logo — full-width, uncropped */}
+              {/* Logo  -  full-width, uncropped */}
               <div className="w-full bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-center overflow-hidden" style={{ minHeight: "80px", maxHeight: "160px" }}>
                 {storeData?.logoUrl ? (
                   <img src={storeData.logoUrl} alt="Logo" className="max-w-full object-contain p-3" style={{ maxHeight: "160px" }} />

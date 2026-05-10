@@ -171,14 +171,14 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
       <Topbar title="Overview" slug={params.slug} />
       <div className="p-6">
         {/* Greeting + clock + Storefront button */}
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-6 gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
           <div>
-            <h2 className="text-xl font-bold text-[#0a0a0a]">{greeting}, {user?.name?.split(" ")[0]! || "there"}</h2>
+            <h2 className="text-xl font-bold text-[#0a0a0a]">{greeting}, {user?.name?.split(" ")[0] || "there"}</h2>
             <p className="text-sm text-gray-400 mt-0.5">{dateStr}</p>
           </div>
-          <div className="flex flex-col sm:items-end gap-2">
+          <div className="flex items-center gap-4">
             <button onClick={openStorefront}
-              className="flex items-center gap-2 px-4 py-2 bg-[#0a0a0a] hover:bg-black/80 text-white text-sm font-medium rounded-lg transition-colors">
+              className="flex items-center gap-2 px-4 py-2 bg-[#0a0a0a] hover:bg-black/80 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap flex-shrink-0">
               <ExternalLink size={14} /> Open Storefront
             </button>
             <div className="text-right">

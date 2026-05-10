@@ -139,7 +139,7 @@ export default function AuditLogDetailPage({ params }: { params: { slug: string;
                     )}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-[#0a0a0a] truncate">{log.user.name || "—"}</p>
+                    <p className="text-sm font-medium text-[#0a0a0a] truncate">{log.user.name || "-"}</p>
                     <p className="text-xs text-gray-400 truncate">{log.user.email}</p>
                     <span className="inline-flex items-center mt-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-600">
                       {ROLE_LABELS[log.user.role] || log.user.role}

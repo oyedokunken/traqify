@@ -177,10 +177,10 @@ export const getCustomerChart = async (req: AuthRequest, res: Response): Promise
 const REPORT_LABELS: Record<string, string> = {
   revenue: "Revenue Report", products: "Products Report", orders: "Orders Report",
   customers: "Customers Report", inventory: "Inventory Report", staff: "Staff Report",
-  newsletter: "Newsletter Subscribers Report",
+  newsletter: "Newsletter Subscribers Report", payments: "Payments Report",
 };
 
-const DATE_RANGE_TYPES = ["revenue", "orders"];
+const DATE_RANGE_TYPES = ["revenue", "orders", "payments"];
 
 async function buildReportData(type: string, orgId: string, from: Date, to: Date) {
   if (type === "revenue") {
@@ -197,6 +197,8 @@ async function buildReportData(type: string, orgId: string, from: Date, to: Date
     return prisma.user.findMany({ where: { organizationId: orgId }, orderBy: { createdAt: "asc" } });
   } else if (type === "newsletter") {
     return prisma.newsletterSubscriber.findMany({ orderBy: { createdAt: "desc" } });
+  } else if (type === "payments") {
+    return prisma.payment.findMany({ where: { organizationId: orgId, createdAt: { gte: from, lte: to } }, include: { order: { select: { id: true } } }, orderBy: { createdAt: "desc" } });
   }
   return [];
 }
@@ -223,7 +225,7 @@ function buildPDF(type: string, label: string, org: any, from: string, to: strin
     doc.rect(40, 14, 28, 28).fillColor("#DE1010").fill();
     doc.fontSize(16).fillColor("#ffffff").font("Helvetica-Bold").text("T", 40, 18, { width: 28, align: "center" });
     doc.fontSize(13).fillColor("#ffffff").font("Helvetica-Bold").text("TRAQIFY", 74, 20);
-    doc.fontSize(7).fillColor("#6b7280").font("Helvetica").text("Business Management Platform", 74, 34);
+    doc.fontSize(7).fillColor("#6b7280").font("Helvetica").text("Enterprise Store Management System", 74, 34);
 
     // Right: org name + contact (email · phone on one line)
     const contactParts = [org?.email, org?.phone].filter(Boolean).join("  ·  ");
@@ -304,6 +306,10 @@ function buildPDF(type: string, label: string, org: any, from: string, to: strin
       const w = [Math.round(totalW*0.30), Math.round(totalW*0.45), Math.round(totalW*0.25)];
       addRow(["Name", "Email", "Subscribed On"], w, true);
       rows.forEach((r) => addRow([safe(r.name, "Anonymous"), safe(r.email), fmt(r.createdAt)], w));
+    } else if (type === "payments") {
+      const w = [Math.round(totalW*0.12), Math.round(totalW*0.14), Math.round(totalW*0.16), Math.round(totalW*0.16), Math.round(totalW*0.16), Math.round(totalW*0.14), Math.round(totalW*0.12)];
+      addRow(["Reference", "Method", "Amount (NGN)", "Status", "Order", "Notes", "Date"], w, true);
+      rows.forEach((r) => addRow([safe(r.reference), safe(r.method), money(r.amount), safe(r.status), r.order ? r.order.id.slice(-8).toUpperCase() : "-", safe(r.notes), fmt(r.createdAt)], w));
     }
 
     // Footer
@@ -330,6 +336,7 @@ export const downloadReport = async (req: AuthRequest, res: Response): Promise<v
 
     const org = await prisma.organization.findUnique({ where: { id: orgId } });
     const rows = await buildReportData(type, orgId, fromDate, toDate);
+    if ((rows as any[]).length === 0) { res.status(400).json({ error: `No ${label.toLowerCase()} data found for the selected date range. Try a wider range.` }); return; }
 
     const pdf = await buildPDF(type, label, org, from || "", to || "", rows as any[]);
     res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${type}-report.pdf"` });
@@ -356,6 +363,7 @@ export const emailReport = async (req: AuthRequest, res: Response): Promise<void
 
     const org = await prisma.organization.findUnique({ where: { id: orgId } });
     const rows = await buildReportData(type, orgId, fromDate, toDate);
+    if ((rows as any[]).length === 0) { res.status(400).json({ error: `No ${label.toLowerCase()} data found for the selected date range. Try a wider range.` }); return; }
 
     const pdf = await buildPDF(type, label, org, from || "", to_date || "", rows as any[]);
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";

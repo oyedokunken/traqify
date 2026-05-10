@@ -20,9 +20,9 @@ export const sendEmail = async (to: string, subject: string, html: string, attac
       to, subject, html,
       attachments: attachments?.map((a) => ({ filename: a.filename, content: a.content, contentType: a.contentType })),
     });
-    console.log(`[Email] Sent to ${to} — "${subject}" (${info.messageId})`);
+    console.log(`[Email] Sent to ${to}  -  "${subject}" (${info.messageId})`);
   } catch (err: any) {
-    console.error(`[Email] FAILED to ${to} — "${subject}":`, err.message);
+    console.error(`[Email] FAILED to ${to}  -  "${subject}":`, err.message);
     throw err;
   }
 };

@@ -371,7 +371,7 @@ export default function PublicStorePage({ params }: { params: { slug: string } }
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         <div className="flex gap-6">
 
-          {/* Left filter sidebar — desktop only */}
+          {/* Left filter sidebar - desktop only */}
           <aside className="hidden lg:block w-52 flex-shrink-0">
             <div className="bg-white rounded-xl border border-gray-200 p-4 sticky top-20">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Filters</p>

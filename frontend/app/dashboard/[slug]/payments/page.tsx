@@ -245,7 +245,7 @@ export default function PaymentsPage({ params }: { params: { slug: string } }) {
                         )}
                       </td>
                       <td className="px-5 py-3.5 text-sm text-gray-500 hidden md:table-cell">
-                        {pmt.order ? `#${pmt.order.orderNumber}` : <span className="text-gray-300">—</span>}
+                        {pmt.order ? `#${pmt.order.orderNumber}` : <span className="text-gray-300">-</span>}
                       </td>
                       <td className="px-5 py-3.5 text-sm font-semibold text-[#0a0a0a]">
                         {formatCurrency(pmt.amount)}
@@ -257,7 +257,7 @@ export default function PaymentsPage({ params }: { params: { slug: string } }) {
                         </span>
                       </td>
                       <td className="px-5 py-3.5 text-sm text-gray-500 hidden lg:table-cell">
-                        {pmt.method || <span className="text-gray-300">—</span>}
+                        {pmt.method || <span className="text-gray-300">-</span>}
                       </td>
                       <td className="px-5 py-3.5 text-sm text-gray-500 hidden lg:table-cell">
                         {formatDate(pmt.createdAt)}

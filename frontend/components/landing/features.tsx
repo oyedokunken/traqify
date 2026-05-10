@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import {
   Package, ShoppingCart, Users, BarChart3,
-  Shield, Bell, Store, FileText
+  Shield, Bell, Store, FileText, CreditCard
 } from "lucide-react";
 
 const features = [
@@ -28,7 +28,7 @@ const features = [
   {
     icon: BarChart3,
     title: "Advanced Reports",
-    description: "Revenue charts, top products, and order history — filtered by date range and exportable.",
+    description: "Revenue charts, top products, and order history - filtered by date range and exportable.",
     color: "bg-green-50 text-green-600",
   },
   {
@@ -54,6 +54,12 @@ const features = [
     title: "Audit Logs",
     description: "Every action is logged with user, timestamp, and details. Full accountability at all times.",
     color: "bg-indigo-50 text-indigo-600",
+  },
+  {
+    icon: CreditCard,
+    title: "Payment Tracking",
+    description: "Record and track payments against orders. View totals, statuses, and download payment reports.",
+    color: "bg-orange-50 text-orange-600",
   },
 ];
 
