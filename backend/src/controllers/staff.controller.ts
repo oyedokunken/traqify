@@ -4,7 +4,7 @@ import crypto from "crypto";
 import prisma from "../config/database";
 import { inviteStaffSchema } from "../utils/validators";
 import { sendEmail } from "../config/email";
-import { staffInviteEmailTemplate, accountRestrictedEmailTemplate, passwordResetByAdminEmailTemplate } from "../emails/templates";
+import { staffInviteEmailTemplate, accountRestrictedEmailTemplate, passwordResetByAdminEmailTemplate, staffRemovedEmailTemplate } from "../emails/templates";
 import { createAuditLog } from "../utils/audit";
 import { AuthRequest } from "../middleware/auth.middleware";
 
@@ -205,6 +205,12 @@ export const removeStaff = async (req: AuthRequest, res: Response): Promise<void
     }
 
     await prisma.user.update({ where: { id: userId }, data: { organizationId: null } });
+
+    const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { name: true } });
+    if (member.email && org) {
+      sendEmail(member.email, `You have been removed from ${org.name}`, staffRemovedEmailTemplate(member.name || "there", org.name)).catch(() => {});
+    }
+
     await createAuditLog(req.user!.id, orgId, "DELETE", "User", userId, `Removed ${member.name} from the organization`, req);
     res.json({ message: `${member.name} has been removed from the organization.` });
   } catch {

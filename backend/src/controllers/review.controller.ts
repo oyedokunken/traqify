@@ -100,6 +100,7 @@ export const getDashboardReviews = async (req: AuthRequest, res: Response): Prom
         orderBy: { createdAt: "desc" },
         include: {
           product: { select: { id: true, name: true, imageUrl: true } },
+          order: { select: { id: true, orderNumber: true } },
         },
       }),
       prisma.review.count({ where }),

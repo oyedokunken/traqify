@@ -5,6 +5,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v1.13.0] - 2025-05-13
+
+### Added
+- **Payments auto-creation**: store checkout now automatically creates a `Payment` record (PENDING for bank transfer, COMPLETED for verified Paystack) so the payments dashboard is populated from the first order
+- **Staff removal email**: `staffRemovedEmailTemplate` added; backend sends removal notification email when an OWNER removes a staff member from the organization
+- **Customer view modal**: clicking any row on the Customers page (or the eye icon) opens a full-detail modal showing contact info, source, date added, and up to 5 recent orders with status and amount
+- **Reviews stats cards**: Reviews dashboard now shows 4 summary cards (total reviews, average star rating, pending count, approved count) when any reviews exist
+- **Review order context**: each review card now displays the linked order number (e.g. "Order #STR-XYZ") from the order that generated the review
+- **Newsletter CSV Status column**: CSV export for newsletter subscribers now includes a "Status" column (value: "Active") for all exported rows
+- **Audit Logs report card**: Reports page now has an Audit Logs card with "View Audit Logs" (navigates to the audit-logs page) and "Download PDF" buttons
+- **Audit Logs PDF report**: backend supports `audit-logs` as a valid report type; generates a PDF with Action, Entity, Performed By, Email, Details, Date columns and is date-range filtered
+- **Reports empty state**: when a report has no data, the PDF now renders "No data available for the selected date range." instead of returning HTTP 400
+
+### Changed
+- **Reports 400 guard removed**: `downloadReport` and `emailReport` no longer return HTTP 400 on empty data; an empty PDF with a "no data" message is generated instead
+- **Audit log detail page**: removed `max-w-2xl` constraint; page is now full-width with responsive padding (`p-4 sm:p-6`); meta grid uses `lg:grid-cols-4` for wide screens
+- **Footer newsletter form**: replaced manual `useState` and HTML `required` attributes with `react-hook-form` + `zod` validation; inline error messages appear below each field on blur/submit; no native browser required-field popups
+- **Staff actions audit**: confirmed RESTRICT (`PATCH /api/staff/:id/access`), RESET-PASSWORD (`POST /api/staff/:id/reset-password`), and DELETE (`DELETE /api/staff/:id`) all work end-to-end with correct email templates (`accountRestrictedEmailTemplate`, `passwordResetByAdminEmailTemplate`, `staffRemovedEmailTemplate`) and audit log entries
+- **Reviews backend**: `getDashboardReviews` now includes the linked `order { id, orderNumber }` in the response
+- **Order email**: `order.controller.ts` fixed to pass a properly typed items array to `newOrderEmailTemplate` instead of `orderItems.length`
+
+### Fixed
+- **Payments page empty**: root cause was that no `Payment` record was ever created on store checkout; fixed by auto-creating one in `storeCheckout`
+- **Reports 400 on empty data**: Revenue, Orders, and Payments reports no longer error when the selected date range has no records
+- **`order.controller.ts` type error**: `newOrderEmailTemplate` call now receives `{ name, qty, subtotal }[]` array instead of a bare number
+
+---
+
 ## [v1.11.0] - 2025-05-10
 
 ### Added

@@ -243,10 +243,12 @@ Located at `/dashboard/[slug]/newsletter` (OWNER/MANAGER only).
 - Searchable by name or email
 - Shows subscriber name, email, join date, and status badge
 - **Refresh** button to reload live data
-- **Export CSV** button to download all subscribers as a CSV file
+- **Export CSV** button to download all subscribers as a CSV file; CSV includes Name, Email, Subscribed On, and **Status** columns
+- **Delete subscriber**: trash icon on each row; confirm modal before deletion; audit log entry created
 
 ### Subscription Form
 The public newsletter subscription form on the landing page posts to `POST /api/newsletter/subscribe`.
+Validated with `react-hook-form` and `zod` -- no HTML `required` attribute; inline error messages appear below each field.
 A welcome email is sent to the subscriber automatically.
 
 ---
@@ -271,6 +273,8 @@ A welcome email is sent to the subscriber automatically.
 ### Dashboard Reviews page
 Located at `/dashboard/[slug]/reviews`  -  tabs for PENDING / APPROVED / REJECTED.
 Actions: **Approve**, **Reject**, **Delete**. Search by customer name, product name, or comment text.
+**Stats cards** (shown when reviews exist): Total reviews, Average rating (with star), Pending count, Approved count.
+Each review card shows the **order number** it was linked to (e.g. `Order #STR-ABC123`).
 
 ### Review counts on product cards
 Products with at least one approved review show an amber star pill (e.g. ★ 3) on:
@@ -293,13 +297,16 @@ Approved reviews appear as a card grid on `/store/[slug]/products/[id]` below th
 - Low-stock alert banner if any products are at or below their alert threshold
 
 ### Report Types
-Six downloadable / emailable report types:
-1. **Revenue** - COMPLETED orders with totals
+Nine downloadable / emailable report types:
+1. **Revenue** - COMPLETED orders with totals (date-range filtered)
 2. **Products** - product catalog with inventory counts
-3. **Orders** - all orders with status and customer
+3. **Orders** - all orders with status and customer (date-range filtered)
 4. **Customers** - customer list with order totals
 5. **Inventory** - stock levels and alert thresholds
 6. **Staff** - staff roster with roles and join dates
+7. **Newsletter** - subscriber list with name, email, date, status
+8. **Payments** - all payment records with method, amount, status, and linked order
+9. **Audit Logs** - full action trail with performer, entity, details, and date (date-range filtered); card also has a "View Audit Logs" shortcut button
 
 ### PDF Layout
 Dark header band with Traqify logo mark; org name right-aligned; report name in a gray strip below; generation date/time in footer; "Powered by Traqify" tagline.
@@ -328,6 +335,7 @@ All emails use branded HTML templates defined in `backend/src/emails/templates.t
 | `welcomeEmailTemplate` | After OTP verification |
 | `accountRestrictedEmailTemplate` | Admin restricts a staff account |
 | `passwordResetByAdminEmailTemplate` | Admin resets a staff password |
+| `staffRemovedEmailTemplate` | Admin removes a staff member from the org |
 | `storeStatusEmailTemplate` | Store published / unpublished |
 | `orderApprovedEmailTemplate` | Order approved (sent to customer) |
 | `orderCompletedEmailTemplate` | Order delivered (sent to customer) |
@@ -398,6 +406,7 @@ All emails use branded HTML templates defined in `backend/src/emails/templates.t
 |--------|------|-------------|
 | POST | /api/newsletter/subscribe | Subscribe to newsletter |
 | GET | /api/newsletter/subscribers | List subscribers (OWNER/MANAGER) |
+| DELETE | /api/newsletter/:id | Delete subscriber (OWNER/MANAGER) |
 
 ### Public Store
 | Method | Path | Description |

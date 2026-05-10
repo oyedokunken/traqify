@@ -157,10 +157,15 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
     if (orgOwner) {
       const org = await prisma.organization.findUnique({ where: { id: orgId } });
       const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+      const emailItems = order.orderItems.map((i: any) => ({
+        name: i.product?.name || "Item",
+        qty: i.quantity,
+        subtotal: i.subtotal ?? i.unitPrice * i.quantity,
+      }));
       sendEmail(
         orgOwner.email,
         `New order received: ${org?.name}`,
-        newOrderEmailTemplate(org?.name || "", order.id, order.customer?.name || "Walk-in", order.totalAmount, order.orderItems.length, `${frontendUrl}/dashboard/${org?.slug || ""}/orders`)
+        newOrderEmailTemplate(org?.name || "", order.id, order.customer?.name || "Walk-in", order.totalAmount, emailItems, `${frontendUrl}/dashboard/${org?.slug || ""}/orders`)
       ).catch((e) => console.error("[Email] New order notification failed:", e.message));
     }
 

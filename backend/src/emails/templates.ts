@@ -241,6 +241,13 @@ export const passwordResetByAdminEmailTemplate = (name: string, tempPassword: st
     <p style="${bodyStyle}">Please log in and change your password immediately. For security reasons, do not share this password with anyone.</p>
   `);
 
+export const staffRemovedEmailTemplate = (name: string, orgName: string): string =>
+  wrapEmail(`
+    <h1 style="${headingStyle}">You have been removed from ${orgName}</h1>
+    <p style="${bodyStyle}">Hi ${name}, your account has been removed from <strong>${orgName}</strong> on Traqify by an administrator. You can no longer access this organization's dashboard.</p>
+    <p style="${bodyStyle}">If you believe this was done in error, please contact your organization administrator directly.</p>
+  `);
+
 export const passwordChangedEmailTemplate = (name: string, loginUrl: string): string =>
   wrapEmail(`
     <h1 style="${headingStyle}">Your password was changed</h1>

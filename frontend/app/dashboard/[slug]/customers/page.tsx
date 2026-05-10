@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Search, Users, Trash2, AlertTriangle, ShoppingBag, UserPlus } from "lucide-react";
+import { Plus, Search, Users, Trash2, AlertTriangle, ShoppingBag, UserPlus, X, Eye, Mail, Phone, MapPin, Calendar, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +23,10 @@ interface Customer {
   _count?: { orders: number };
 }
 
+interface CustomerDetail extends Customer {
+  orders: { id: string; orderNumber: string; totalAmount: number; status: string; createdAt: string }[];
+}
+
 export default function CustomersPage({ params }: { params: { slug: string } }) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState("");
@@ -34,6 +38,8 @@ export default function CustomersPage({ params }: { params: { slug: string } }) 
   const [showAdd, setShowAdd] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [viewTarget, setViewTarget] = useState<CustomerDetail | null>(null);
+  const [viewLoading, setViewLoading] = useState(false);
   const { register, handleSubmit, reset, formState: { isSubmitting } } = useForm<{ name: string; email: string; phone: string; address: string }>();
 
   const fetchCustomers = () => {
@@ -56,6 +62,15 @@ export default function CustomersPage({ params }: { params: { slug: string } }) 
       setShowAdd(false);
       fetchCustomers();
     } catch (err: any) { setError(err.response?.data?.error || "Failed to add customer."); }
+  };
+
+  const openView = async (c: Customer) => {
+    setViewLoading(true);
+    try {
+      const res = await api.get(`/api/customers/${c.id}`);
+      setViewTarget(res.data);
+    } catch { setError("Failed to load customer details."); }
+    finally { setViewLoading(false); }
   };
 
   const confirmDelete = async () => {
@@ -106,7 +121,7 @@ export default function CustomersPage({ params }: { params: { slug: string } }) 
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {customers.map((c) => (
-                  <tr key={c.id} className="hover:bg-gray-50 transition-colors">
+                  <tr key={c.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => openView(c)}>
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-600">
@@ -136,9 +151,14 @@ export default function CustomersPage({ params }: { params: { slug: string } }) 
                     <td className="px-5 py-3.5 text-sm text-gray-600 hidden md:table-cell">{c._count?.orders ?? 0}</td>
                     <td className="px-5 py-3.5 text-sm text-gray-500 hidden lg:table-cell">{formatDate(c.createdAt)}</td>
                     <td className="px-5 py-3.5">
-                      <button onClick={() => setDeleteTarget(c)} className="text-gray-300 hover:text-[#DE1010] transition-colors">
-                        <Trash2 size={15} />
-                      </button>
+                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        <button onClick={() => openView(c)} className="p-1.5 text-gray-400 hover:text-[#0a0a0a] hover:bg-gray-100 rounded-lg transition-colors" title="View details">
+                          <Eye size={14} />
+                        </button>
+                        <button onClick={() => setDeleteTarget(c)} className="p-1.5 text-gray-300 hover:text-[#DE1010] hover:bg-red-50 rounded-lg transition-colors" title="Delete">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -200,6 +220,101 @@ export default function CustomersPage({ params }: { params: { slug: string } }) 
       </AnimatePresence>
 
       <ErrorModal isOpen={!!error} onClose={() => setError("")} message={error} />
+
+      {/* View customer modal */}
+      <AnimatePresence>
+        {(viewTarget || viewLoading) && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4"
+            onClick={() => setViewTarget(null)}>
+            <motion.div initial={{ scale: 0.95, y: 8 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 8 }}
+              className="bg-white rounded-xl w-full max-w-lg shadow-xl max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}>
+              {viewLoading ? (
+                <div className="flex justify-center py-16"><div className="w-6 h-6 border-2 border-[#DE1010] border-t-transparent rounded-full animate-spin" /></div>
+              ) : viewTarget ? (
+                <>
+                  <div className="flex items-start justify-between p-6 border-b border-gray-100">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-base font-bold text-gray-600">
+                        {getInitials(viewTarget.name)}
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-[#0a0a0a]">{viewTarget.name}</h3>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold mt-1 ${
+                          viewTarget.source === "PURCHASE" ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-600"
+                        }`}>
+                          {viewTarget.source === "PURCHASE" ? <ShoppingBag size={9} /> : <UserPlus size={9} />}
+                          {viewTarget.source === "PURCHASE" ? "Auto (Purchase)" : "Manual"}
+                        </span>
+                      </div>
+                    </div>
+                    <button onClick={() => setViewTarget(null)} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"><X size={16} /></button>
+                  </div>
+                  <div className="p-6 space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      {viewTarget.email && (
+                        <div className="flex items-start gap-2.5">
+                          <Mail size={14} className="text-gray-400 mt-0.5 flex-shrink-0" />
+                          <div><p className="text-[10px] text-gray-400">Email</p><p className="text-sm text-[#0a0a0a] break-all">{viewTarget.email}</p></div>
+                        </div>
+                      )}
+                      {viewTarget.phone && (
+                        <div className="flex items-start gap-2.5">
+                          <Phone size={14} className="text-gray-400 mt-0.5 flex-shrink-0" />
+                          <div><p className="text-[10px] text-gray-400">Phone</p><p className="text-sm text-[#0a0a0a]">{viewTarget.phone}</p></div>
+                        </div>
+                      )}
+                      {viewTarget.address && (
+                        <div className="flex items-start gap-2.5 col-span-2">
+                          <MapPin size={14} className="text-gray-400 mt-0.5 flex-shrink-0" />
+                          <div><p className="text-[10px] text-gray-400">Address</p><p className="text-sm text-[#0a0a0a]">{viewTarget.address}</p></div>
+                        </div>
+                      )}
+                      <div className="flex items-start gap-2.5">
+                        <Calendar size={14} className="text-gray-400 mt-0.5 flex-shrink-0" />
+                        <div><p className="text-[10px] text-gray-400">Added</p><p className="text-sm text-[#0a0a0a]">{formatDate(viewTarget.createdAt)}</p></div>
+                      </div>
+                      <div className="flex items-start gap-2.5">
+                        <ShoppingCart size={14} className="text-gray-400 mt-0.5 flex-shrink-0" />
+                        <div><p className="text-[10px] text-gray-400">Total orders</p><p className="text-sm font-semibold text-[#0a0a0a]">{viewTarget._count?.orders ?? viewTarget.orders?.length ?? 0}</p></div>
+                      </div>
+                    </div>
+
+                    {viewTarget.orders && viewTarget.orders.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Recent orders</p>
+                        <div className="space-y-2">
+                          {viewTarget.orders.slice(0, 5).map((o) => (
+                            <div key={o.id} className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg">
+                              <div>
+                                <p className="text-sm font-medium text-[#0a0a0a]">#{o.orderNumber}</p>
+                                <p className="text-xs text-gray-400">{formatDate(o.createdAt)}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm font-semibold text-[#0a0a0a]">&#8358;{Number(o.totalAmount).toLocaleString()}</p>
+                                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                                  o.status === "COMPLETED" ? "bg-green-100 text-green-700" :
+                                  o.status === "CANCELLED" ? "bg-red-100 text-red-600" :
+                                  o.status === "APPROVED" ? "bg-blue-100 text-blue-700" :
+                                  "bg-amber-100 text-amber-700"
+                                }`}>{o.status}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {viewTarget.orders && viewTarget.orders.length === 0 && (
+                      <p className="text-sm text-gray-400 text-center py-4">No orders yet</p>
+                    )}
+                  </div>
+                </>
+              ) : null}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

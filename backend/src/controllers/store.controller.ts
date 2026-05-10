@@ -176,6 +176,18 @@ export const storeCheckout = async (req: Request, res: Response): Promise<void> 
       },
     }) as any;
 
+    prisma.payment.create({
+      data: {
+        amount: totalAmount,
+        currency: "NGN",
+        status: paystackReference && verifiedAmount !== null ? "COMPLETED" : "PENDING",
+        method: paymentMethod || "TRANSFER",
+        reference: paystackReference || null,
+        organizationId: org.id,
+        orderId: order.id,
+      },
+    }).catch(() => {});
+
     for (const item of orderItemsData) {
       await prisma.inventory.updateMany({
         where: { productId: item.productId },
