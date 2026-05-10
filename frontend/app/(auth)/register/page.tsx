@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -48,7 +48,7 @@ type Step3Data = z.infer<typeof step3Schema>;
 
 const steps = ["Email", "Your details", "Your organization", "You're all set"];
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
   const params = useSearchParams();
   const verifiedEmail = params.get("verifiedEmail");
@@ -337,5 +337,13 @@ export default function RegisterPage() {
       </div>
       <ErrorModal isOpen={!!error} onClose={() => setError("")} message={error} />
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><div className="text-gray-400 text-sm">Loading...</div></div>}>
+      <RegisterForm />
+    </Suspense>
   );
 }
