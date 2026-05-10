@@ -210,18 +210,14 @@ export const storeCheckout = async (req: Request, res: Response): Promise<void> 
       orgFull?.phone ? `Phone: ${orgFull.phone}` : null,
       orgFull?.address ? `Address: ${orgFull.address}` : null,
       orgFull?.website ? `Website: ${orgFull.website}` : null,
-    ].filter(Boolean).map((l) => `<p style="margin:2px 0;color:#6b7280;font-size:12px">${l}</p>`).join("");
+    ].filter(Boolean).map((l) => `<p style="margin:2px 0;color:#9ca3af;font-size:12px;text-align:center">${l}</p>`).join("");
 
     try { await sendEmail(
       email,
       `Order ${orderNumber} confirmed - ${org.name}`,
       `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;padding-bottom:20px;border-bottom:1px solid #f0f0f0">
-          ${org.logoUrl ? `<img src="${org.logoUrl}" alt="${org.name}" style="width:40px;height:40px;border-radius:8px;object-fit:cover">` : `<div style="width:40px;height:40px;background:#DE1010;border-radius:8px;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:16px">${org.name[0]}</div>`}
-          <div>
-            <p style="margin:0;font-weight:700;color:#0a0a0a;font-size:16px">${org.name}</p>
-            ${contactLines}
-          </div>
+        <div style="text-align:center;margin-bottom:28px;padding-bottom:20px;border-bottom:1px solid #f0f0f0">
+          ${org.logoUrl ? `<img src="${org.logoUrl}" alt="${org.name}" style="max-height:60px;max-width:200px;object-fit:contain">` : `<div style="display:inline-flex;width:56px;height:56px;background:#DE1010;border-radius:12px;align-items:center;justify-content:center;color:white;font-weight:700;font-size:24px">${org.name[0]}</div>`}
         </div>
         <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px;margin-bottom:20px;display:flex;align-items:center;gap:12px">
           <span style="font-size:24px">&#10003;</span>
@@ -247,11 +243,15 @@ export const storeCheckout = async (req: Request, res: Response): Promise<void> 
           ${notes ? `<p style="margin:8px 0 0;font-size:13px;color:#92400e"><strong>Your notes:</strong> ${notes}</p>` : ""}
         </div>
         <hr style="border:none;border-top:1px solid #f0f0f0;margin:24px 0">
-        <p style="color:#9ca3af;font-size:11px;text-align:center;margin:0">Powered by <strong style="color:#DE1010">Traqify</strong></p>
+        <div style="text-align:center">
+          ${contactLines}
+          <p style="color:#c4c4c4;font-size:10px;margin:10px 0 0">Powered by <strong style="color:#DE1010">Traqify</strong></p>
+        </div>
       </div>`
     ); } catch (emailErr) { console.error("Order confirmation email failed:", emailErr); }
 
     res.status(201).json({
+      id: order.id,
       orderNumber: order.orderNumber,
       totalAmount: order.totalAmount,
       status: order.status,

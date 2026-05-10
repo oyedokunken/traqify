@@ -23,13 +23,17 @@ export function Footer() {
 
   const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!name.trim()) {
+      setModal({ open: true, type: "error", msg: "Please enter your name." });
+      return;
+    }
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setModal({ open: true, type: "error", msg: "Please enter a valid email address." });
       return;
     }
     setLoading(true);
     try {
-      await api.post("/api/newsletter/subscribe", { email, name: name.trim() || undefined });
+      await api.post("/api/newsletter/subscribe", { email, name: name.trim() });
       setName("");
       setEmail("");
       setModal({ open: true, type: "success", msg: "You are subscribed! Check your inbox for a confirmation." });
@@ -103,7 +107,8 @@ export function Footer() {
                 <User size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
                 <input
                   type="text"
-                  placeholder="Your name (optional)"
+                  placeholder="Your name"
+                  required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full pl-8 pr-3 py-2 text-xs bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#DE1010] transition-colors"

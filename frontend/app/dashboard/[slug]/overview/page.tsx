@@ -47,6 +47,12 @@ interface ChartPoint {
 const fadeUp = { hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } };
 const stagger = { visible: { transition: { staggerChildren: 0.08 } } };
 
+const fmtChartDate = (raw: string) => {
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return raw;
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+};
+
 export default function OverviewPage({ params }: { params: { slug: string } }) {
   const { user } = useAuth();
   const [data, setData] = useState<OverviewData | null>(null);
@@ -247,10 +253,11 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} />
+                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} tickFormatter={fmtChartDate} />
                     <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} tickFormatter={(v) => `₦${(v / 1000).toFixed(0)}k`} />
                     <Tooltip
                       contentStyle={{ border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 12 }}
+                      labelFormatter={fmtChartDate}
                       formatter={(v: number) => [formatCurrency(v), "Revenue"]}
                     />
                     <Area type="monotone" dataKey="revenue" stroke="#DE1010" strokeWidth={2} fill="url(#revGrad)" />
@@ -275,9 +282,9 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} />
+                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} tickFormatter={fmtChartDate} />
                     <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} />
-                    <Tooltip contentStyle={{ border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 12 }} formatter={(v: number) => [v, "Orders"]} />
+                    <Tooltip contentStyle={{ border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 12 }} labelFormatter={fmtChartDate} formatter={(v: number) => [v, "Orders"]} />
                     <Area type="monotone" dataKey="orders" stroke="#DE1010" strokeWidth={2} fill="url(#ordGrad)" name="Orders" dot={false} />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -292,9 +299,9 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
                 <ResponsiveContainer width="100%" height={220}>
                   <LineChart data={customerChart} margin={{ top: 4, right: 0, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} />
+                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} tickFormatter={fmtChartDate} />
                     <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} />
-                    <Tooltip contentStyle={{ border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 12 }} />
+                    <Tooltip contentStyle={{ border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 12 }} labelFormatter={fmtChartDate} />
                     <Line type="monotone" dataKey="customers" stroke="#0a0a0a" strokeWidth={2} dot={false} name="Customers" />
                   </LineChart>
                 </ResponsiveContainer>
