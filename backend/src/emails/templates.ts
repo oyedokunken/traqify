@@ -297,6 +297,26 @@ export const orderCompletedEmailTemplate = (
     <p style="${bodyStyle}">We hope to see you again soon.</p>
   `);
 
+export const newStaffJoinedEmailTemplate = (
+  ownerName: string,
+  newStaffName: string,
+  newStaffEmail: string,
+  newStaffRole: string,
+  orgName: string,
+  dashboardUrl: string
+): string =>
+  wrapEmail(`
+    <h1 style="${headingStyle}">A new team member has joined ${orgName}</h1>
+    <p style="${bodyStyle}">Hi ${ownerName}, a staff member you invited has accepted their invitation and joined your organization on Traqify.</p>
+    <table style="width:100%;border-collapse:collapse;margin:16px 0">
+      <tr><td style="padding:8px 0;border-bottom:1px solid #f0f0f0;color:#6b7280;font-size:13px;width:100px">Name</td><td style="padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:13px;font-weight:600;color:#0a0a0a">${newStaffName}</td></tr>
+      <tr><td style="padding:8px 0;border-bottom:1px solid #f0f0f0;color:#6b7280;font-size:13px">Email</td><td style="padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:13px;color:#0a0a0a">${newStaffEmail}</td></tr>
+      <tr><td style="padding:8px 0;color:#6b7280;font-size:13px">Role</td><td style="padding:8px 0;font-size:13px;font-weight:600;color:#DE1010">${newStaffRole}</td></tr>
+    </table>
+    <p style="${bodyStyle}">You can manage team access, roles, and permissions from the Staff section of your dashboard.</p>
+    <a href="${dashboardUrl}" style="${buttonStyle}">View Staff</a>
+  `);
+
 export const reportEmailTemplate = (orgName: string, reportLabel: string, dateFrom: string, dateTo: string, dashboardUrl: string): string =>
   wrapEmail(`
     <h1 style="${headingStyle}">${reportLabel}</h1>

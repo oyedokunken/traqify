@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Eye, EyeOff, ArrowRight, ArrowLeft } from "lucide-react";
 import Image from "next/image";
@@ -19,9 +19,12 @@ import { INDUSTRY_OPTIONS, ORG_SIZE_OPTIONS } from "@/lib/utils";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 
-const step1Schema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters."),
+const emailSchema = z.object({
   email: z.string().email("Please enter a valid email address."),
+});
+
+const step2Schema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters."),
   password: z
     .string()
     .min(8, "Password must be at least 8 characters.")
@@ -31,7 +34,7 @@ const step1Schema = z.object({
     .regex(/[^A-Za-z0-9]/, "Must contain a special character."),
 });
 
-const step2Schema = z.object({
+const step3Schema = z.object({
   orgName: z.string().min(2, "Organization name is required."),
   orgEmail: z.string().email().optional().or(z.literal("")),
   orgAddress: z.string().min(3, "Business address is required."),
@@ -39,21 +42,35 @@ const step2Schema = z.object({
   size: z.string().optional(),
 });
 
-type Step1Data = z.infer<typeof step1Schema>;
+type EmailData = z.infer<typeof emailSchema>;
 type Step2Data = z.infer<typeof step2Schema>;
+type Step3Data = z.infer<typeof step3Schema>;
 
-const steps = ["Your details", "Your organization", "You're all set"];
+const steps = ["Email", "Your details", "Your organization", "You're all set"];
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [step, setStep] = useState(1);
+  const params = useSearchParams();
+  const verifiedEmail = params.get("verifiedEmail");
+  
+  const [step, setStep] = useState(verifiedEmail ? 2 : 1);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
-  const [step1Data, setStep1Data] = useState<Step1Data | null>(null);
+  const [emailData, setEmailData] = useState<EmailData | null>(null);
+  const [step2Data, setStep2Data] = useState<Step2Data | null>(null);
+  const [pendingToken, setPendingToken] = useState<string | null>(null);
 
-  const form1 = useForm<Step1Data>({ resolver: zodResolver(step1Schema) });
-  const form2 = useForm<Step2Data>({ resolver: zodResolver(step2Schema) });
-  const watchedPassword = form1.watch("password", "");
+  const emailForm = useForm<EmailData>({ resolver: zodResolver(emailSchema) });
+  const form2 = useForm<Step2Data>({ resolver: zodResolver(step2Schema), defaultValues: {} });
+  const form3 = useForm<Step3Data>({ resolver: zodResolver(step3Schema) });
+  const watchedPassword = form2.watch("password", "");
+
+  useEffect(() => {
+    if (verifiedEmail) {
+      setEmailData({ email: verifiedEmail });
+      form2.reset();
+    }
+  }, [verifiedEmail, form2]);
 
   function getPasswordStrength(pw: string): { score: number; label: string; color: string } {
     const checks = [
@@ -69,9 +86,20 @@ export default function RegisterPage() {
     return { score, label: "Strong", color: "bg-green-500" };
   }
 
-  const handleStep1 = async (data: Step1Data) => {
+  const handleEmailStep = async (data: EmailData) => {
+    try {
+      await api.post("/api/auth/send-otp", { email: data.email });
+      setEmailData(data);
+      router.push(`/verify-email?email=${encodeURIComponent(data.email)}&returnTo=register`);
+    } catch (err: any) {
+      setError(err.response?.data?.error || "Failed to send verification code.");
+    }
+  };
+
+  const handleStep2 = async (data: Step2Data) => {
+    if (!emailData) return;
     const nameParts = data.name.toLowerCase().split(" ").filter(Boolean);
-    const emailLocal = data.email.split("@")[0].toLowerCase();
+    const emailLocal = emailData.email.split("@")[0].toLowerCase();
     const pw = data.password.toLowerCase();
     const containsName = nameParts.some((part) => part.length > 2 && pw.includes(part));
     const containsEmail = emailLocal.length > 2 && pw.includes(emailLocal);
@@ -80,9 +108,14 @@ export default function RegisterPage() {
       return;
     }
     try {
-      await api.post("/api/auth/register", data);
-      setStep1Data(data);
-      setStep(2);
+      const res = await api.post("/api/auth/register", { ...data, email: emailData.email });
+      setStep2Data(data);
+      if (res.data.token) {
+        // Save token temporarily — we need it to call /api/organizations
+        setPendingToken(res.data.token);
+        api.defaults.headers.common["Authorization"] = `Bearer ${res.data.token}`;
+      }
+      setStep(3);
     } catch (err: any) {
       setError(err.response?.data?.error || "Registration failed.");
     }
@@ -90,12 +123,33 @@ export default function RegisterPage() {
 
   const [orgPhone, setOrgPhone] = useState("");
 
-  const handleStep2 = async (data: Step2Data) => {
+  const handleStep3 = async (data: Step3Data) => {
     if (!orgPhone) { setError("Business phone number is required."); return; }
     try {
-      router.push(`/verify-email?email=${encodeURIComponent(step1Data!.email)}&orgName=${encodeURIComponent(data.orgName)}&orgEmail=${encodeURIComponent(data.orgEmail || "")}&orgPhone=${encodeURIComponent(orgPhone)}&orgAddress=${encodeURIComponent(data.orgAddress)}&industry=${encodeURIComponent(data.industry || "")}&size=${encodeURIComponent(data.size || "")}`);
+      const orgRes = await api.post("/api/organizations", {
+        name: data.orgName,
+        email: data.orgEmail || undefined,
+        phone: orgPhone || undefined,
+        address: data.orgAddress || undefined,
+        industry: data.industry || undefined,
+        size: data.size || undefined,
+      });
+      // Re-login to get a fresh JWT that includes the new organizationId
+      if (emailData && step2Data) {
+        const loginRes = await api.post("/api/auth/login", {
+          email: emailData.email,
+          password: step2Data.password,
+        });
+        api.defaults.headers.common["Authorization"] = `Bearer ${loginRes.data.token}`;
+        localStorage.setItem("traqify_token", loginRes.data.token);
+        localStorage.setItem("traqify_refresh_token", loginRes.data.refreshToken);
+        localStorage.setItem("traqify_user", JSON.stringify(loginRes.data.user));
+        router.push(`/dashboard/${orgRes.data.slug}/overview`);
+      } else {
+        router.push("/login");
+      }
     } catch (err: any) {
-      setError(err.response?.data?.error || "Failed to proceed.");
+      setError(err.response?.data?.error || "Failed to create organization.");
     }
   };
 
@@ -108,9 +162,10 @@ export default function RegisterPage() {
               <Logo href="/" size="md" className="mb-6" />
               <h1 className="text-2xl font-bold text-[#0a0a0a] mb-1">Create your account</h1>
               <p className="text-gray-500 text-sm">
-                {step === 1 && "Start with your personal details"}
-                {step === 2 && "Tell us about your organization"}
-                {step === 3 && "You're almost there"}
+                {step === 1 && "Let's start with your email"}
+                {step === 2 && "Now set up your account"}
+                {step === 3 && "Tell us about your organization"}
+                {step === 4 && "You're all set"}
               </p>
             </div>
 
@@ -131,49 +186,17 @@ export default function RegisterPage() {
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  onSubmit={form1.handleSubmit(handleStep1)}
+                  onSubmit={emailForm.handleSubmit(handleEmailStep)}
                   className="space-y-5"
                 >
                   <div>
-                    <Label htmlFor="name">Full name</Label>
-                    <Input id="name" placeholder="Your full name" className="mt-1.5" {...form1.register("name")} />
-                    {form1.formState.errors.name && <p className="text-xs text-[#DE1010] mt-1">{form1.formState.errors.name.message}</p>}
-                  </div>
-                  <div>
                     <Label htmlFor="email">Work email</Label>
-                    <Input id="email" type="email" placeholder="you@company.com" className="mt-1.5" {...form1.register("email")} />
-                    {form1.formState.errors.email && <p className="text-xs text-[#DE1010] mt-1">{form1.formState.errors.email.message}</p>}
-                  </div>
-                  <div>
-                    <Label htmlFor="password">Password</Label>
-                    <div className="relative mt-1.5">
-                      <Input id="password" type={showPassword ? "text" : "password"} placeholder="Create a strong password" {...form1.register("password")} />
-                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                    </div>
-                    {watchedPassword.length > 0 && (() => {
-                      const { score, label, color } = getPasswordStrength(watchedPassword);
-                      return (
-                        <div className="mt-2">
-                          <div className="flex gap-1 mb-1">
-                            {[1,2,3,4,5].map((i) => (
-                              <div key={i} className={`flex-1 h-1 rounded-full transition-all duration-300 ${
-                                i <= score ? color : "bg-gray-200"
-                              }`} />
-                            ))}
-                          </div>
-                          <p className={`text-[10px] font-medium ${
-                            score <= 2 ? "text-[#DE1010]" : score <= 4 ? "text-yellow-500" : "text-green-600"
-                          }`}>{label} password</p>
-                        </div>
-                      );
-                    })()}
-                    {form1.formState.errors.password && <p className="text-xs text-[#DE1010] mt-1">{form1.formState.errors.password.message}</p>}
+                    <Input id="email" type="email" placeholder="you@company.com" className="mt-1.5" {...emailForm.register("email")} />
+                    {emailForm.formState.errors.email && <p className="text-xs text-[#DE1010] mt-1">{emailForm.formState.errors.email.message}</p>}
                   </div>
 
-                  <Button type="submit" className="w-full gap-2" disabled={form1.formState.isSubmitting}>
-                    {form1.formState.isSubmitting ? "Creating account..." : "Continue"}
+                  <Button type="submit" className="w-full gap-2" disabled={emailForm.formState.isSubmitting}>
+                    {emailForm.formState.isSubmitting ? "Sending code..." : "Send verification code"}
                     <ArrowRight size={16} />
                   </Button>
 
@@ -198,22 +221,77 @@ export default function RegisterPage() {
                   onSubmit={form2.handleSubmit(handleStep2)}
                   className="space-y-5"
                 >
+                  <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3">
+                    <p className="text-sm text-green-700">
+                      <strong>Email verified:</strong> {emailData?.email}
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="name">Full name</Label>
+                    <Input id="name" placeholder="Your full name" className="mt-1.5" {...form2.register("name")} />
+                    {form2.formState.errors.name && <p className="text-xs text-[#DE1010] mt-1">{form2.formState.errors.name.message}</p>}
+                  </div>
+                  <div>
+                    <Label htmlFor="password">Password</Label>
+                    <div className="relative mt-1.5">
+                      <Input id="password" type={showPassword ? "text" : "password"} placeholder="Create a strong password" {...form2.register("password")} />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                    {watchedPassword.length > 0 && (() => {
+                      const { score, label, color } = getPasswordStrength(watchedPassword);
+                      return (
+                        <div className="mt-2">
+                          <div className="flex gap-1 mb-1">
+                            {[1,2,3,4,5].map((i) => (
+                              <div key={i} className={`flex-1 h-1 rounded-full transition-all duration-300 ${
+                                i <= score ? color : "bg-gray-200"
+                              }`} />
+                            ))}
+                          </div>
+                          <p className={`text-[10px] font-medium ${
+                            score <= 2 ? "text-[#DE1010]" : score <= 4 ? "text-yellow-500" : "text-green-600"
+                          }`}>{label} password</p>
+                        </div>
+                      );
+                    })()}
+                    {form2.formState.errors.password && <p className="text-xs text-[#DE1010] mt-1">{form2.formState.errors.password.message}</p>}
+                  </div>
+
+                  <Button type="submit" className="w-full gap-2" disabled={form2.formState.isSubmitting}>
+                    {form2.formState.isSubmitting ? "Creating account..." : "Continue"}
+                    <ArrowRight size={16} />
+                  </Button>
+                </motion.form>
+              )}
+
+              {step === 3 && (
+                <motion.form
+                  key="step3"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  onSubmit={form3.handleSubmit(handleStep3)}
+                  className="space-y-5"
+                >
                   <div>
                     <Label htmlFor="orgName">Organization name</Label>
-                    <Input id="orgName" placeholder="Your company name" className="mt-1.5" {...form2.register("orgName")} />
-                    {form2.formState.errors.orgName && <p className="text-xs text-[#DE1010] mt-1">{form2.formState.errors.orgName.message}</p>}
+                    <Input id="orgName" placeholder="Your company name" className="mt-1.5" {...form3.register("orgName")} />
+                    {form3.formState.errors.orgName && <p className="text-xs text-[#DE1010] mt-1">{form3.formState.errors.orgName.message}</p>}
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="industry">Industry</Label>
-                      <select id="industry" className="mt-1.5 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" {...form2.register("industry")}>
+                      <select id="industry" className="mt-1.5 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" {...form3.register("industry")}>
                         <option value="">Select...</option>
                         {INDUSTRY_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
                       </select>
                     </div>
                     <div>
                       <Label htmlFor="size">Team size</Label>
-                      <select id="size" className="mt-1.5 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" {...form2.register("size")}>
+                      <select id="size" className="mt-1.5 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" {...form3.register("size")}>
                         <option value="">Select...</option>
                         {ORG_SIZE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
                       </select>
@@ -221,7 +299,7 @@ export default function RegisterPage() {
                   </div>
                   <div>
                     <Label htmlFor="orgEmail">Business email (optional)</Label>
-                    <Input id="orgEmail" type="email" placeholder="info@company.com" className="mt-1.5" {...form2.register("orgEmail")} />
+                    <Input id="orgEmail" type="email" placeholder="info@company.com" className="mt-1.5" {...form3.register("orgEmail")} />
                   </div>
                   <div>
                     <Label>Business phone <span className="text-[#DE1010]">*</span></Label>
@@ -232,17 +310,17 @@ export default function RegisterPage() {
                   </div>
                   <div>
                     <Label htmlFor="orgAddress">Business address <span className="text-[#DE1010]">*</span></Label>
-                    <Input id="orgAddress" placeholder="123 Business Road, Lagos" className="mt-1.5" {...form2.register("orgAddress")} />
-                    {form2.formState.errors.orgAddress && <p className="text-xs text-[#DE1010] mt-1">{form2.formState.errors.orgAddress.message}</p>}
+                    <Input id="orgAddress" placeholder="123 Business Road, Lagos" className="mt-1.5" {...form3.register("orgAddress")} />
+                    {form3.formState.errors.orgAddress && <p className="text-xs text-[#DE1010] mt-1">{form3.formState.errors.orgAddress.message}</p>}
                   </div>
 
                   <div className="flex gap-3">
-                    <Button type="button" variant="outline" className="flex-1 gap-2" onClick={() => setStep(1)}>
+                    <Button type="button" variant="outline" className="flex-1 gap-2" onClick={() => setStep(2)}>
                       <ArrowLeft size={16} />
                       Back
                     </Button>
-                    <Button type="submit" className="flex-1 gap-2" disabled={form2.formState.isSubmitting}>
-                      Continue
+                    <Button type="submit" className="flex-1 gap-2" disabled={form3.formState.isSubmitting}>
+                      {form3.formState.isSubmitting ? "Creating..." : "Complete setup"}
                       <ArrowRight size={16} />
                     </Button>
                   </div>

@@ -25,7 +25,7 @@ npm run dev                        # starts on port 3000
 
 ```
 app/
-  (auth)/           login, register, forgot-password, reset-password, verify pages
+  (auth)/           login, register (OTP-first flow), forgot-password, reset-password, verify pages
   dashboard/[slug]/ per-org dashboard
     overview/       stats cards + revenue/customer charts
     products/       product grid + new/edit product forms
@@ -39,8 +39,8 @@ app/
     newsletter/     subscriber list + CSV export + refresh modal (OWNER/MANAGER)
     reviews/        approve/reject/delete customer reviews (OWNER/MANAGER)
     reports/        PDF + email reports (OWNER/MANAGER/AUDITOR)
-    audit-logs/     immutable action history (OWNER/AUDITOR)
-    settings/       profile, org, password tabs (ALL roles)
+    audit-logs/     immutable action history with unread badge (OWNER/AUDITOR)
+    settings/       profile, org, password tabs (password disabled for Google users) (ALL roles)
   store/[slug]/     public storefront
     page.tsx        product grid, cart drawer, wishlist
     products/[id]/  product detail + customer reviews

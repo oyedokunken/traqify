@@ -175,23 +175,32 @@ export default function StorePage({ params }: { params: { slug: string } }) {
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <h3 className="font-semibold text-[#0a0a0a] mb-4">Store overview</h3>
             <div className="space-y-4">
-              {/* Logo preview */}
-              <div className="flex items-center gap-3 pb-4 border-b border-gray-100">
-                <div className="w-12 h-12 rounded-xl border border-gray-200 flex items-center justify-center overflow-hidden bg-gray-50 flex-shrink-0">
-                  {storeData?.logoUrl ? (
-                    <img src={storeData.logoUrl} alt="Logo" className="w-full h-full object-contain" />
-                  ) : (
-                    <Globe size={18} className="text-gray-300" />
-                  )}
-                </div>
-                <div className="min-w-0">
-                  <p className="font-semibold text-[#0a0a0a] truncate">{storeData?.name || "-"}</p>
-                  <p className="text-xs text-gray-400 truncate">{storeData?.industry || "No industry set"}</p>
-                  {storeData?.description && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{storeData.description}</p>}
-                </div>
+              {/* Logo — full-width, uncropped */}
+              <div className="w-full bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-center overflow-hidden" style={{ minHeight: "80px", maxHeight: "160px" }}>
+                {storeData?.logoUrl ? (
+                  <img src={storeData.logoUrl} alt="Logo" className="max-w-full object-contain p-3" style={{ maxHeight: "160px" }} />
+                ) : (
+                  <div className="flex flex-col items-center gap-1 py-6">
+                    <Globe size={28} className="text-gray-200" />
+                    <p className="text-xs text-gray-400">No logo uploaded</p>
+                  </div>
+                )}
+              </div>
+              {/* Store name */}
+              <p className="font-bold text-[#0a0a0a] text-base">{storeData?.name || "-"}</p>
+              {/* Pills: industry + store ID */}
+              <div className="flex flex-wrap gap-2">
+                {storeData?.industry && (
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">{storeData.industry}</span>
+                )}
+                {storeData?.id && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-mono bg-gray-100 text-gray-500 border border-gray-200 select-all" title="Store ID">
+                    ID: {storeData.id}
+                  </span>
+                )}
               </div>
               {/* Stats */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3 pt-3 border-t border-gray-100">
                 {[
                   { icon: Package, label: "Published products", value: productCount },
                   { icon: Tag, label: "Categories", value: categoryCount },
@@ -220,7 +229,7 @@ export default function StorePage({ params }: { params: { slug: string } }) {
                   <Icon size={13} className="text-gray-400 mt-0.5 flex-shrink-0" />
                   <div className="min-w-0">
                     <p className="text-[10px] text-gray-400">{label}</p>
-                    <p className="text-sm text-[#0a0a0a] truncate">{value || <span className="text-gray-300 italic">Not set</span>}</p>
+                    <p className={`text-sm text-[#0a0a0a]${label !== "Address" ? " truncate" : " whitespace-normal break-words"}`}>{value || <span className="text-gray-300 italic">Not set</span>}</p>
                   </div>
                 </div>
               ))}
