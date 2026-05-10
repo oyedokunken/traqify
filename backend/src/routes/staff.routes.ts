@@ -3,6 +3,7 @@ import {
   getStaff,
   inviteStaff,
   getInvites,
+  cancelInvite,
   updateStaffRole,
   toggleStaffAccess,
   removeStaff,
@@ -20,6 +21,7 @@ router.use(authenticate, requireOrg);
 
 router.get("/", getStaff);
 router.get("/invites", isOwnerOrManager, getInvites);
+router.delete("/invites/:inviteId", isOwnerOrManager, cancelInvite);
 router.post("/invite", isOwnerOrManager, inviteStaff);
 router.patch("/:userId/role", isOwnerOnly, updateStaffRole);
 router.patch("/:userId/access", isOwnerOrManager, toggleStaffAccess);

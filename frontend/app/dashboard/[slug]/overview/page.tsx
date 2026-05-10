@@ -171,21 +171,17 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
       <Topbar title="Overview" slug={params.slug} />
       <div className="p-6">
         {/* Greeting + clock + Storefront button */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-6 gap-4">
           <div>
             <h2 className="text-xl font-bold text-[#0a0a0a]">{greeting}, {user?.name?.split(" ")[0] || "there"}</h2>
             <p className="text-sm text-gray-400 mt-0.5">{dateStr}</p>
+            <p className="text-lg font-bold text-[#0a0a0a] tabular-nums mt-1 tracking-tight">{timeStr}</p>
+            <p className="text-xs text-gray-400">{tz.replace(/_/g, " ")}</p>
           </div>
-          <div className="flex items-center gap-4">
-            <button onClick={openStorefront}
-              className="flex items-center gap-2 px-4 py-2 bg-[#0a0a0a] hover:bg-black/80 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap flex-shrink-0">
-              <ExternalLink size={14} /> Open Storefront
-            </button>
-            <div className="text-right">
-              <p className="text-2xl font-bold text-[#0a0a0a] tracking-tight tabular-nums">{timeStr}</p>
-              <p className="text-xs text-gray-400">{tz.replace(/_/g, " ")}</p>
-            </div>
-          </div>
+          <button onClick={openStorefront}
+            className="flex items-center gap-2 px-4 py-2 bg-[#0a0a0a] hover:bg-black/80 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap flex-shrink-0 self-start">
+            <ExternalLink size={14} /> Open Storefront
+          </button>
         </div>
 
         <motion.div initial="hidden" animate="visible" variants={stagger}>
@@ -391,12 +387,28 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
                 </svg>
               </div>
               <h2 className="text-xl font-bold text-[#0a0a0a] mb-2">Welcome to Traqify</h2>
-              <p className="text-gray-500 text-sm leading-relaxed mb-1">
-                Hi {user?.name?.split(" ")[0] || "there"}, your workspace is ready. You can now add products, invite your team, and manage your store from this dashboard.
-              </p>
-              <p className="text-gray-400 text-xs mb-6">
-                {user?.organization?.name || "Your organization"} is set up and live.
-              </p>
+              {user?.role === "OWNER" ? (
+                <>
+                  <p className="text-gray-500 text-sm leading-relaxed mb-1">
+                    Hi {user?.name?.split(" ")[0] || "there"}, your workspace is ready. You can now add products, invite your team, and manage your store from this dashboard.
+                  </p>
+                  <p className="text-gray-400 text-xs mb-6">
+                    {user?.organization?.name || "Your organization"} is set up and live.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-gray-500 text-sm leading-relaxed mb-1">
+                    Hi {user?.name?.split(" ")[0] || "there"}, you have joined <strong className="text-[#0a0a0a]">{user?.organization?.name || "the organization"}</strong> as a <strong className="text-[#0a0a0a]">{user?.role === "MANAGER" ? "Manager" : user?.role === "AUDITOR" ? "Auditor" : "Cashier"}</strong>.
+                  </p>
+                  <p className="text-gray-400 text-xs mb-1">
+                    {user?.role === "MANAGER" && "You can manage products, orders, customers, inventory, staff, and access reports."}
+                    {user?.role === "AUDITOR" && "You can view orders, inventory, audit logs, and access reports."}
+                    {user?.role === "CASHIER" && "You can view and process orders and products."}
+                  </p>
+                  <p className="text-gray-400 text-xs mb-6">Your dashboard is ready to go.</p>
+                </>
+              )}
               <button
                 onClick={() => setShowWelcome(false)}
                 className="w-full px-6 py-3 bg-[#DE1010] text-white rounded-xl font-semibold text-sm hover:bg-red-700 transition-colors"

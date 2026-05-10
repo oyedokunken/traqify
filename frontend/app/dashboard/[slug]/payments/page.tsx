@@ -162,49 +162,6 @@ export default function PaymentsPage({ params }: { params: { slug: string } }) {
           )}
         </div>
 
-        {/* Add payment inline form */}
-        <AnimatePresence>
-          {showAdd && (
-            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-              className="bg-white rounded-xl border border-gray-200 p-6 mb-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-[#0a0a0a]">Record payment</h3>
-                <button onClick={() => { setShowAdd(false); reset(); }} className="p-1 text-gray-400 hover:text-gray-700 rounded"><X size={16} /></button>
-              </div>
-              <form onSubmit={handleSubmit(onAddSubmit)} className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Amount (NGN) *</Label>
-                  <Input className="mt-1.5" type="number" step="0.01" placeholder="0.00" {...register("amount", { required: true })} />
-                </div>
-                <div>
-                  <Label>Status</Label>
-                  <select className="mt-1.5 h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" {...register("status")}>
-                    <option value="PENDING">Pending</option>
-                    <option value="COMPLETED">Completed</option>
-                    <option value="FAILED">Failed</option>
-                    <option value="REFUNDED">Refunded</option>
-                  </select>
-                </div>
-                <div>
-                  <Label>Payment method</Label>
-                  <Input className="mt-1.5" placeholder="e.g. Paystack, Cash, Transfer" {...register("method")} />
-                </div>
-                <div>
-                  <Label>Reference</Label>
-                  <Input className="mt-1.5" placeholder="Transaction reference" {...register("reference")} />
-                </div>
-                <div className="col-span-2">
-                  <Label>Notes</Label>
-                  <Input className="mt-1.5" placeholder="Optional notes" {...register("notes")} />
-                </div>
-                <div className="col-span-2 flex justify-end gap-3">
-                  <Button type="button" variant="outline" onClick={() => { setShowAdd(false); reset(); }}>Cancel</Button>
-                  <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Saving..." : "Save payment"}</Button>
-                </div>
-              </form>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         {/* Table */}
         {loading ? (
@@ -351,6 +308,59 @@ export default function PaymentsPage({ params }: { params: { slug: string } }) {
                   </Button>
                 </div>
               )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Record payment modal */}
+      <AnimatePresence>
+        {showAdd && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4"
+            onClick={() => { setShowAdd(false); reset(); }}>
+            <motion.div initial={{ scale: 0.95, y: 8 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 8 }}
+              className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl"
+              onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="font-bold text-[#0a0a0a]">Record payment</h3>
+                <button onClick={() => { setShowAdd(false); reset(); }} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100">
+                  <X size={16} />
+                </button>
+              </div>
+              <form onSubmit={handleSubmit(onAddSubmit)} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Amount (NGN) *</Label>
+                    <Input className="mt-1.5" type="number" step="0.01" placeholder="0.00" {...register("amount", { required: true })} />
+                  </div>
+                  <div>
+                    <Label>Status</Label>
+                    <select className="mt-1.5 h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" {...register("status")}>
+                      <option value="PENDING">Pending</option>
+                      <option value="COMPLETED">Completed</option>
+                      <option value="FAILED">Failed</option>
+                      <option value="REFUNDED">Refunded</option>
+                    </select>
+                  </div>
+                  <div>
+                    <Label>Payment method</Label>
+                    <Input className="mt-1.5" placeholder="e.g. Paystack, Cash, Transfer" {...register("method")} />
+                  </div>
+                  <div>
+                    <Label>Reference</Label>
+                    <Input className="mt-1.5" placeholder="Transaction reference" {...register("reference")} />
+                  </div>
+                </div>
+                <div>
+                  <Label>Notes</Label>
+                  <Input className="mt-1.5" placeholder="Optional notes" {...register("notes")} />
+                </div>
+                <div className="flex gap-3 pt-1">
+                  <Button type="button" variant="outline" className="flex-1" onClick={() => { setShowAdd(false); reset(); }}>Cancel</Button>
+                  <Button type="submit" className="flex-1" disabled={isSubmitting}>{isSubmitting ? "Saving..." : "Save payment"}</Button>
+                </div>
+              </form>
             </motion.div>
           </motion.div>
         )}

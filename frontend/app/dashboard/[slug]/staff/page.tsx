@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { UserPlus, Shield, ShieldOff, Trash2, Key, Search } from "lucide-react";
+import { UserPlus, Shield, ShieldOff, Trash2, Key, Search, MailX, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,6 +19,11 @@ interface StaffMember {
   id: string; name?: string; email: string; role: string; isActive: boolean;
   avatarUrl?: string; lastLoginAt?: string; createdAt: string; invitedBy?: { name: string };
 }
+
+interface PendingInvite {
+  id: string; email: string; role: string; createdAt: string; expiresAt: string;
+}
+
 const roleVariant: Record<string, any> = { OWNER: "default", MANAGER: "info", CASHIER: "secondary", AUDITOR: "outline" };
 
 type ConfirmAction = { type: "access" | "remove" | "reset"; memberId: string; name: string; isActive?: boolean } | null;
@@ -27,6 +32,7 @@ export default function StaffPage({ params }: { params: { slug: string } }) {
   const { user } = useAuth();
   const { blocked } = useRoleGuard(["OWNER", "MANAGER"], `/dashboard/${params.slug}/overview`);
   const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [invites, setInvites] = useState<PendingInvite[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
@@ -35,13 +41,23 @@ export default function StaffPage({ params }: { params: { slug: string } }) {
   const [successMsg, setSuccessMsg] = useState("");
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
+  const [cancelTarget, setCancelTarget] = useState<PendingInvite | null>(null);
   const { register, handleSubmit, reset, formState: { isSubmitting } } = useForm<{ email: string; role: string }>();
 
   const canManage = ["OWNER", "MANAGER"].includes(user?.role || "");
   const flash = (msg: string) => { setSuccessMsg(msg); setTimeout(() => setSuccessMsg(""), 4000); };
 
   const fetchStaff = () => {
-    api.get("/api/staff").then((r) => setStaff(r.data)).catch(() => setError("Failed to load staff.")).finally(() => setLoading(false));
+    Promise.all([
+      api.get("/api/staff"),
+      api.get("/api/staff/invites").catch(() => ({ data: [] })),
+    ])
+      .then(([staffRes, inviteRes]) => {
+        setStaff(staffRes.data);
+        setInvites((inviteRes.data as PendingInvite[]).filter((i: any) => i.status === "PENDING" && new Date(i.expiresAt) > new Date()));
+      })
+      .catch(() => setError("Failed to load staff."))
+      .finally(() => setLoading(false));
   };
   useEffect(() => { fetchStaff(); }, []);
 
@@ -62,14 +78,30 @@ export default function StaffPage({ params }: { params: { slug: string } }) {
     finally { setConfirmAction(null); }
   };
 
-  const filtered = staff.filter((s) => {
+  const cancelInvite = async () => {
+    if (!cancelTarget) return;
+    try {
+      await api.delete(`/api/staff/invites/${cancelTarget.id}`);
+      flash(`Invitation for ${cancelTarget.email} cancelled.`);
+      fetchStaff();
+    } catch { setError("Failed to cancel invitation."); }
+    finally { setCancelTarget(null); }
+  };
+
+  const filtered = statusFilter === "pending" ? [] : staff.filter((s) => {
     const matchSearch = !search ||
       s.name?.toLowerCase().includes(search.toLowerCase()) ||
       s.email.toLowerCase().includes(search.toLowerCase());
     const matchRole = !roleFilter || s.role === roleFilter;
     const matchStatus = !statusFilter ||
-      (statusFilter === "active" ? s.isActive : !s.isActive);
+      (statusFilter === "active" ? s.isActive : statusFilter === "restricted" ? !s.isActive : true);
     return matchSearch && matchRole && matchStatus;
+  });
+
+  const filteredInvites = statusFilter === "active" || statusFilter === "restricted" ? [] : invites.filter((inv) => {
+    const matchSearch = !search || inv.email.toLowerCase().includes(search.toLowerCase());
+    const matchRole = !roleFilter || inv.role === roleFilter;
+    return matchSearch && matchRole;
   });
 
   const actionLabels: Record<string, { title: string; msg: string; btn: string }> = {
@@ -112,10 +144,11 @@ export default function StaffPage({ params }: { params: { slug: string } }) {
               <option value="">All status</option>
               <option value="active">Active</option>
               <option value="restricted">Restricted</option>
+              <option value="pending">Pending invite</option>
             </select>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-500">{filtered.length} member{filtered.length !== 1 ? "s" : ""}</span>
+            <span className="text-sm text-gray-500">{filtered.length + filteredInvites.length} member{(filtered.length + filteredInvites.length) !== 1 ? "s" : ""}{filteredInvites.length > 0 && <span className="ml-1 text-amber-600">({filteredInvites.length} pending)</span>}</span>
             {canManage && (
               <Button onClick={() => setShowInviteModal(true)} className="gap-2">
                 <UserPlus size={16} /> Invite staff
@@ -154,7 +187,7 @@ export default function StaffPage({ params }: { params: { slug: string } }) {
                           </div>
                         )}
                         <div>
-                          <p className="text-sm font-medium text-[#0a0a0a]">{member.name || "Pending"}</p>
+                          <p className="text-sm font-medium text-[#0a0a0a]">{member.name || "(no name)"}</p>
                           <p className="text-xs text-gray-400">{member.email}</p>
                         </div>
                       </div>
@@ -184,7 +217,40 @@ export default function StaffPage({ params }: { params: { slug: string } }) {
                     {canManage && member.role === "OWNER" && <td />}
                   </tr>
                 ))}
-                {filtered.length === 0 && (
+                {filteredInvites.map((inv) => (
+                  <tr key={`invite-${inv.id}`} className="hover:bg-amber-50/30 transition-colors">
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center flex-shrink-0">
+                          <Clock size={14} className="text-amber-500" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-[#0a0a0a] italic">Invite pending...</p>
+                          <p className="text-xs text-gray-400">{inv.email}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4"><Badge variant={roleVariant[inv.role]}>{ROLE_LABELS[inv.role] || inv.role}</Badge></td>
+                    <td className="px-5 py-4 hidden md:table-cell text-sm text-gray-500">{formatDate(inv.createdAt)}</td>
+                    <td className="px-5 py-4 hidden lg:table-cell text-sm text-gray-500">Never</td>
+                    <td className="px-5 py-4">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
+                        <Clock size={10} /> Pending
+                      </span>
+                    </td>
+                    {canManage && (
+                      <td className="px-5 py-4">
+                        <div className="flex items-center justify-end">
+                          <button onClick={() => setCancelTarget(inv)}
+                            className="p-2 rounded-lg text-gray-400 hover:bg-red-50 hover:text-[#DE1010] transition-colors" title="Cancel invite">
+                            <MailX size={15} />
+                          </button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+                {filtered.length === 0 && filteredInvites.length === 0 && (
                   <tr><td colSpan={6} className="px-5 py-16 text-center text-sm text-gray-400">No staff members found.</td></tr>
                 )}
               </tbody>
@@ -239,6 +305,26 @@ export default function StaffPage({ params }: { params: { slug: string } }) {
                 <button onClick={executeAction} className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors ${confirmAction.type === "remove" ? "bg-[#DE1010] hover:bg-red-700" : "bg-[#0a0a0a] hover:bg-gray-800"}`}>
                   {actionLabels[confirmAction.type]?.btn}
                 </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Cancel invite modal */}
+      <AnimatePresence>
+        {cancelTarget && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
+              className="bg-white rounded-xl p-6 w-full max-w-sm shadow-xl">
+              <h3 className="font-bold text-[#0a0a0a] mb-2">Cancel invitation?</h3>
+              <p className="text-gray-500 text-sm mb-5">
+                The invitation sent to <span className="font-medium text-[#0a0a0a]">{cancelTarget.email}</span> will be cancelled. They will no longer be able to join using the existing link.
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setCancelTarget(null)} className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Keep</button>
+                <button onClick={cancelInvite} className="flex-1 px-4 py-2 bg-[#DE1010] text-white rounded-lg text-sm font-medium hover:bg-red-700">Cancel invite</button>
               </div>
             </motion.div>
           </motion.div>

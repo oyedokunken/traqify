@@ -38,6 +38,7 @@ export default function AcceptInvitePage({ params }: { params: { token: string }
   const [loading, setLoading] = useState(true);
   const [invalid, setInvalid] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
 
@@ -101,48 +102,54 @@ export default function AcceptInvitePage({ params }: { params: { token: string }
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-md">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <div className="text-center mb-8">
-            <div className="text-2xl font-bold tracking-tight text-[#0a0a0a] mb-4">
-              Traq<span className="text-[#DE1010]">ify</span>
-            </div>
-            <h1 className="text-2xl font-bold text-[#0a0a0a] mb-1">You have been invited</h1>
-            <p className="text-gray-500 text-sm">
-              Join <span className="font-semibold text-[#0a0a0a]">{invite?.organizationName}</span> on Traqify
-            </p>
-            {invite?.role && (
-              <Badge variant="secondary" className="mt-2">{ROLE_LABELS[invite.role] || invite.role}</Badge>
-            )}
-          </div>
-
           <div className="bg-white rounded-xl border border-gray-200 p-8 shadow-sm">
-            <p className="text-sm text-gray-500 mb-5">
-              Setting up account for <span className="font-medium text-[#0a0a0a]">{invite?.email}</span>
-            </p>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-              <div>
-                <Label htmlFor="name">Your name</Label>
-                <Input id="name" placeholder="Your full name" className="mt-1.5" {...register("name")} />
-                {errors.name && <p className="text-xs text-[#DE1010] mt-1">{errors.name.message}</p>}
+            <div className="mb-6">
+              <div className="text-xl font-bold tracking-tight text-[#0a0a0a] mb-5">
+                Traq<span className="text-[#DE1010]">ify</span>
               </div>
-              <div>
-                <Label htmlFor="password">Create a password</Label>
-                <div className="relative mt-1.5">
-                  <Input id="password" type={showPassword ? "text" : "password"} placeholder="Create a strong password" {...register("password")} />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
+              <h1 className="text-xl font-bold text-[#0a0a0a] mb-1">You have been invited</h1>
+              <p className="text-gray-500 text-sm">
+                Join <span className="font-semibold text-[#0a0a0a]">{invite?.organizationName}</span> on Traqify
+              </p>
+              {invite?.role && (
+                <Badge variant="secondary" className="mt-2">{ROLE_LABELS[invite.role] || invite.role}</Badge>
+              )}
+            </div>
+            <div className="border-t border-gray-100 pt-5">
+              <p className="text-sm text-gray-500 mb-5">
+                Setting up account for <span className="font-medium text-[#0a0a0a]">{invite?.email}</span>
+              </p>
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+                <div>
+                  <Label htmlFor="name">Your name</Label>
+                  <Input id="name" placeholder="Your full name" className="mt-1.5" {...register("name")} />
+                  {errors.name && <p className="text-xs text-[#DE1010] mt-1">{errors.name.message}</p>}
                 </div>
-                {errors.password && <p className="text-xs text-[#DE1010] mt-1">{errors.password.message}</p>}
-              </div>
-              <div>
-                <Label htmlFor="confirmPassword">Confirm password</Label>
-                <Input id="confirmPassword" type="password" placeholder="Repeat your password" className="mt-1.5" {...register("confirmPassword")} />
-                {errors.confirmPassword && <p className="text-xs text-[#DE1010] mt-1">{errors.confirmPassword.message}</p>}
-              </div>
-              <Button type="submit" className="w-full" disabled={isSubmitting}>
-                {isSubmitting ? "Setting up account..." : "Accept invitation"}
-              </Button>
-            </form>
+                <div>
+                  <Label htmlFor="password">Create a password</Label>
+                  <div className="relative mt-1.5">
+                    <Input id="password" type={showPassword ? "text" : "password"} placeholder="Create a strong password" {...register("password")} />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                  {errors.password && <p className="text-xs text-[#DE1010] mt-1">{errors.password.message}</p>}
+                </div>
+                <div>
+                  <Label htmlFor="confirmPassword">Confirm password</Label>
+                  <div className="relative mt-1.5">
+                    <Input id="confirmPassword" type={showConfirmPassword ? "text" : "password"} placeholder="Repeat your password" {...register("confirmPassword")} />
+                    <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                      {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                  {errors.confirmPassword && <p className="text-xs text-[#DE1010] mt-1">{errors.confirmPassword.message}</p>}
+                </div>
+                <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  {isSubmitting ? "Setting up account..." : "Accept invitation"}
+                </Button>
+              </form>
+            </div>
           </div>
         </motion.div>
       </div>

@@ -68,6 +68,13 @@ export const getInvites = async (req: AuthRequest, res: Response): Promise<void>
       orderBy: { createdAt: "desc" },
     });
 
+    const now = new Date();
+    const justExpired = invites.filter((i) => i.status === "PENDING" && i.expiresAt < now);
+    for (const inv of justExpired) {
+      prisma.staffInvite.update({ where: { id: inv.id }, data: { status: "EXPIRED" } }).catch(() => {});
+      createAuditLog(req.user!.id, orgId, "UPDATE", "StaffInvite", inv.id, `Invitation for ${inv.email} has expired`, req).catch(() => {});
+    }
+
     res.json(invites);
   } catch {
     res.status(500).json({ error: "Failed to fetch invites." });
@@ -100,7 +107,7 @@ export const inviteStaff = async (req: AuthRequest, res: Response): Promise<void
     }
 
     const token = crypto.randomBytes(32).toString("hex");
-    const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000);
 
     const invite = await prisma.staffInvite.create({
       data: { email, role, token, expiresAt, organizationId: orgId, invitedById: req.user!.id },
@@ -202,6 +209,25 @@ export const removeStaff = async (req: AuthRequest, res: Response): Promise<void
     res.json({ message: `${member.name} has been removed from the organization.` });
   } catch {
     res.status(500).json({ error: "Failed to remove staff member." });
+  }
+};
+
+export const cancelInvite = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { inviteId } = req.params;
+    const orgId = req.user!.organizationId!;
+
+    const invite = await prisma.staffInvite.findFirst({ where: { id: inviteId, organizationId: orgId, status: "PENDING" } });
+    if (!invite) {
+      res.status(404).json({ error: "Pending invitation not found." });
+      return;
+    }
+
+    await prisma.staffInvite.delete({ where: { id: inviteId } });
+    await createAuditLog(req.user!.id, orgId, "DELETE", "StaffInvite", inviteId, `Cancelled invitation for ${invite.email}`, req);
+    res.json({ message: `Invitation for ${invite.email} has been cancelled.` });
+  } catch {
+    res.status(500).json({ error: "Failed to cancel invitation." });
   }
 };
 

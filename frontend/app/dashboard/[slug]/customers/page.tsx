@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Search, Users, Trash2, AlertTriangle, ShoppingBag, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -81,37 +81,6 @@ export default function CustomersPage({ params }: { params: { slug: string } }) 
           <Button onClick={() => setShowAdd(true)} className="gap-2"><Plus size={16} />Add customer</Button>
         </div>
 
-        {showAdd && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-xl border border-gray-200 p-6 mb-6"
-          >
-            <h3 className="font-semibold text-[#0a0a0a] mb-4">Add customer</h3>
-            <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Full name</Label>
-                <Input className="mt-1.5" placeholder="Customer name" {...register("name", { required: true })} />
-              </div>
-              <div>
-                <Label>Email (optional)</Label>
-                <Input className="mt-1.5" type="email" placeholder="customer@email.com" {...register("email")} />
-              </div>
-              <div>
-                <Label>Phone (optional)</Label>
-                <Input className="mt-1.5" placeholder="+234..." {...register("phone")} />
-              </div>
-              <div>
-                <Label>Address (optional)</Label>
-                <Input className="mt-1.5" placeholder="Customer address" {...register("address")} />
-              </div>
-              <div className="col-span-2 flex justify-end gap-3">
-                <Button type="button" variant="outline" onClick={() => { setShowAdd(false); reset(); }}>Cancel</Button>
-                <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Saving..." : "Add customer"}</Button>
-              </div>
-            </form>
-          </motion.div>
-        )}
 
         {loading ? (
           <div className="flex justify-center py-24">
@@ -186,6 +155,50 @@ export default function CustomersPage({ params }: { params: { slug: string } }) 
           </div>
         )}
       </div>
+      {/* Add customer modal */}
+      <AnimatePresence>
+        {showAdd && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4"
+            onClick={() => { setShowAdd(false); reset(); }}>
+            <motion.div initial={{ scale: 0.95, y: 8 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 8 }}
+              className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl"
+              onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="font-bold text-[#0a0a0a]">Add customer</h3>
+                <button onClick={() => { setShowAdd(false); reset(); }} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+              </div>
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Full name *</Label>
+                    <Input className="mt-1.5" placeholder="Customer name" {...register("name", { required: true })} />
+                  </div>
+                  <div>
+                    <Label>Email (optional)</Label>
+                    <Input className="mt-1.5" type="email" placeholder="customer@email.com" {...register("email")} />
+                  </div>
+                  <div>
+                    <Label>Phone (optional)</Label>
+                    <Input className="mt-1.5" placeholder="+234..." {...register("phone")} />
+                  </div>
+                  <div>
+                    <Label>Address (optional)</Label>
+                    <Input className="mt-1.5" placeholder="Customer address" {...register("address")} />
+                  </div>
+                </div>
+                <div className="flex gap-3 pt-1">
+                  <Button type="button" variant="outline" className="flex-1" onClick={() => { setShowAdd(false); reset(); }}>Cancel</Button>
+                  <Button type="submit" className="flex-1" disabled={isSubmitting}>{isSubmitting ? "Saving..." : "Add customer"}</Button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <ErrorModal isOpen={!!error} onClose={() => setError("")} message={error} />
 
       {deleteTarget && (

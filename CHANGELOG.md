@@ -5,7 +5,33 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [1.10.0] - 2026-05-10
+## [v1.11.0] - 2025-05-10
+
+### Added
+- Staff page: pending invites visible in table with amber "Pending" badge and clock icon
+- Staff page: "Cancel invite" action for pending invites (soft-delete with audit log)
+- Staff page: "Pending invite" option added to status filter
+- Backend: `DELETE /api/staff/invites/:inviteId` endpoint for cancelling pending invites
+- Backend: Lazy expiry detection in `getInvites` -- expired PENDING invites are auto-marked EXPIRED with audit log entry
+- Payments: "Record payment" button now opens a centered modal overlay
+- Customers: "Add customer" button now opens a centered modal overlay
+- Overview: time and timezone moved from storefront button row to greeting/date section
+- Overview: first-time welcome modal now shows role-specific message for invited members (MANAGER/AUDITOR/CASHIER)
+- Invite accept page: all header content (logo, title, org, role badge) moved inside the form card; left-aligned
+- Invite accept page: eye icon added to "Confirm password" field
+- Settings: "Company" tab now visible to all roles (MANAGER/CASHIER/AUDITOR see read-only company details)
+- Settings Security: password change validation rejects passwords containing name or email address
+- Settings Security: policy hint text updated to reflect restrictions
+
+### Changed
+- Staff invite expiry: extended from 48 hours to 3 days (72 hours)
+- Email template: invite expiry copy updated from "48 hours" to "3 days"
+- Products page: "Add product" button gated behind `categoriesLoaded` flag to prevent false "No categories" modal on first render
+
+### Fixed
+- Review controller: added `console.error` logging to expose actual 500 errors in Vercel function logs
+
+## [v1.10.0] - 2026-05-10
 
 ### Added
 - **Profile: phone + role fields**: Settings > Profile tab now shows four fields in a 2x2 grid (Name, Role, Email, Phone); role is an immutable display field; phone is editable and saved to the database via `PATCH /api/auth/me`; form resets when user data loads
