@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Search, Users, Trash2, AlertTriangle } from "lucide-react";
+import { Plus, Search, Users, Trash2, AlertTriangle, ShoppingBag, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +18,7 @@ interface Customer {
   email?: string;
   phone?: string;
   address?: string;
+  source?: "MANUAL" | "PURCHASE";
   createdAt: string;
   _count?: { orders: number };
 }
@@ -128,6 +129,7 @@ export default function CustomersPage({ params }: { params: { slug: string } }) 
                 <tr className="border-b border-gray-100 bg-gray-50">
                   <th className="text-left text-xs font-semibold text-gray-500 px-5 py-3">Customer</th>
                   <th className="text-left text-xs font-semibold text-gray-500 px-5 py-3 hidden md:table-cell">Contact</th>
+                  <th className="text-left text-xs font-semibold text-gray-500 px-5 py-3 hidden sm:table-cell">Source</th>
                   <th className="text-left text-xs font-semibold text-gray-500 px-5 py-3 hidden md:table-cell">Orders</th>
                   <th className="text-left text-xs font-semibold text-gray-500 px-5 py-3 hidden lg:table-cell">Added</th>
                   <th className="px-5 py-3" />
@@ -150,6 +152,17 @@ export default function CustomersPage({ params }: { params: { slug: string } }) 
                     <td className="px-5 py-3.5 hidden md:table-cell">
                       <p className="text-sm text-gray-600">{c.email || "—"}</p>
                       <p className="text-xs text-gray-400">{c.phone || ""}</p>
+                    </td>
+                    <td className="px-5 py-3.5 hidden sm:table-cell">
+                      {c.source === "PURCHASE" ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-50 text-green-700 border border-green-100">
+                          <ShoppingBag size={9} /> Auto
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-600 border border-gray-200">
+                          <UserPlus size={9} /> Manual
+                        </span>
+                      )}
                     </td>
                     <td className="px-5 py-3.5 text-sm text-gray-600 hidden md:table-cell">{c._count?.orders ?? 0}</td>
                     <td className="px-5 py-3.5 text-sm text-gray-500 hidden lg:table-cell">{formatDate(c.createdAt)}</td>

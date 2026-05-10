@@ -47,6 +47,33 @@ export const getUnreadCount = async (req: AuthRequest, res: Response): Promise<v
   }
 };
 
+export const getAuditLogById = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const orgId = req.user!.organizationId!;
+    const { id } = req.params;
+
+    const log = await prisma.auditLog.findFirst({
+      where: { id, organizationId: orgId },
+      include: {
+        user: { select: { id: true, name: true, email: true, avatarUrl: true, role: true } },
+      },
+    });
+
+    if (!log) {
+      res.status(404).json({ error: "Audit log not found." });
+      return;
+    }
+
+    if (!log.isRead) {
+      await prisma.auditLog.update({ where: { id }, data: { isRead: true } });
+    }
+
+    res.json({ ...log, isRead: true });
+  } catch {
+    res.status(500).json({ error: "Failed to fetch audit log." });
+  }
+};
+
 export const markLogsRead = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const orgId = req.user!.organizationId!;

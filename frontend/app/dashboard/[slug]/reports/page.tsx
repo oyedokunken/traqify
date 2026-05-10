@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Download, Mail, Users, Package, TrendingUp, ShoppingCart, UserCheck, Warehouse, FileText, X, Send, AtSign } from "lucide-react";
+import { Download, Mail, Users, Package, TrendingUp, ShoppingCart, UserCheck, Warehouse, FileText, X, Send, AtSign, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,6 +19,7 @@ const reportTypes = [
   { id: "inventory", label: "Inventory Report",     sub: "Current stock levels, low-stock alerts and reorder recommendations.", icon: Warehouse,   color: "bg-red-50 text-[#DE1010]",    pill: "Stock" },
   { id: "staff",     label: "Staff Report",         sub: "Team members, roles, access status and activity summary.",            icon: UserCheck,   color: "bg-gray-50 text-gray-600",    pill: "Team" },
   { id: "newsletter",label: "Newsletter Report",    sub: "All newsletter subscribers with email and subscription date.",       icon: AtSign,      color: "bg-indigo-50 text-indigo-600", pill: "Marketing" },
+  { id: "payments",  label: "Payments Report",      sub: "All payment records with amounts, statuses, methods and references.",  icon: CreditCard,  color: "bg-teal-50 text-teal-600",     pill: "Finance" },
 ];
 
 type ModalType = "download" | "email" | null;

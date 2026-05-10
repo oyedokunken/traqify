@@ -45,6 +45,18 @@ enum ReviewStatus {
   REJECTED
 }
 
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum CustomerSource {
+  MANUAL
+  PURCHASE
+}
+
 model User {
   id             String       @id @default(cuid())
   name           String?
@@ -97,6 +109,7 @@ model Organization {
   categories  ProductCategory[]
   wishlists   Wishlist[]
   reviews     Review[]
+  payments    Payment[]
 
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
@@ -233,6 +246,7 @@ model Customer {
   phone          String?
   address        String?
   notes          String?
+  source         CustomerSource @default(MANUAL)
 
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -264,6 +278,7 @@ model Order {
 
   orderItems     OrderItem[]
   reviews        Review[]
+  payments       Payment[]
 
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
@@ -338,6 +353,27 @@ model Review {
 
   @@unique([orderId, productId])
   @@map("reviews")
+}
+
+model Payment {
+  id             String        @id @default(cuid())
+  amount         Float
+  currency       String        @default("NGN")
+  status         PaymentStatus @default(PENDING)
+  method         String?
+  reference      String?
+  notes          String?
+
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  orderId        String?
+  order          Order?        @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@map("payments")
 }
 
 model AuditLog {

@@ -9,13 +9,14 @@
 6. [Orders](#orders)
 7. [Customers](#customers)
 8. [Staff Management](#staff-management)
-9. [Public Store](#public-store)
-10. [Newsletter](#newsletter)
-11. [Product Reviews](#product-reviews)
-12. [Reports and Analytics](#reports-and-analytics)
-13. [Audit Logs](#audit-logs)
-14. [Email System](#email-system)
-15. [API Reference](#api-reference)
+9. [Payments](#payments)
+10. [Public Store](#public-store)
+11. [Newsletter](#newsletter)
+12. [Product Reviews](#product-reviews)
+13. [Reports and Analytics](#reports-and-analytics)
+14. [Audit Logs](#audit-logs)
+15. [Email System](#email-system)
+16. [API Reference](#api-reference)
 
 ---
 
@@ -174,6 +175,35 @@ When a new order is created (from the dashboard or the public store), the org OW
 - Only OWNER and MANAGER can access the Staff page
 - MANAGER can invite new staff but cannot assign OWNER role
 - All sensitive staff actions (restrict, remove, reset) require confirmation
+
+---
+
+## Payments
+
+The Payments module tracks all financial transactions for an organization.
+
+### Payment Statuses
+- **PENDING** — payment recorded but not yet confirmed
+- **COMPLETED** — payment successfully received
+- **FAILED** — transaction unsuccessful
+- **REFUNDED** — payment reversed
+
+### Dashboard (`/dashboard/[slug]/payments`)
+- **Summary cards** — total amount, completed, pending, failed+refunded counts and amounts
+- **Search** — filter by reference, method, or notes
+- **Status filter** — All / Pending / Completed / Failed / Refunded
+- **Detail modal** — click any row to see full payment info; OWNER/MANAGER can mark Pending payments as Completed or Failed inline
+
+### API Endpoints
+| Method | Path | Access |
+|--------|------|--------|
+| GET | /api/payments | OWNER/MANAGER/AUDITOR |
+| GET | /api/payments/:id | OWNER/MANAGER/AUDITOR |
+| POST | /api/payments | OWNER/MANAGER |
+| PATCH | /api/payments/:id | OWNER/MANAGER |
+
+### Creating Payments
+Payments can be linked to an existing order via `orderId` or recorded standalone. Required fields: `amount`. Optional: `currency` (default NGN), `status`, `method`, `reference`, `notes`.
 
 ---
 

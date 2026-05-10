@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Search, Edit, Trash2, Package, Star } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Package, Star, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +41,7 @@ export default function ProductsPage({ params }: { params: { slug: string } }) {
   const LIMIT = 20;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [showNoCatModal, setShowNoCatModal] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editProduct, setEditProduct] = useState<Product | null>(null);
 
@@ -58,7 +60,7 @@ export default function ProductsPage({ params }: { params: { slug: string } }) {
     params.set("limit", String(LIMIT));
     api.get(`/api/products?${params}`)
       .then((r) => { const d = r.data; setProducts(Array.isArray(d) ? d : d.products || []); setTotal(typeof d.total === "number" ? d.total : (Array.isArray(d) ? d.length : 0)); })
-      .catch(() => setError("Failed to load products."))
+      .catch(() => { setProducts([]); setTotal(0); })
       .finally(() => setLoading(false));
   };
 
@@ -109,7 +111,7 @@ export default function ProductsPage({ params }: { params: { slug: string } }) {
           </div>
           {canEdit && (
             <Button onClick={() => {
-              if (categories.length === 0) { setError("You need at least one product category before adding products. Go to Categories to create one."); return; }
+              if (categories.length === 0) { setShowNoCatModal(true); return; }
               router.push(`/dashboard/${params.slug}/products/new`);
             }} className="gap-2">
               <Plus size={16} /> Add product
@@ -128,7 +130,7 @@ export default function ProductsPage({ params }: { params: { slug: string } }) {
             <p className="text-gray-400 text-sm mt-1">Add your first product to get started</p>
             {canEdit && (
               <Button className="mt-4 gap-2" onClick={() => {
-                if (categories.length === 0) { setError("You need at least one product category before adding products. Go to Categories to create one."); return; }
+                if (categories.length === 0) { setShowNoCatModal(true); return; }
                 setEditProduct(null); setShowModal(true);
               }}>
                 <Plus size={15} /> Add product
@@ -245,6 +247,29 @@ export default function ProductsPage({ params }: { params: { slug: string } }) {
         )}
       </AnimatePresence>
       <ErrorModal isOpen={!!error} onClose={() => setError("")} message={error} />
+      <AnimatePresence>
+        {showNoCatModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
+              className="bg-white rounded-xl p-6 w-full max-w-sm shadow-xl">
+              <div className="w-10 h-10 bg-amber-50 rounded-lg flex items-center justify-center mb-4">
+                <Tag size={20} className="text-amber-600" />
+              </div>
+              <h3 className="font-bold text-[#0a0a0a] mb-2">No categories yet</h3>
+              <p className="text-gray-500 text-sm mb-5">
+                You need at least one product category before you can add products. Create a category first to continue.
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setShowNoCatModal(false)} className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+                <Link href={`/dashboard/${params.slug}/categories`} className="flex-1">
+                  <button className="w-full px-4 py-2 bg-[#DE1010] text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors">Go to Categories</button>
+                </Link>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
