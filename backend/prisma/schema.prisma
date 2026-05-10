@@ -192,6 +192,8 @@ model Product {
   downloadUrl    String?
   isActive       Boolean          @default(true)
 
+  slug           String?
+
   categoryId     String?
   productCategory ProductCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
@@ -207,6 +209,7 @@ model Product {
   updatedAt      DateTime         @updatedAt
 
   @@unique([sku, organizationId])
+  @@unique([slug, organizationId])
   @@map("products")
 }
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Users, Search, Download, RefreshCw, Calendar } from "lucide-react";
+import { Mail, Users, Search, Download, RefreshCw, Calendar, Trash2, CheckCircle2, XCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,9 @@ export default function NewsletterPage({ params }: { params: { slug: string } })
   const [search, setSearch] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [refreshModal, setRefreshModal] = useState<{ open: boolean; type: "success" | "error" }>({ open: false, type: "success" });
+  const [deleteTarget, setDeleteTarget] = useState<Subscriber | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [actionModal, setActionModal] = useState<{ open: boolean; type: "success" | "error"; msg: string }>({ open: false, type: "success", msg: "" });
 
   const fetchSubscribers = async (silent = false) => {
     if (!silent) setLoading(true); else setRefreshing(true);
@@ -44,6 +47,22 @@ export default function NewsletterPage({ params }: { params: { slug: string } })
   };
 
   useEffect(() => { fetchSubscribers(); }, []);
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/api/newsletter/${deleteTarget.id}`);
+      setSubscribers((prev) => prev.filter((s) => s.id !== deleteTarget.id));
+      setDeleteTarget(null);
+      setActionModal({ open: true, type: "success", msg: `${deleteTarget.email} has been removed from the newsletter list.` });
+    } catch (err: any) {
+      setDeleteTarget(null);
+      setActionModal({ open: true, type: "error", msg: err.response?.data?.error || "Failed to remove subscriber. Please try again." });
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const filtered = subscribers.filter((s) =>
     s.email.toLowerCase().includes(search.toLowerCase()) ||
@@ -154,6 +173,7 @@ export default function NewsletterPage({ params }: { params: { slug: string } })
                   <th className="text-left text-xs font-semibold text-gray-500 px-5 py-3">Email</th>
                   <th className="text-left text-xs font-semibold text-gray-500 px-5 py-3 hidden sm:table-cell">Subscribed</th>
                   <th className="text-left text-xs font-semibold text-gray-500 px-5 py-3 hidden md:table-cell">Status</th>
+                  <th className="px-5 py-3" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -166,6 +186,12 @@ export default function NewsletterPage({ params }: { params: { slug: string } })
                     <td className="px-5 py-3.5 text-sm text-gray-500 hidden sm:table-cell">{fmt(s.createdAt)}</td>
                     <td className="px-5 py-3.5 hidden md:table-cell">
                       <Badge variant="success" className="text-[10px]">Active</Badge>
+                    </td>
+                    <td className="px-3 py-3.5 text-right">
+                      <button onClick={() => setDeleteTarget(s)}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-[#DE1010] hover:bg-red-50 transition-colors">
+                        <Trash2 size={14} />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -181,6 +207,64 @@ export default function NewsletterPage({ params }: { params: { slug: string } })
         </div>
       </motion.div>
     </div>
+
+      {/* Confirm delete modal */}
+    <AnimatePresence>
+      {deleteTarget && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4"
+          onClick={() => setDeleteTarget(null)}>
+          <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
+            className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl"
+            onClick={(e) => e.stopPropagation()}>
+            <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+              <Trash2 size={22} className="text-[#DE1010]" />
+            </div>
+            <h3 className="font-bold text-[#0a0a0a] text-base text-center mb-1">Remove subscriber?</h3>
+            <p className="text-sm text-gray-500 text-center mb-5">
+              <span className="font-medium text-[#0a0a0a]">{deleteTarget.email}</span> will be permanently removed from the newsletter list.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setDeleteTarget(null)}
+                className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+                Cancel
+              </button>
+              <button onClick={confirmDelete} disabled={deleting}
+                className="flex-1 py-2.5 bg-[#DE1010] text-white rounded-xl text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50">
+                {deleting ? "Removing..." : "Remove"}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+
+      {/* Action result modal */}
+    <AnimatePresence>
+      {actionModal.open && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4"
+          onClick={() => setActionModal((m) => ({ ...m, open: false }))}>
+          <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
+            className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl"
+            onClick={(e) => e.stopPropagation()}>
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4 ${actionModal.type === "success" ? "bg-green-100" : "bg-red-50"}`}>
+              {actionModal.type === "success"
+                ? <CheckCircle2 size={22} className="text-green-600" />
+                : <XCircle size={22} className="text-[#DE1010]" />}
+            </div>
+            <h3 className="font-bold text-[#0a0a0a] text-base text-center mb-2">
+              {actionModal.type === "success" ? "Subscriber removed" : "Action failed"}
+            </h3>
+            <p className="text-sm text-gray-500 text-center mb-5">{actionModal.msg}</p>
+            <button onClick={() => setActionModal((m) => ({ ...m, open: false }))}
+              className="w-full py-2.5 bg-[#0a0a0a] text-white rounded-xl text-sm font-medium hover:bg-black/80 transition-colors">
+              Got it
+            </button>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
 
       {/* Refresh summary modal */}
     <AnimatePresence>

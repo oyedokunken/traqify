@@ -13,6 +13,7 @@ import { formatCurrency } from "@/lib/utils";
 
 interface Product {
   id: string;
+  slug?: string | null;
   name: string;
   sku: string;
   price: number;
@@ -59,19 +60,16 @@ export default function ProductPage({ params }: { params: { slug: string; id: st
   }, [params.slug]);
 
   useEffect(() => {
-    api.get(`/api/reviews/product/${params.id}`)
-      .then((r) => setReviews(r.data || []))
-      .catch(() => {});
-  }, [params.id]);
-
-  useEffect(() => {
     api.get(`/api/organizations/${params.slug}/store`).then((r) => {
       setOrg(r.data.org);
       const products: Product[] = r.data.products || [];
       setAllProducts(products);
-      const found = products.find((p) => p.id === params.id) || null;
+      const found = products.find((p) => (p.slug && p.slug === params.id) || p.id === params.id) || null;
       setProduct(found);
       if (found) {
+        api.get(`/api/reviews/product/${found.id}`)
+          .then((rv) => setReviews(rv.data || []))
+          .catch(() => {});
         const sameCat = products.filter((p) => p.id !== found.id && p.productCategory?.id === found.productCategory?.id);
         const others = products.filter((p) => p.id !== found.id && p.productCategory?.id !== found.productCategory?.id);
         setUpsells([...sameCat, ...others].slice(0, 6));
@@ -310,7 +308,7 @@ export default function ProductPage({ params }: { params: { slug: string; id: st
                 return (
                   <motion.div key={p.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                     whileHover={{ y: -4 }} className="group cursor-pointer"
-                    onClick={() => router.push(`/store/${params.slug}/products/${p.id}`)}>
+                    onClick={() => router.push(`/store/${params.slug}/products/${p.slug || p.id}`)}>
                     <div className="relative aspect-square bg-white rounded-xl overflow-hidden border border-gray-100 mb-2 shadow-sm group-hover:shadow-md transition-shadow">
                       {imgs[0] ? (
                         <img src={imgs[0]} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />

@@ -3,6 +3,7 @@ import prisma from "../config/database";
 import { productSchema } from "../utils/validators";
 import { createAuditLog } from "../utils/audit";
 import { AuthRequest } from "../middleware/auth.middleware";
+import { generateSlug } from "../utils/slug";
 
 export const getProducts = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -75,9 +76,20 @@ export const createProduct = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
+    const baseSlug = generateSlug(name);
+    let productSlug = baseSlug;
+    let slugCount = 0;
+    while (true) {
+      const slugExists = await prisma.product.findUnique({ where: { slug_organizationId: { slug: productSlug, organizationId: orgId } } });
+      if (!slugExists) break;
+      slugCount++;
+      productSlug = `${baseSlug}-${slugCount}`;
+    }
+
     const product = await prisma.product.create({
       data: {
         name, sku, description, price, comparePrice,
+        slug: productSlug,
         categoryId: categoryId || undefined,
         imageUrl: imageUrl || (imageUrls && imageUrls[0]) || undefined,
         imageUrls: imageUrls || [],

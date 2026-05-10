@@ -25,8 +25,8 @@ export const submitReview = async (req: Request, res: Response): Promise<void> =
       res.status(404).json({ error: "Order not found." });
       return;
     }
-    if (order.status !== "COMPLETED") {
-      res.status(400).json({ error: "Reviews can only be submitted for completed orders." });
+    if (order.status === "CANCELLED") {
+      res.status(400).json({ error: "Reviews cannot be submitted for cancelled orders." });
       return;
     }
     if (!order.orderItems.length) {

@@ -174,9 +174,8 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
         <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-6 gap-4">
           <div>
             <h2 className="text-xl font-bold text-[#0a0a0a]">{greeting}, {user?.name?.split(" ")[0] || "there"}</h2>
-            <p className="text-sm text-gray-400 mt-0.5">{dateStr}</p>
-            <p className="text-lg font-bold text-[#0a0a0a] tabular-nums mt-1 tracking-tight">{timeStr}</p>
-            <p className="text-xs text-gray-400">{tz.replace(/_/g, " ")}</p>
+            <p className="text-sm text-gray-500 mt-0.5 tabular-nums">{dateStr} &nbsp;&middot;&nbsp; {timeStr}</p>
+            <p className="text-sm text-gray-400">{tz.replace(/_/g, " ")}</p>
           </div>
           <button onClick={openStorefront}
             className="flex items-center gap-2 px-4 py-2 bg-[#0a0a0a] hover:bg-black/80 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap flex-shrink-0 self-start">

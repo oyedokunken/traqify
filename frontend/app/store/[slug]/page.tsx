@@ -15,6 +15,7 @@ const PAGE_SIZE = 12;
 
 interface Product {
   id: string;
+  slug?: string | null;
   name: string;
   sku: string;
   price: number;
@@ -74,7 +75,7 @@ function ProductCard({ product, images, inStock, inWishlist, slug, onAddToCart, 
   return (
     <motion.div variants={fadeUp} className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow group"
       onMouseEnter={startCycle} onMouseLeave={stopCycle}>
-      <Link href={`/store/${slug}/products/${product.id}`} className="block">
+      <Link href={`/store/${slug}/products/${product.slug || product.id}`} className="block">
       <div className="relative h-48 bg-gray-50 flex items-center justify-center overflow-hidden cursor-pointer">
         {images.length > 0 ? (
           <img src={images[imgIdx]} alt={product.name} className="w-full h-full object-cover transition-opacity duration-300" />

@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { motion } from "framer-motion";
-import { CheckCircle, Package, ShoppingCart, Shield, Lock, ChevronRight, RefreshCw, Star } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { CheckCircle, Package, ShoppingCart, Shield, Lock, ChevronRight, RefreshCw, Star, CheckCircle2, XCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -51,6 +51,7 @@ export default function CheckoutPage({ params }: { params: { slug: string } }) {
   const [reviewComment, setReviewComment] = useState("");
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewDone, setReviewDone] = useState<string[]>([]);
+  const [reviewModal, setReviewModal] = useState<{ open: boolean; type: "success" | "error"; msg: string }>({ open: false, type: "success", msg: "" });
   const [org, setOrg] = useState<{ name: string; logoUrl?: string } | null>(null);
   const [captcha, setCaptcha] = useState(() => makeCaptcha());
   const [captchaInput, setCaptchaInput] = useState("");
@@ -121,7 +122,10 @@ export default function CheckoutPage({ params }: { params: { slug: string } }) {
       });
       setReviewDone((prev) => [...prev, productId]);
       setActiveReview(null); setReviewComment(""); setReviewRating(5);
-    } catch {} finally { setReviewSubmitting(false); }
+      setReviewModal({ open: true, type: "success", msg: "Your review has been submitted and is pending approval. Thank you!" });
+    } catch (err: any) {
+      setReviewModal({ open: true, type: "error", msg: err.response?.data?.error || "Failed to submit review. Please try again." });
+    } finally { setReviewSubmitting(false); }
   };
 
   if (success) return (
@@ -194,6 +198,32 @@ export default function CheckoutPage({ params }: { params: { slug: string } }) {
           </motion.div>
         )}
       </div>
+
+      <AnimatePresence>
+        {reviewModal.open && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4"
+            onClick={() => setReviewModal((m) => ({ ...m, open: false }))}>
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
+              className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl"
+              onClick={(e) => e.stopPropagation()}>
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4 ${reviewModal.type === "success" ? "bg-green-100" : "bg-red-50"}`}>
+                {reviewModal.type === "success"
+                  ? <CheckCircle2 size={22} className="text-green-600" />
+                  : <XCircle size={22} className="text-[#DE1010]" />}
+              </div>
+              <h3 className="font-bold text-[#0a0a0a] text-base text-center mb-2">
+                {reviewModal.type === "success" ? "Review submitted!" : "Submission failed"}
+              </h3>
+              <p className="text-sm text-gray-500 text-center mb-5">{reviewModal.msg}</p>
+              <button onClick={() => setReviewModal((m) => ({ ...m, open: false }))}
+                className={`w-full py-2.5 rounded-xl text-sm font-medium transition-colors ${reviewModal.type === "success" ? "bg-[#0a0a0a] text-white hover:bg-black/80" : "bg-[#DE1010] text-white hover:bg-red-700"}`}>
+                Got it
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 
