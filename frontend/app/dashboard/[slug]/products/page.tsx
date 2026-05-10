@@ -36,6 +36,7 @@ export default function ProductsPage({ params }: { params: { slug: string } }) {
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [categoriesLoaded, setCategoriesLoaded] = useState(false);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const LIMIT = 20;
@@ -47,7 +48,12 @@ export default function ProductsPage({ params }: { params: { slug: string } }) {
 
   const canEdit = user?.role === "OWNER" || user?.role === "MANAGER";
 
-  useEffect(() => { api.get("/api/categories").then((r) => setCategories(r.data)).catch(() => {}); }, []);
+  useEffect(() => {
+    api.get("/api/categories")
+      .then((r) => setCategories(r.data))
+      .catch(() => {})
+      .finally(() => setCategoriesLoaded(true));
+  }, []);
 
   const fetchProducts = () => {
     setLoading(true);
@@ -111,6 +117,7 @@ export default function ProductsPage({ params }: { params: { slug: string } }) {
           </div>
           {canEdit && (
             <Button onClick={() => {
+              if (!categoriesLoaded) return;
               if (categories.length === 0) { setShowNoCatModal(true); return; }
               router.push(`/dashboard/${params.slug}/products/new`);
             }} className="gap-2">
@@ -130,6 +137,7 @@ export default function ProductsPage({ params }: { params: { slug: string } }) {
             <p className="text-gray-400 text-sm mt-1">Add your first product to get started</p>
             {canEdit && (
               <Button className="mt-4 gap-2" onClick={() => {
+                if (!categoriesLoaded) return;
                 if (categories.length === 0) { setShowNoCatModal(true); return; }
                 setEditProduct(null); setShowModal(true);
               }}>

@@ -119,7 +119,7 @@ export const staffInviteEmailTemplate = (
   wrapEmail(`
     <h1 style="${headingStyle}">You have been invited to join ${orgName}</h1>
     <p style="${bodyStyle}">You have been invited to join <strong>${orgName}</strong> on Traqify as a <strong>${role.charAt(0) + role.slice(1).toLowerCase()}</strong>.</p>
-    <p style="${bodyStyle}">Click the button below to accept your invitation and set up your account. This invitation expires in 48 hours.</p>
+    <p style="${bodyStyle}">Click the button below to accept your invitation and set up your account. This invitation expires in 3 days.</p>
     <a href="${inviteUrl}" style="${buttonStyle}">Accept Invitation</a>
     <p style="${bodyStyle}">If you were not expecting this invitation, you can safely ignore it.</p>
   `);

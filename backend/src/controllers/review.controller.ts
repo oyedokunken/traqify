@@ -106,7 +106,8 @@ export const getDashboardReviews = async (req: AuthRequest, res: Response): Prom
     ]);
 
     res.json({ reviews, total, page: Number(page), limit: Number(limit) });
-  } catch {
+  } catch (err) {
+    console.error("[getDashboardReviews]", err);
     res.status(500).json({ error: "Failed to fetch reviews." });
   }
 };

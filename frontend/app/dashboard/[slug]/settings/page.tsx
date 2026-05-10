@@ -14,7 +14,7 @@ import { useForm } from "react-hook-form";
 
 const TABS = [
   { id: "profile",      label: "Profile",      icon: User,      roles: ["OWNER","MANAGER","CASHIER","AUDITOR"] },
-  { id: "organization", label: "Organization",  icon: Building2, roles: ["OWNER"] },
+  { id: "organization", label: "Company",       icon: Building2, roles: ["OWNER","MANAGER","CASHIER","AUDITOR"] },
   { id: "security",     label: "Security",      icon: Lock,      roles: ["OWNER","MANAGER","CASHIER","AUDITOR"] },
 ];
 
@@ -75,6 +75,11 @@ export default function SettingsPage({ params }: { params: { slug: string } }) {
 
   const onChangePassword = async (data: any) => {
     if (data.newPassword !== data.confirmPassword) { flash("error", "Passwords do not match."); return; }
+    const pw = data.newPassword.toLowerCase();
+    const emailLocal = (user?.email || "").split("@")[0].toLowerCase();
+    const nameParts = (user?.name || "").toLowerCase().split(" ").filter((p: string) => p.length > 2);
+    if (pw.includes(emailLocal) && emailLocal.length > 2) { flash("error", "Password cannot contain your email address."); return; }
+    if (nameParts.some((part: string) => pw.includes(part))) { flash("error", "Password cannot contain your name."); return; }
     try { await api.post("/api/auth/change-password", { currentPassword: data.currentPassword, newPassword: data.newPassword }); pwForm.reset(); flash("success", "Password changed successfully."); }
     catch (err: any) { flash("error", err.response?.data?.error || "Incorrect current password or server error."); }
   };
@@ -176,6 +181,30 @@ export default function SettingsPage({ params }: { params: { slug: string } }) {
           )}
 
           {/* Organization tab */}
+          {tab === "organization" && role !== "OWNER" && (
+            <motion.div key="company-view" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }}
+              className="bg-white rounded-xl border border-gray-200 p-6">
+              <h3 className="font-semibold text-[#0a0a0a] mb-1">Company details</h3>
+              <p className="text-gray-400 text-sm mb-5">Your organization information. Contact your administrator to make changes.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {[
+                  { label: "Company name", value: orgData?.name },
+                  { label: "Business email", value: orgData?.email },
+                  { label: "Store URL", value: orgData?.slug ? `${typeof window !== "undefined" ? window.location.origin : ""}/store/${orgData.slug}` : null },
+                  { label: "Industry", value: orgData?.industry },
+                  { label: "Team size", value: orgData?.size },
+                  { label: "Phone", value: orgData?.phone },
+                  { label: "Address", value: orgData?.address },
+                  { label: "Website", value: orgData?.website },
+                ].filter(({ value }) => value).map(({ label, value }) => (
+                  <div key={label} className="bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-200">
+                    <p className="text-[10px] text-gray-400 mb-0.5">{label}</p>
+                    <p className="text-sm font-medium text-[#0a0a0a] break-all">{value}</p>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
           {tab === "organization" && role === "OWNER" && (
             <motion.div key="organization" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }}
               className="bg-white rounded-xl border border-gray-200 p-6">
@@ -284,7 +313,7 @@ export default function SettingsPage({ params }: { params: { slug: string } }) {
               {user?.signInMethod !== "GOOGLE" && (
                 <>
                   <h3 className="font-semibold text-[#0a0a0a] mb-1">Change password</h3>
-                  <p className="text-gray-400 text-sm mb-5">Set a new password for your account. Use at least 8 characters with a mix of letters, numbers and symbols.</p>
+                  <p className="text-gray-400 text-sm mb-5">Use at least 8 characters. Your password cannot contain your name or email address.</p>
                   <form onSubmit={pwForm.handleSubmit(onChangePassword)} className="space-y-4">
                     <div>
                       <Label>Current password</Label>
