@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Star, Search, CheckCircle, XCircle, Trash2, MessageSquare } from "lucide-react";
+import { Star, Search, CheckCircle, XCircle, Trash2, MessageSquare, ShoppingBag } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ interface Review {
   status: "PENDING" | "APPROVED" | "REJECTED";
   createdAt: string;
   product: { id: string; name: string; imageUrl?: string };
+  order?: { id: string; orderNumber: string } | null;
 }
 
 const statusVariant: Record<string, string> = {
@@ -40,6 +41,7 @@ export default function ReviewsPage({ params }: { params: { slug: string } }) {
   const { user } = useAuth();
   const { blocked } = useRoleGuard(["OWNER", "MANAGER"], `/dashboard/${params.slug}/overview`);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [allReviews, setAllReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("PENDING");
   const [search, setSearch] = useState("");
@@ -47,17 +49,21 @@ export default function ReviewsPage({ params }: { params: { slug: string } }) {
   const [actionId, setActionId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
-  const fetchReviews = async () => {
+  const fetchReviews = async (initial = false) => {
     setLoading(true);
     try {
-      const res = await api.get(`/api/reviews?status=${statusFilter}&limit=50`);
-      setReviews(res.data.reviews);
-      setTotal(res.data.total);
+      const [filteredRes, allRes] = await Promise.all([
+        api.get(`/api/reviews?status=${statusFilter}&limit=50`),
+        initial ? api.get(`/api/reviews?limit=200`) : Promise.resolve(null),
+      ]);
+      setReviews(filteredRes.data.reviews);
+      setTotal(filteredRes.data.total);
+      if (initial && allRes) setAllReviews(allRes.data.reviews);
     } catch { setError("Failed to load reviews."); }
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchReviews(); }, [statusFilter]);
+  useEffect(() => { fetchReviews(statusFilter === "PENDING"); }, [statusFilter]);
 
   const moderate = async (id: string, action: "approve" | "reject") => {
     setActionId(id);
@@ -84,6 +90,12 @@ export default function ReviewsPage({ params }: { params: { slug: string } }) {
     (r.comment || "").toLowerCase().includes(search.toLowerCase())
   );
 
+  const avgRating = allReviews.length
+    ? (allReviews.reduce((s, r) => s + r.rating, 0) / allReviews.length).toFixed(1)
+    : "0.0";
+  const pendingCount = allReviews.filter((r) => r.status === "PENDING").length;
+  const approvedCount = allReviews.filter((r) => r.status === "APPROVED").length;
+
   if (blocked) return null;
 
   return (
@@ -98,6 +110,31 @@ export default function ReviewsPage({ params }: { params: { slug: string } }) {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Stats */}
+        {allReviews.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <p className="text-xs text-gray-400 font-medium mb-1">Total reviews</p>
+              <p className="text-2xl font-bold text-[#0a0a0a]">{allReviews.length}</p>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <p className="text-xs text-gray-400 font-medium mb-1">Avg rating</p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-2xl font-bold text-amber-500">{avgRating}</p>
+                <Star size={16} className="fill-amber-400 text-amber-400" />
+              </div>
+            </div>
+            <div className="bg-amber-50 rounded-xl border border-amber-100 p-4">
+              <p className="text-xs text-amber-600 font-medium mb-1">Pending review</p>
+              <p className="text-2xl font-bold text-amber-600">{pendingCount}</p>
+            </div>
+            <div className="bg-green-50 rounded-xl border border-green-100 p-4">
+              <p className="text-xs text-green-700 font-medium mb-1">Approved</p>
+              <p className="text-2xl font-bold text-green-700">{approvedCount}</p>
+            </div>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex items-center gap-2 mb-6 border-b border-gray-200 pb-0">
@@ -151,6 +188,11 @@ export default function ReviewsPage({ params }: { params: { slug: string } }) {
                       <p className="text-xs text-gray-500 mt-0.5">{r.customerName}
                         {r.customerEmail && <span className="text-gray-400"> · {r.customerEmail}</span>}
                       </p>
+                      {r.order && (
+                        <p className="text-[10px] text-gray-400 mt-0.5 flex items-center gap-1">
+                          <ShoppingBag size={9} /> Order #{r.order.orderNumber}
+                        </p>
+                      )}
                       <div className="flex items-center gap-2 mt-1.5">
                         <Stars rating={r.rating} />
                         <Badge variant={statusVariant[r.status] as any} className="text-[10px]">{r.status}</Badge>

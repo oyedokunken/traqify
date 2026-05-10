@@ -177,10 +177,11 @@ export const getCustomerChart = async (req: AuthRequest, res: Response): Promise
 const REPORT_LABELS: Record<string, string> = {
   revenue: "Revenue Report", products: "Products Report", orders: "Orders Report",
   customers: "Customers Report", inventory: "Inventory Report", staff: "Staff Report",
+  "audit-logs": "Audit Logs Report",
   newsletter: "Newsletter Subscribers Report", payments: "Payments Report",
 };
 
-const DATE_RANGE_TYPES = ["revenue", "orders", "payments"];
+const DATE_RANGE_TYPES = ["revenue", "orders", "payments", "audit-logs"];
 
 async function buildReportData(type: string, orgId: string, from: Date, to: Date) {
   if (type === "revenue") {
@@ -199,6 +200,8 @@ async function buildReportData(type: string, orgId: string, from: Date, to: Date
     return prisma.newsletterSubscriber.findMany({ orderBy: { createdAt: "desc" } });
   } else if (type === "payments") {
     return prisma.payment.findMany({ where: { organizationId: orgId, createdAt: { gte: from, lte: to } }, include: { order: { select: { id: true } } }, orderBy: { createdAt: "desc" } });
+  } else if (type === "audit-logs") {
+    return prisma.auditLog.findMany({ where: { organizationId: orgId, createdAt: { gte: from, lte: to } }, include: { user: { select: { name: true, email: true, role: true } } }, orderBy: { createdAt: "desc" } });
   }
   return [];
 }
@@ -310,6 +313,15 @@ function buildPDF(type: string, label: string, org: any, from: string, to: strin
       const w = [Math.round(totalW*0.12), Math.round(totalW*0.14), Math.round(totalW*0.16), Math.round(totalW*0.16), Math.round(totalW*0.16), Math.round(totalW*0.14), Math.round(totalW*0.12)];
       addRow(["Reference", "Method", "Amount (NGN)", "Status", "Order", "Notes", "Date"], w, true);
       rows.forEach((r) => addRow([safe(r.reference), safe(r.method), money(r.amount), safe(r.status), r.order ? r.order.id.slice(-8).toUpperCase() : "-", safe(r.notes), fmt(r.createdAt)], w));
+    } else if (type === "audit-logs") {
+      const w = [Math.round(totalW*0.12), Math.round(totalW*0.14), Math.round(totalW*0.20), Math.round(totalW*0.20), Math.round(totalW*0.20), Math.round(totalW*0.14)];
+      addRow(["Action", "Entity", "Performed By", "Email", "Details", "Date"], w, true);
+      rows.forEach((r) => addRow([safe(r.action), safe(r.entity), safe(r.user?.name, "System"), safe(r.user?.email), safe(r.details), fmt(r.createdAt)], w));
+    }
+
+    if (rows.length === 0) {
+      doc.fontSize(11).fillColor("#9ca3af").font("Helvetica")
+        .text("No data available for the selected date range.", 40, y + 12, { width: CONTENT_W, align: "center" });
     }
 
     // Footer
@@ -336,8 +348,6 @@ export const downloadReport = async (req: AuthRequest, res: Response): Promise<v
 
     const org = await prisma.organization.findUnique({ where: { id: orgId } });
     const rows = await buildReportData(type, orgId, fromDate, toDate);
-    if ((rows as any[]).length === 0) { res.status(400).json({ error: `No ${label.toLowerCase()} data found for the selected date range. Try a wider range.` }); return; }
-
     const pdf = await buildPDF(type, label, org, from || "", to || "", rows as any[]);
     res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${type}-report.pdf"` });
     createAuditLog(req.user!.id, orgId, "EXPORT", "Report", undefined, `Downloaded ${label}`, req).catch(() => {});
@@ -363,8 +373,6 @@ export const emailReport = async (req: AuthRequest, res: Response): Promise<void
 
     const org = await prisma.organization.findUnique({ where: { id: orgId } });
     const rows = await buildReportData(type, orgId, fromDate, toDate);
-    if ((rows as any[]).length === 0) { res.status(400).json({ error: `No ${label.toLowerCase()} data found for the selected date range. Try a wider range.` }); return; }
-
     const pdf = await buildPDF(type, label, org, from || "", to_date || "", rows as any[]);
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
     const html = reportEmailTemplate(org?.name || "", label, from || fmt(fromDate), to_date || fmt(toDate), `${frontendUrl}/dashboard/${org?.slug || ""}/reports`);

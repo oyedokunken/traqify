@@ -62,7 +62,7 @@ export default function AuditLogDetailPage({ params }: { params: { slug: string;
   return (
     <div>
       <Topbar title="Audit Log Detail" slug={params.slug} />
-      <div className="p-6 max-w-2xl mx-auto">
+      <div className="p-4 sm:p-6 w-full">
         <button
           onClick={() => router.push(`/dashboard/${params.slug}/audit-logs`)}
           className="flex items-center gap-2 text-sm text-gray-500 hover:text-[#0a0a0a] mb-6 transition-colors"
@@ -121,7 +121,7 @@ export default function AuditLogDetailPage({ params }: { params: { slug: string;
             </div>
 
             {/* Meta grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
               {/* Performed by */}
               <div className="bg-white rounded-xl border border-gray-200 p-5">

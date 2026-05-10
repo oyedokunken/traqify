@@ -58,7 +58,7 @@ The system is live at **[https://traqify.vercel.app](https://traqify.vercel.app)
 1. Visit any live store: `https://traqify.vercel.app/store/[slug]`
 2. Add a product to cart
 3. Checkout with a test Paystack card: `4084 0840 8408 4081`, exp `01/25`, CVV `408`
-4. Watch the order appear in the dashboard under Orders
+4. Watch the order appear in the dashboard under Orders, and a corresponding **Payment** record appear under Payments
 
 ### What to look for
 
@@ -217,6 +217,7 @@ Four roles with granular middleware enforcement:
 
 ### Customers
 - Full customer records (name, email, phone, address)
+- **View-detail modal**: click any customer row (or the eye icon) to see contact info, source, date added, and up to 5 recent orders
 - Purchase history per customer
 - Search by name or email
 
@@ -226,6 +227,9 @@ Four roles with granular middleware enforcement:
 - **Pending invites** visible in the Staff table with amber badge; re-inviting a pending address is blocked at the API level (409 Conflict)
 - **Cancel invite** action removes the pending invite and logs the cancellation in the audit trail
 - **Lazy expiry**: when invites are fetched, newly-expired entries are auto-marked `EXPIRED` and logged
+- **RESTRICT**: toggle staff access on/off; sends `accountRestrictedEmailTemplate` notification
+- **RESET-PASSWORD**: generates temporary password; sends `passwordResetByAdminEmailTemplate` notification
+- **DELETE**: removes staff from the organization; sends `staffRemovedEmailTemplate` notification; all three actions produce audit log entries
 - Invite accept page: branded card UI with left-aligned content and eye icons on both password fields
 - **Role-specific welcome modal** on first login: invited members see their role name and access scope; org owners see workspace setup instructions
 - Account restriction / unrestriction with email notification; OWNER account cannot be restricted

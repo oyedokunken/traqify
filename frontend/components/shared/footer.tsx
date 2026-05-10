@@ -6,6 +6,9 @@ import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { Logo } from "@/components/shared/logo";
 import { Twitter, Instagram, Linkedin, Github, ArrowRight, Mail, User, CheckCircle2, XCircle } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import api from "@/lib/api";
 
 const socials = [
@@ -15,27 +18,25 @@ const socials = [
   { icon: Github, href: "https://github.com/oyedokunken/traqify", label: "GitHub" },
 ];
 
+const subscribeSchema = z.object({
+  name: z.string().min(1, "Please enter your name."),
+  email: z.string().min(1, "Email is required.").email("Please enter a valid email address."),
+});
+type SubscribeForm = z.infer<typeof subscribeSchema>;
+
 export function Footer() {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [modal, setModal] = useState<{ open: boolean; type: "success" | "error"; msg: string }>({ open: false, type: "success", msg: "" });
 
-  const handleSubscribe = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) {
-      setModal({ open: true, type: "error", msg: "Please enter your name." });
-      return;
-    }
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setModal({ open: true, type: "error", msg: "Please enter a valid email address." });
-      return;
-    }
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<SubscribeForm>({
+    resolver: zodResolver(subscribeSchema),
+  });
+
+  const handleSubscribe = async (data: SubscribeForm) => {
     setLoading(true);
     try {
-      await api.post("/api/newsletter/subscribe", { email, name: name.trim() });
-      setName("");
-      setEmail("");
+      await api.post("/api/newsletter/subscribe", { email: data.email, name: data.name });
+      reset();
       setModal({ open: true, type: "success", msg: "You are subscribed! Check your inbox for a confirmation." });
     } catch (err: any) {
       setModal({ open: true, type: "error", msg: err.response?.data?.error || "Failed to subscribe. Please try again." });
@@ -102,33 +103,36 @@ export function Footer() {
           <div>
             <h4 className="text-sm font-semibold mb-5 text-gray-200">Stay updated</h4>
             <p className="text-gray-400 text-xs mb-4 leading-relaxed">Get product updates and tips delivered to your inbox.</p>
-            <form onSubmit={handleSubscribe} className="space-y-2">
-              <div className="relative">
-                <User size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-                <input
-                  type="text"
-                  placeholder="Your name"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full pl-8 pr-3 py-2 text-xs bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#DE1010] transition-colors"
-                />
-              </div>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Mail size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+            <form onSubmit={handleSubmit(handleSubscribe)} className="space-y-2">
+              <div>
+                <div className="relative">
+                  <User size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
                   <input
-                    type="email"
-                    placeholder="your@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-8 pr-3 py-2 text-xs bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#DE1010] transition-colors"
+                    type="text"
+                    placeholder="Your name"
+                    {...register("name")}
+                    className={`w-full pl-8 pr-3 py-2 text-xs bg-white/5 border rounded-lg text-white placeholder-gray-500 focus:outline-none transition-colors ${errors.name ? "border-[#DE1010]" : "border-white/10 focus:border-[#DE1010]"}`}
                   />
                 </div>
-                <button type="submit" disabled={loading}
-                  className="flex-shrink-0 w-9 h-9 bg-[#DE1010] hover:bg-[#c00d0d] rounded-lg flex items-center justify-center transition-colors disabled:opacity-50">
-                  <ArrowRight size={14} />
-                </button>
+                {errors.name && <p className="text-[10px] text-[#DE1010] mt-0.5">{errors.name.message}</p>}
+              </div>
+              <div>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Mail size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                    <input
+                      type="email"
+                      placeholder="your@email.com"
+                      {...register("email")}
+                      className={`w-full pl-8 pr-3 py-2 text-xs bg-white/5 border rounded-lg text-white placeholder-gray-500 focus:outline-none transition-colors ${errors.email ? "border-[#DE1010]" : "border-white/10 focus:border-[#DE1010]"}`}
+                    />
+                  </div>
+                  <button type="submit" disabled={loading}
+                    className="flex-shrink-0 w-9 h-9 bg-[#DE1010] hover:bg-[#c00d0d] rounded-lg flex items-center justify-center transition-colors disabled:opacity-50">
+                    <ArrowRight size={14} />
+                  </button>
+                </div>
+                {errors.email && <p className="text-[10px] text-[#DE1010] mt-0.5">{errors.email.message}</p>}
               </div>
             </form>
           </div>

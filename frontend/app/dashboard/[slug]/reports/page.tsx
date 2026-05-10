@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Download, Mail, Users, Package, TrendingUp, ShoppingCart, UserCheck, Warehouse, FileText, X, Send, AtSign, CreditCard } from "lucide-react";
+import { Download, Mail, Users, Package, TrendingUp, ShoppingCart, UserCheck, Warehouse, FileText, X, Send, AtSign, CreditCard, BookOpen, ExternalLink } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,12 +21,14 @@ const reportTypes = [
   { id: "staff",     label: "Staff Report",         sub: "Team members, roles, access status and activity summary.",            icon: UserCheck,   color: "bg-gray-50 text-gray-600",    pill: "Team" },
   { id: "newsletter",label: "Newsletter Report",    sub: "All newsletter subscribers with email and subscription date.",       icon: AtSign,      color: "bg-indigo-50 text-indigo-600", pill: "Marketing" },
   { id: "payments",  label: "Payments Report",      sub: "All payment records with amounts, statuses, methods and references.",  icon: CreditCard,  color: "bg-teal-50 text-teal-600",     pill: "Finance" },
+  { id: "audit-logs", label: "Audit Logs Report",    sub: "Full audit trail of all actions taken across your organization.",       icon: BookOpen,    color: "bg-amber-50 text-amber-600",   pill: "Security", linkOnly: true },
 ];
 
 type ModalType = "download" | "email" | null;
 
 export default function ReportsPage({ params }: { params: { slug: string } }) {
   const { user } = useAuth();
+  const router = useRouter();
   const [activeReport, setActiveReport] = useState<string | null>(null);
   const [modalType, setModalType] = useState<ModalType>(null);
   const [emailTo, setEmailTo] = useState(user?.email || "");
@@ -88,7 +91,7 @@ export default function ReportsPage({ params }: { params: { slug: string } }) {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          {reportTypes.map((report, i) => (
+          {reportTypes.map((report: any, i: number) => (
             <motion.div key={report.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
               className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md transition-shadow flex flex-col gap-4">
               <div className="flex items-start gap-4">
@@ -103,14 +106,25 @@ export default function ReportsPage({ params }: { params: { slug: string } }) {
                   <p className="text-xs text-gray-400 leading-relaxed">{report.sub}</p>
                 </div>
               </div>
-              <div className="flex gap-2 mt-auto">
-                <Button size="sm" variant="outline" className="flex-1 gap-1.5 text-xs" onClick={() => openModal(report.id, "download")}>
-                  <Download size={13} /> Download PDF
-                </Button>
-                <Button size="sm" className="flex-1 gap-1.5 text-xs" onClick={() => openModal(report.id, "email")}>
-                  <Mail size={13} /> Email report
-                </Button>
-              </div>
+              {report.linkOnly ? (
+                <div className="flex gap-2 mt-auto">
+                  <Button size="sm" variant="outline" className="flex-1 gap-1.5 text-xs" onClick={() => router.push(`/dashboard/${params.slug}/audit-logs`)}>
+                    <ExternalLink size={13} /> View Audit Logs
+                  </Button>
+                  <Button size="sm" className="flex-1 gap-1.5 text-xs" onClick={() => openModal(report.id, "download")}>
+                    <Download size={13} /> Download PDF
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex gap-2 mt-auto">
+                  <Button size="sm" variant="outline" className="flex-1 gap-1.5 text-xs" onClick={() => openModal(report.id, "download")}>
+                    <Download size={13} /> Download PDF
+                  </Button>
+                  <Button size="sm" className="flex-1 gap-1.5 text-xs" onClick={() => openModal(report.id, "email")}>
+                    <Mail size={13} /> Email report
+                  </Button>
+                </div>
+              )}
             </motion.div>
           ))}
         </div>

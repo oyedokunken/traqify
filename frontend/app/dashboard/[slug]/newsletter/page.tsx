@@ -70,8 +70,8 @@ export default function NewsletterPage({ params }: { params: { slug: string } })
   );
 
   const exportCsv = () => {
-    const header = "Name,Email,Subscribed On\n";
-    const rows = subscribers.map((s) => `"${s.name || ""}","${s.email}","${fmt(s.createdAt)}"`).join("\n");
+    const header = "Name,Email,Subscribed On,Status\n";
+    const rows = subscribers.map((s) => `"${s.name || ""}","${s.email}","${fmt(s.createdAt)}","Active"`).join("\n");
     const bom = "\uFEFF";
     const blob = new Blob([bom + header + rows], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
