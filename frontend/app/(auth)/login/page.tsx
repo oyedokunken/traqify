@@ -31,16 +31,21 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [isGoogleHint, setIsGoogleHint] = useState(false);
+
+  const { register, handleSubmit, formState: { errors, isSubmitting }, setValue } = useForm<FormData>({
+    resolver: zodResolver(schema),
+  });
 
   useEffect(() => {
     const e = searchParams.get("error");
+    const hint = searchParams.get("hint");
+    const emailParam = searchParams.get("email");
     if (e === "oauth_failed") setError("Google sign-in failed. Please try again.");
     if (e === "email_account") setError("This email is registered with a password. Please sign in with your email and password instead.");
-  }, [searchParams]);
-
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
-    resolver: zodResolver(schema),
-  });
+    if (hint === "exists") setError("You already have an account with this email. Please sign in.");
+    if (emailParam) setValue("email", emailParam);
+  }, [searchParams, setValue]);
 
   const onSubmit = async (data: FormData) => {
     try {
@@ -51,11 +56,16 @@ function LoginForm() {
       if (!res.data.user.organizationId) {
         router.push("/create-organization");
       } else {
-        router.push(`/dashboard/${res.data.user.organization?.slug || ""}/overview`);
+        router.push(`/dashboard/${res.data.user.orgSlug || ""}/overview`);
       }
     } catch (err: any) {
       if (err.response?.data?.requiresVerification) {
         router.push(`/verify-email?email=${encodeURIComponent(data.email)}`);
+        return;
+      }
+      if (err.response?.data?.isGoogleAccount) {
+        setError("This email uses Google Sign-In. Please click \"Continue with Google\" below.");
+        setIsGoogleHint(true);
         return;
       }
       const msg = err.response?.data?.error || "Login failed. Please try again.";
@@ -131,7 +141,7 @@ function LoginForm() {
 
             <Button
               variant="outline"
-              className="w-full gap-3"
+              className={`w-full gap-3 transition-all ${isGoogleHint ? "ring-2 ring-[#DE1010] ring-offset-1" : ""}`}
               disabled={isGoogleLoading}
               onClick={() => {
                 setIsGoogleLoading(true);
@@ -150,7 +160,7 @@ function LoginForm() {
         </motion.div>
       </div>
 
-      <ErrorModal isOpen={!!error} onClose={() => setError("")} message={error} />
+      <ErrorModal isOpen={!!error} onClose={() => { setError(""); setIsGoogleHint(false); }} message={error} />
     </div>
   );
 }

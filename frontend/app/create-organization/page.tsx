@@ -38,8 +38,8 @@ export default function CreateOrganizationPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (user?.organizationId) {
-      router.push(`/dashboard/${user.organization?.slug || ""}/overview`);
+    if (user?.organizationId && user?.organization?.slug) {
+      router.push(`/dashboard/${user.organization.slug}/overview`);
     }
   }, [user, router]);
 

@@ -75,6 +75,32 @@ export const register = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
+export const checkEmail = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email } = req.body;
+    if (!email || typeof email !== "string") {
+      res.status(400).json({ error: "Email is required." });
+      return;
+    }
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: { organization: { select: { slug: true } } },
+    });
+    if (!user) {
+      res.json({ exists: false });
+      return;
+    }
+    res.json({
+      exists: true,
+      signInMethod: user.signInMethod || "EMAIL",
+      hasOrg: !!user.organizationId,
+      orgSlug: user.organization?.slug || null,
+    });
+  } catch {
+    res.status(500).json({ error: "Failed to check email." });
+  }
+};
+
 export const sendOTP = async (req: Request, res: Response): Promise<void> => {
   try {
     const { email } = req.body;
@@ -157,7 +183,10 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     }
 
     const { email, password } = parsed.data;
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: { organization: { select: { slug: true } } },
+    });
 
     if (!user) {
       res.status(401).json({ error: "Invalid email or password." });
@@ -213,6 +242,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         name: user.name,
         role: user.role,
         organizationId: user.organizationId,
+        orgSlug: user.organization?.slug || null,
         avatarUrl: user.avatarUrl,
         signInMethod: user.signInMethod || "EMAIL",
       },
@@ -282,7 +312,7 @@ export const googleCallback = async (req: Request, res: Response): Promise<void>
         },
         include: { organization: { select: { id: true, name: true, slug: true, logoUrl: true } } },
       }) as any;
-    } else if (user.password && !user.avatarUrl?.includes("google")) {
+    } else if (user.password && user.signInMethod !== "GOOGLE") {
       res.redirect(`${frontendUrl}/login?error=email_account`);
       return;
     } else {
