@@ -186,10 +186,15 @@ export const storeCheckout = async (req: Request, res: Response): Promise<void> 
     createAuditLog(orgOwner.id, org.id, "CREATE", "Order", order.id, `Store order ${orderNumber} placed by ${name} (${email}) - NGN ${totalAmount.toLocaleString()}`, req).catch(() => {});
 
     // Notify org owner by email
+    const emailItems = order.orderItems.map((i: { product: { name: string }; quantity: number; unitPrice: number; subtotal?: number }) => ({
+      name: i.product.name,
+      qty: i.quantity,
+      subtotal: i.subtotal ?? i.unitPrice * i.quantity,
+    }));
     sendEmail(
       orgOwner.email,
       `New store order received: ${org.name}`,
-      newOrderEmailTemplate(org.name, order.id, name, totalAmount, orderItemsData.length, `${process.env.FRONTEND_URL || "http://localhost:3000"}/dashboard/${org.slug}/orders`)
+      newOrderEmailTemplate(org.name, order.id, name, totalAmount, emailItems, `${process.env.FRONTEND_URL || "http://localhost:3000"}/dashboard/${org.slug}/orders`)
     ).catch((e) => console.error("[Email] Store order notification failed:", e.message));
 
     const itemsHtml = order.orderItems

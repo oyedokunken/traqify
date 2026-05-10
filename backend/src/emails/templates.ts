@@ -171,7 +171,7 @@ export const newOrderEmailTemplate = (
   orderId: string,
   customerName: string,
   totalAmount: number,
-  itemCount: number,
+  items: { name: string; qty: number; subtotal: number }[],
   dashboardUrl: string
 ): string =>
   wrapEmail(`
@@ -180,8 +180,21 @@ export const newOrderEmailTemplate = (
     <table style="width: 100%; background: #f4f4f5; border-radius: 8px; padding: 20px; margin: 24px 0; border-collapse: collapse;">
       <tr><td style="padding: 6px 0; font-size: 14px; color: #52525b;"><strong>Order ID:</strong></td><td style="padding: 6px 0; font-size: 14px; color: #0a0a0a;">#${orderId.slice(-8).toUpperCase()}</td></tr>
       <tr><td style="padding: 6px 0; font-size: 14px; color: #52525b;"><strong>Customer:</strong></td><td style="padding: 6px 0; font-size: 14px; color: #0a0a0a;">${customerName}</td></tr>
-      <tr><td style="padding: 6px 0; font-size: 14px; color: #52525b;"><strong>Items:</strong></td><td style="padding: 6px 0; font-size: 14px; color: #0a0a0a;">${itemCount}</td></tr>
+      <tr><td style="padding: 6px 0; font-size: 14px; color: #52525b;"><strong>Items:</strong></td><td style="padding: 6px 0; font-size: 14px; color: #0a0a0a;">${items.length}</td></tr>
       <tr><td style="padding: 6px 0; font-size: 14px; color: #52525b;"><strong>Total:</strong></td><td style="padding: 6px 0; font-size: 14px; color: #DE1010; font-weight: 700;">NGN ${totalAmount.toLocaleString()}</td></tr>
+    </table>
+    <p style="font-size: 14px; font-weight: 600; color: #0a0a0a; margin: 0 0 8px 0;">Products ordered</p>
+    <table style="width: 100%; border-collapse: collapse; margin: 0 0 24px 0; font-size: 14px;">
+      <thead>
+        <tr style="background: #f4f4f5;">
+          <th style="text-align: left; padding: 8px 12px; color: #52525b; font-size: 13px;">Product</th>
+          <th style="text-align: center; padding: 8px 12px; color: #52525b; font-size: 13px;">Qty</th>
+          <th style="text-align: right; padding: 8px 12px; color: #52525b; font-size: 13px;">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${items.map((i) => `<tr style="border-bottom: 1px solid #f4f4f5;"><td style="padding: 8px 12px; color: #0a0a0a;">${i.name}</td><td style="padding: 8px 12px; text-align: center; color: #52525b;">&times; ${i.qty}</td><td style="padding: 8px 12px; text-align: right; font-weight: 600; color: #0a0a0a;">NGN ${i.subtotal.toLocaleString()}</td></tr>`).join("")}
+      </tbody>
     </table>
     <a href="${dashboardUrl}" style="${buttonStyle}">View Order</a>
     <p style="${bodyStyle}">Log in to your dashboard to review, process, or update the order status.</p>

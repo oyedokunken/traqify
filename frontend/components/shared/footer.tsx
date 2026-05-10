@@ -3,8 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { motion, AnimatePresence } from "framer-motion";
 import { Logo } from "@/components/shared/logo";
-import { Twitter, Instagram, Linkedin, Github, ArrowRight, Mail } from "lucide-react";
+import { Twitter, Instagram, Linkedin, Github, ArrowRight, Mail, User, CheckCircle2, XCircle } from "lucide-react";
 import api from "@/lib/api";
 
 const socials = [
@@ -15,30 +16,32 @@ const socials = [
 ];
 
 export function Footer() {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [msg, setMsg] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [modal, setModal] = useState<{ open: boolean; type: "success" | "error"; msg: string }>({ open: false, type: "success", msg: "" });
 
   const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setMsg("Please enter a valid email address.");
-      setStatus("error");
+      setModal({ open: true, type: "error", msg: "Please enter a valid email address." });
       return;
     }
-    setStatus("loading");
+    setLoading(true);
     try {
-      await api.post("/api/newsletter/subscribe", { email });
-      setStatus("success");
-      setMsg("You are subscribed!");
+      await api.post("/api/newsletter/subscribe", { email, name: name.trim() || undefined });
+      setName("");
       setEmail("");
+      setModal({ open: true, type: "success", msg: "You are subscribed! Check your inbox for a confirmation." });
     } catch (err: any) {
-      setStatus("error");
-      setMsg(err.response?.data?.error || "Failed to subscribe. Try again.");
+      setModal({ open: true, type: "error", msg: err.response?.data?.error || "Failed to subscribe. Please try again." });
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
+    <>
     <footer className="bg-[#111111] text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-10">
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-6 lg:gap-10 mb-12">
@@ -96,6 +99,16 @@ export function Footer() {
             <h4 className="text-sm font-semibold mb-5 text-gray-200">Stay updated</h4>
             <p className="text-gray-400 text-xs mb-4 leading-relaxed">Get product updates and tips delivered to your inbox.</p>
             <form onSubmit={handleSubscribe} className="space-y-2">
+              <div className="relative">
+                <User size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                <input
+                  type="text"
+                  placeholder="Your name (optional)"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full pl-8 pr-3 py-2 text-xs bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#DE1010] transition-colors"
+                />
+              </div>
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <Mail size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
@@ -107,14 +120,11 @@ export function Footer() {
                     className="w-full pl-8 pr-3 py-2 text-xs bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#DE1010] transition-colors"
                   />
                 </div>
-                <button type="submit" disabled={status === "loading"}
+                <button type="submit" disabled={loading}
                   className="flex-shrink-0 w-9 h-9 bg-[#DE1010] hover:bg-[#c00d0d] rounded-lg flex items-center justify-center transition-colors disabled:opacity-50">
                   <ArrowRight size={14} />
                 </button>
               </div>
-              {msg && (
-                <p className={`text-xs ${status === "success" ? "text-green-400" : "text-red-400"}`}>{msg}</p>
-              )}
             </form>
           </div>
         </div>
@@ -140,5 +150,32 @@ export function Footer() {
         </div>
       </div>
     </footer>
+
+    <AnimatePresence>
+      {modal.open && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4"
+          onClick={() => setModal((m) => ({ ...m, open: false }))}>
+          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+            className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl"
+            onClick={(e) => e.stopPropagation()}>
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4 ${modal.type === "success" ? "bg-green-100" : "bg-red-50"}`}>
+              {modal.type === "success"
+                ? <CheckCircle2 size={24} className="text-green-600" />
+                : <XCircle size={24} className="text-[#DE1010]" />}
+            </div>
+            <h3 className="font-bold text-[#0a0a0a] text-center text-base mb-2">
+              {modal.type === "success" ? "Subscribed!" : "Subscription failed"}
+            </h3>
+            <p className="text-sm text-gray-500 text-center mb-5">{modal.msg}</p>
+            <button onClick={() => setModal((m) => ({ ...m, open: false }))}
+              className={`w-full py-2.5 rounded-xl text-sm font-medium transition-colors ${modal.type === "success" ? "bg-[#0a0a0a] text-white hover:bg-black/80" : "bg-[#DE1010] text-white hover:bg-red-700"}`}>
+              Got it
+            </button>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+    </>
   );
 }

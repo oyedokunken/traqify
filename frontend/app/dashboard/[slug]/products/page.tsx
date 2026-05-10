@@ -139,7 +139,7 @@ export default function ProductsPage({ params }: { params: { slug: string } }) {
               <Button className="mt-4 gap-2" onClick={() => {
                 if (!categoriesLoaded) return;
                 if (categories.length === 0) { setShowNoCatModal(true); return; }
-                setEditProduct(null); setShowModal(true);
+                router.push(`/dashboard/${params.slug}/products/new`);
               }}>
                 <Plus size={15} /> Add product
               </Button>
