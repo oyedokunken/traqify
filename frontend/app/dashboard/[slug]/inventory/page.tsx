@@ -141,7 +141,7 @@ export default function InventoryPage({ params }: { params: { slug: string } }) 
                       <td className="px-5 py-3.5 text-sm font-medium text-[#0a0a0a]">{item.product.name}</td>
                       <td className="px-5 py-3.5 text-sm text-gray-500 hidden md:table-cell">{item.product.sku}</td>
                       <td className="px-5 py-3.5 hidden md:table-cell">
-                        {item.product.productCategory?.name ? <Badge variant="outline" className="text-xs">{item.product.productCategory.name}</Badge> : <span className="text-xs text-gray-400">—</span>}
+                        {item.product.productCategory?.name ? <Badge variant="outline" className="text-xs">{item.product.productCategory.name}</Badge> : <span className="text-xs text-gray-400">-</span>}
                       </td>
                       <td className="px-5 py-3.5">
                         {isEditing ? (

@@ -150,7 +150,7 @@ export default function CustomersPage({ params }: { params: { slug: string } }) 
                       </div>
                     </td>
                     <td className="px-5 py-3.5 hidden md:table-cell">
-                      <p className="text-sm text-gray-600">{c.email || "—"}</p>
+                      <p className="text-sm text-gray-600">{c.email || "-"}</p>
                       <p className="text-xs text-gray-400">{c.phone || ""}</p>
                     </td>
                     <td className="px-5 py-3.5 hidden sm:table-cell">

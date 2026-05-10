@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, BookOpen, CheckSquare, Square, Eye, EyeOff, Filter, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { Search, BookOpen, CheckSquare, Square, Eye, EyeOff, Filter, ChevronLeft, ChevronRight, X, CheckCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Topbar } from "@/components/dashboard/topbar";
@@ -41,6 +42,7 @@ const LIMIT = 20;
 
 export default function AuditLogsPage({ params }: { params: { slug: string } }) {
   const { user } = useAuth();
+  const router = useRouter();
   const { blocked } = useRoleGuard(["OWNER", "AUDITOR"], `/dashboard/${params.slug}/overview`);
   const isManager = user?.role === "OWNER" || user?.role === "MANAGER";
 
@@ -61,6 +63,7 @@ export default function AuditLogsPage({ params }: { params: { slug: string } }) 
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [marking, setMarking] = useState(false);
+  const [successMsg, setSuccessMsg] = useState("");
 
   const fetchLogs = useCallback(() => {
     setLoading(true);
@@ -113,12 +116,14 @@ export default function AuditLogsPage({ params }: { params: { slug: string } }) 
 
   const markSelected = async (isRead: boolean) => {
     if (!selected.size) return;
+    const count = selected.size;
     setMarking(true);
     try {
       const r = await api.patch("/api/audit-logs/mark-read", { ids: Array.from(selected), isRead });
       setUnreadCount(r.data.unreadCount ?? 0);
       setLogs((prev) => prev.map((l) => selected.has(l.id) ? { ...l, isRead } : l));
       setSelected(new Set());
+      setSuccessMsg(`${count} notification${count !== 1 ? "s" : ""} marked ${isRead ? "read" : "unread"}.`);
     } catch { setError("Failed to update read status."); }
     finally { setMarking(false); }
   };
@@ -127,9 +132,11 @@ export default function AuditLogsPage({ params }: { params: { slug: string } }) 
     setMarking(true);
     try {
       const r = await api.patch("/api/audit-logs/mark-read", { all: true, isRead });
+      const count = r.data.count ?? logs.length;
       setUnreadCount(r.data.unreadCount ?? 0);
       setLogs((prev) => prev.map((l) => ({ ...l, isRead })));
       setSelected(new Set());
+      setSuccessMsg(`${count} notification${count !== 1 ? "s" : ""} marked ${isRead ? "read" : "unread"}.`);
     } catch { setError("Failed to update read status."); }
     finally { setMarking(false); }
   };
@@ -291,8 +298,8 @@ export default function AuditLogsPage({ params }: { params: { slug: string } }) 
               <tbody className="divide-y divide-gray-50">
                 {filtered.map((log) => (
                   <tr key={log.id}
-                    onClick={() => isManager && toggleOne(log.id)}
-                    className={`transition-colors ${isManager ? "cursor-pointer" : ""} ${selected.has(log.id) ? "bg-red-50" : log.isRead ? "hover:bg-gray-50" : "bg-blue-50/30 hover:bg-blue-50/50"}`}>
+                    onClick={() => router.push(`/dashboard/${params.slug}/audit-logs/${log.id}`)}
+                    className={`cursor-pointer transition-colors ${selected.has(log.id) ? "bg-red-50" : log.isRead ? "hover:bg-gray-50" : "bg-blue-50/30 hover:bg-blue-50/50"}`}>
                     {isManager && (
                       <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
                         <button onClick={() => toggleOne(log.id)} className="text-gray-400 hover:text-[#DE1010]">
@@ -363,6 +370,29 @@ export default function AuditLogsPage({ params }: { params: { slug: string } }) 
         )}
       </motion.div>
       <ErrorModal isOpen={!!error} onClose={() => setError("")} message={error} />
+
+      {/* Success modal for mark read/unread */}
+      <AnimatePresence>
+        {successMsg && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4"
+            onClick={() => setSuccessMsg("")}>
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
+              className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl text-center"
+              onClick={(e) => e.stopPropagation()}>
+              <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-4">
+                <CheckCircle size={24} className="text-green-600" />
+              </div>
+              <h3 className="font-bold text-[#0a0a0a] mb-1">Done</h3>
+              <p className="text-gray-500 text-sm mb-5">{successMsg}</p>
+              <button onClick={() => setSuccessMsg("")}
+                className="w-full py-2.5 bg-[#0a0a0a] text-white rounded-xl text-sm font-medium hover:bg-black/80 transition-colors">
+                OK
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

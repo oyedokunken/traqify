@@ -5,12 +5,35 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.10.0] - 2026-05-10
+
+### Added
+- **Profile: phone + role fields**: Settings > Profile tab now shows four fields in a 2x2 grid (Name, Role, Email, Phone); role is an immutable display field; phone is editable and saved to the database via `PATCH /api/auth/me`; form resets when user data loads
+- **Payments report PDF**: `payments` report type added to report controller; PDF table includes reference, method, amount, status, order, notes, date columns; empty-range guard returns 400 with clear message
+- **Payments feature card**: "Payment Tracking" card added to landing page features grid
+- **Audit log row navigation**: clicking any row on the audit-logs page navigates to `/dashboard/[slug]/audit-logs/[id]` detail page; checkbox cell stops propagation so selection still works independently
+- **Audit log success modal**: marking notifications read/unread (bulk or all) now shows a confirmation modal: "[N] notifications marked read/unread"
+
+### Changed
+- **Report tagline**: PDF header tagline changed from "Business Management Platform" to "Enterprise Store Management System"
+- **Email footer tagline**: changed from "Traqify - Store Management Platform" to "Traqify - an enterprise store management system"
+- **Empty report guard**: `downloadReport` and `emailReport` now return HTTP 400 with descriptive message if no rows match the selected date range (instead of generating a blank PDF)
+- **Notification bell dropdown**: limited to 3 recent notifications (was 6); each notification is now a single compact line: `ACTION · User · 04:16 PM`
+- **Overview header layout**: "Open Storefront" button and live clock are now displayed inline on both desktop and mobile; button uses `whitespace-nowrap flex-shrink-0` to prevent wrapping
+- **`AuthUser` interface**: `phone?: string | null` field added
+
+### Fixed
+- **Em dashes removed**: all literal em dash characters (`\u2014`) removed from `CHANGELOG.md`, `WIKI.md`, and every source file (`store/page.tsx`, `email.ts`, `payments/page.tsx`, `audit-logs/[id]/page.tsx`, `sidebar.tsx`, `inventory/page.tsx`, `customers/page.tsx`, `products/new/page.tsx`, `store/[slug]/page.tsx`, `features.tsx`)
+- **Prisma client regenerated**: `npx prisma generate` run after `Payment` model was confirmed in schema; `prisma.payment` TS error resolved
+
+---
+
 ## [1.9.0] - 2026-05-10
 
 ### Added
 - **Payments module**: New `Payment` Prisma model (`PaymentStatus`: PENDING/COMPLETED/FAILED/REFUNDED) with `amount`, `currency`, `method`, `reference`, `notes`, `orderId` FK; backend controller (`getPayments`, `getPaymentById`, `createPayment`, `updatePayment`) at `GET/POST/PATCH /api/payments`; frontend `/dashboard/[slug]/payments` page with 4 summary cards (total, completed, pending, failed+refunded), search/filter, paginated table with clickable detail modal and inline status updates
 - **Payments report**: "Payments Report" card added to `/dashboard/[slug]/reports` page (PDF download + email)
-- **Single audit log detail page**: `/dashboard/[slug]/audit-logs/[id]` — shows action, entity, details, performed-by card with user avatar/role, timestamp, log ID, network info (IP, user agent); auto-marks log as read on open; `GET /api/audit-logs/:id` backend endpoint added
+- **Single audit log detail page**: `/dashboard/[slug]/audit-logs/[id]`  -  shows action, entity, details, performed-by card with user avatar/role, timestamp, log ID, network info (IP, user agent); auto-marks log as read on open; `GET /api/audit-logs/:id` backend endpoint added
 - **Notification bell dropdown**: topbar bell now opens a dropdown with the 6 most recent audit logs; unread logs highlighted in red; persistent unread count badge using real `GET /api/audit-logs/unread-count` API (polls every 30 s); "Mark all read" button; "View all notifications" link to audit-logs page; each notification clickable to its single detail page; bell hidden for CASHIER role
 - **Inventory filters**: category dropdown and stock-status filter (In Stock / Low Stock / Out of Stock) with "Clear filters" button added to inventory page
 - **Store publish validation**: clicking "Publish store" now checks logo, description, business email, published products, and categories; shows an explicit numbered error modal listing every missing item before proceeding
@@ -23,7 +46,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Overview welcome modal**: guarded by `user?.organizationId` dependency so new users see the first-time modal (not the "welcome back" modal) on their very first visit
 - **Overview layout**: "Open Storefront" button now renders above the live clock instead of beside it
 - **Products page**: initial load errors are silently swallowed (empty state shown instead of error modal) since 0 products is a valid state
-- **Sidebar nav order**: enterprise-logical ordering — Overview → Orders → Products → Inventory → Categories → Payments → Customers → Staff → Storefront → Logistics → Newsletter → Reviews → Reports → Audit Logs → Settings
+- **Sidebar nav order**: enterprise-logical ordering  -  Overview → Orders → Products → Inventory → Categories → Payments → Customers → Staff → Storefront → Logistics → Newsletter → Reviews → Reports → Audit Logs → Settings
 - **Sidebar Audit Logs**: MANAGER added to allowed roles (consistent with `isAtLeastAuditor` API middleware)
 
 ### Fixed
@@ -42,16 +65,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Comprehensive audit logging**: added `createAuditLog` calls to `emailReport` (report controller) and store publish/unpublish toggle (org controller); `changePassword` already had it
 
 ### Changed
-- **Register step 2 → step 3 flow fixed**: after account creation the JWT is stored in React state (not `localStorage`) and used to call `POST /api/organizations`; after org creation the app re-logs in to issue a fresh JWT that includes `organizationId`, then redirects directly to `/dashboard/[slug]/overview` — no manual login required
+- **Register step 2 → step 3 flow fixed**: after account creation the JWT is stored in React state (not `localStorage`) and used to call `POST /api/organizations`; after org creation the app re-logs in to issue a fresh JWT that includes `organizationId`, then redirects directly to `/dashboard/[slug]/overview`  -  no manual login required
 - **`verifyEmail` endpoint**: handles the case where the user does not exist yet (new OTP-first flow) by validating OTP and returning success without attempting a user update
 - **`verify-email` page redirect**: shows "Redirecting you to complete setup…" when `returnTo=register`; redirects to `/register?verifiedEmail=...` after verification
-- **Product image display**: product cards on the dashboard products page and public store product detail modal changed from `object-contain` with padding to `object-cover` — full image visible without top/bottom cropping
+- **Product image display**: product cards on the dashboard products page and public store product detail modal changed from `object-contain` with padding to `object-cover`  -  full image visible without top/bottom cropping
 - **Org logo storage**: logo uploads go directly to the Supabase `avatars` bucket via `POST /api/organizations/:slug/upload-logo`; local `backend/uploads/` folder removed
 - **Backend README**: expanded key routes table with all new auth, review, newsletter, and audit-log endpoints; added Google OAuth and Supabase env vars
 - **Frontend README**: updated project structure with OTP-first register note, unread badge on audit logs, and Google-disabled password change
 
 ### Fixed
-- **`sendOTP` 404 on register**: endpoint previously returned 404 if the email had no account — now sends OTP to any email address, looked up only for a personalised greeting
+- **`sendOTP` 404 on register**: endpoint previously returned 404 if the email had no account  -  now sends OTP to any email address, looked up only for a personalised greeting
 - **Register skipping org creation**: `handleStep2` was writing tokens to `localStorage` and calling `router.push("/")` immediately, bypassing step 3; now correctly advances to step 3
 - **JWT missing `organizationId` after org creation**: `createOrganization` doesn't reissue a token, so after step 3 the app calls `POST /api/auth/login` to get a fresh token that includes the new org ID before redirecting to the dashboard
 
@@ -60,8 +83,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [1.6.0] - 2026-05-08
 
 ### Added
-- **Product reviews**: end-to-end review system — `Review` Prisma model with `ReviewStatus` (PENDING/APPROVED/REJECTED), unique constraint on `[orderId, productId]`; backend controller (`submitReview`, `getProductReviews`, `getDashboardReviews`, `moderateReview`, `deleteReview`) and routes at `/api/reviews`
-- **Reviews dashboard page**: `/dashboard/[slug]/reviews` — tabbed PENDING/APPROVED/REJECTED views, search, approve/reject/delete actions; OWNER/MANAGER only
+- **Product reviews**: end-to-end review system  -  `Review` Prisma model with `ReviewStatus` (PENDING/APPROVED/REJECTED), unique constraint on `[orderId, productId]`; backend controller (`submitReview`, `getProductReviews`, `getDashboardReviews`, `moderateReview`, `deleteReview`) and routes at `/api/reviews`
+- **Reviews dashboard page**: `/dashboard/[slug]/reviews`  -  tabbed PENDING/APPROVED/REJECTED views, search, approve/reject/delete actions; OWNER/MANAGER only
 - **Review submission on order success**: checkout success screen now prompts customers to rate each purchased product with a 1–5 star widget and optional comment; review submitted to `/api/reviews`
 - **Public product detail reviews**: approved reviews shown in a grid below upsells on `/store/[slug]/products/[id]`
 - **Review count on product cards**: amber star pill with review count shown on dashboard products page and public store product grid (only when count > 0)
@@ -89,14 +112,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [1.4.0] - 2026-05-08
 
 ### Added
-- **Newsletter dashboard**: `/dashboard/[slug]/newsletter` — subscriber stats (total / last 7 days / this month), searchable table, status badge, CSV export, live refresh; OWNER/MANAGER only
-- **Admin new-order notification email**: `newOrderEmailTemplate` sent to org OWNER on every new order placed — both from dashboard (`POST /api/orders`) and public store checkout
+- **Newsletter dashboard**: `/dashboard/[slug]/newsletter`  -  subscriber stats (total / last 7 days / this month), searchable table, status badge, CSV export, live refresh; OWNER/MANAGER only
+- **Admin new-order notification email**: `newOrderEmailTemplate` sent to org OWNER on every new order placed  -  both from dashboard (`POST /api/orders`) and public store checkout
 - **Overview: Open Storefront button**: button in the overview header links to the public store; if store is unpublished, shows an error modal with a link to the Storefront settings page
-- **Overview: chart period filter**: toggle between 7 / 30 / 90-day windows for all three charts (revenue, orders, customer growth) — updates chart titles dynamically
+- **Overview: chart period filter**: toggle between 7 / 30 / 90-day windows for all three charts (revenue, orders, customer growth)  -  updates chart titles dynamically
 - **Products: type filter**: "All types" dropdown on the products page filters by SIMPLE / DOWNLOADABLE / VARIABLE; backed by new `productType` query param on `GET /api/products`
 - **Products: type pill**: product cards now show a coloured badge for product type (secondary / info / warning)
 - **Store description field**: `description String?` column added to the `Organization` Prisma model; editable in Settings > Organization tab (textarea, max 500 chars); rendered below store name in the public store info banner
-- **Store sort bar**: sort dropdown above products grid on the public store (`/store/[slug]`) — Newest, Oldest, Price low→high, Price high→low, Name A–Z; client-side sort with page reset
+- **Store sort bar**: sort dropdown above products grid on the public store (`/store/[slug]`)  -  Newest, Oldest, Price low→high, Price high→low, Name A–Z; client-side sort with page reset
 - **Backend `oldest` sort**: `getStoreProducts` handles `sort=oldest` (`createdAt asc`)
 - **RBAC hardening**: `removeStaff` and `resetStaffPassword` backend functions now return `403` if the target user has the OWNER role
 
@@ -107,7 +130,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Sidebar**: "Store" label renamed to "Storefront"; "Newsletter" nav item added (OWNER/MANAGER only)
 
 ### Fixed
-- **Invite accept redirect**: was using `res.data.user.organization?.slug` (always `undefined`) — now correctly uses `res.data.orgSlug` returned by the `acceptInvite` endpoint
+- **Invite accept redirect**: was using `res.data.user.organization?.slug` (always `undefined`)  -  now correctly uses `res.data.orgSlug` returned by the `acceptInvite` endpoint
 - **`initialStock` / `lowStockAlert` validation**: inputs on `/products/new` were registered without `valueAsNumber: true`; Zod received a string, failed `z.number()` validation, and blocked form submission
 - **`updateOrgSchema` missing fields**: `industry` and `size` were in `createOrganizationSchema` but absent from `updateOrgSchema`, silently dropping those fields on every settings save
 - **Logistics order count**: count query was not filtering by APPROVED status, showing incorrect totals
@@ -121,7 +144,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 - **Audit log completeness**: LOGIN event on successful email/password sign-in; CREATE/Order event on store checkout; EXPORT/Report on PDF download and email; detailed store publish/unpublish log message
 - **Audit log frontend**: `describeLog()` entity map extended with `ProductCategory` and `StaffInvite`; `actionVariant` map covers LOGIN, LOGOUT, EXPORT, INVITE badge colours
-- **Order status emails**: `orderApprovedEmailTemplate` and `orderCompletedEmailTemplate` — sent to customer on status change (non-blocking)
+- **Order status emails**: `orderApprovedEmailTemplate` and `orderCompletedEmailTemplate`  -  sent to customer on status change (non-blocking)
 - **Low-stock email alert**: sent to org OWNER when inventory stock ≤ `lowStockAlert` threshold on update
 - **Customer chart API**: `GET /api/reports/customer-chart?period=` returns cumulative daily customer registration data
 - **Variable product attributes UI**: `/products/new` attribute builder (name + comma-separated values) generates `ProductVariant` rows on save
@@ -136,7 +159,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Individual product main image**: `aspect-[4/5]` + `object-contain p-2` (portrait images no longer cropped at top/bottom)
 - **Inventory API**: `getInventory` now includes `productCategory: { name: true }` relation
 - **Frontend inventory page**: renders `product.productCategory?.name` as badge
-- **`backend/.env.example`**: fully rewritten — clean section headers, precise comments linking to source dashboards, no duplicate entries
+- **`backend/.env.example`**: fully rewritten  -  clean section headers, precise comments linking to source dashboards, no duplicate entries
 - **`frontend/.env.local.example`**: new file with all four required `NEXT_PUBLIC_*` variables documented
 
 ### Fixed

@@ -78,7 +78,7 @@ export function Sidebar({ slug, collapsed, onCollapse }: SidebarProps) {
       {/* react-tooltip portal */}
       <Tooltip id="sidebar-tip" place="right" className="!text-xs !py-1.5 !px-2.5 !rounded-lg !bg-[#1a1a1a] !border !border-white/10 z-[100]" />
 
-      {/* Desktop sidebar — hidden on mobile */}
+      {/* Desktop sidebar  -  hidden on mobile */}
       <aside
         className={cn(
           "hidden md:flex h-screen bg-[#0a0a0a] text-white flex-col flex-shrink-0 overflow-hidden transition-all duration-200",

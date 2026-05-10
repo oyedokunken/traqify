@@ -207,7 +207,7 @@ export default function NewProductPage({ params }: { params: { slug: string } })
                 <div>
                   <Label>Description <span className="text-[#DE1010]">*</span></Label>
                   <textarea className="mt-1.5 flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
-                    placeholder="Describe the product in detail — materials, dimensions, usage, etc."
+                    placeholder="Describe the product in detail - materials, dimensions, usage, etc."
                     {...register("description", { required: "Description is required." })} />
                   {errors.description && <p className="text-xs text-[#DE1010] mt-1">{errors.description.message as string}</p>}
                 </div>

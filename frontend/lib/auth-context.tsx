@@ -11,6 +11,7 @@ export interface AuthUser {
   role: "OWNER" | "MANAGER" | "CASHIER" | "AUDITOR";
   organizationId: string | null;
   avatarUrl: string | null;
+  phone?: string | null;
   signInMethod?: "EMAIL" | "GOOGLE";
   organization?: {
     id: string;

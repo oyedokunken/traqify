@@ -34,14 +34,14 @@ Traqify is a full-stack multi-tenant SaaS application.
 ## Authentication
 
 ### Email / Password (OTP-first flow)
-1. **Step 1 — Email**: Enter email address; `POST /api/auth/send-otp` sends a 6-digit code (works even before an account exists)
-2. **Step 2 — Verify**: Enter OTP on `/verify-email`; backend validates code and returns success; redirects to `/register?verifiedEmail=...`
-3. **Step 3 — Account details**: Enter full name and password; `POST /api/auth/register` creates user with `emailVerified: true` and returns a JWT (stored in React state only)
-4. **Step 4 — Org setup**: Enter org name, address, phone, industry; `POST /api/organizations` creates the org using the step-3 JWT; app then calls `POST /api/auth/login` to issue a fresh JWT that includes `organizationId`; redirects to `/dashboard/[slug]/overview`
+1. **Step 1  -  Email**: Enter email address; `POST /api/auth/send-otp` sends a 6-digit code (works even before an account exists)
+2. **Step 2  -  Verify**: Enter OTP on `/verify-email`; backend validates code and returns success; redirects to `/register?verifiedEmail=...`
+3. **Step 3  -  Account details**: Enter full name and password; `POST /api/auth/register` creates user with `emailVerified: true` and returns a JWT (stored in React state only)
+4. **Step 4  -  Org setup**: Enter org name, address, phone, industry; `POST /api/organizations` creates the org using the step-3 JWT; app then calls `POST /api/auth/login` to issue a fresh JWT that includes `organizationId`; redirects to `/dashboard/[slug]/overview`
 5. Token refresh happens automatically via Axios interceptor on 401
 
 ### Google OAuth
-1. Click "Continue with Google" — redirects to `GET /api/auth/google-redirect`
+1. Click "Continue with Google"  -  redirects to `GET /api/auth/google-redirect`
 2. Backend redirects to Google consent screen
 3. Google redirects to `GET /api/auth/google-callback?code=...`
 4. Backend exchanges code for user info, upserts user, returns tokens
@@ -183,16 +183,16 @@ When a new order is created (from the dashboard or the public store), the org OW
 The Payments module tracks all financial transactions for an organization.
 
 ### Payment Statuses
-- **PENDING** — payment recorded but not yet confirmed
-- **COMPLETED** — payment successfully received
-- **FAILED** — transaction unsuccessful
-- **REFUNDED** — payment reversed
+- **PENDING**  -  payment recorded but not yet confirmed
+- **COMPLETED**  -  payment successfully received
+- **FAILED**  -  transaction unsuccessful
+- **REFUNDED**  -  payment reversed
 
 ### Dashboard (`/dashboard/[slug]/payments`)
-- **Summary cards** — total amount, completed, pending, failed+refunded counts and amounts
-- **Search** — filter by reference, method, or notes
-- **Status filter** — All / Pending / Completed / Failed / Refunded
-- **Detail modal** — click any row to see full payment info; OWNER/MANAGER can mark Pending payments as Completed or Failed inline
+- **Summary cards**  -  total amount, completed, pending, failed+refunded counts and amounts
+- **Search**  -  filter by reference, method, or notes
+- **Status filter**  -  All / Pending / Completed / Failed / Refunded
+- **Detail modal**  -  click any row to see full payment info; OWNER/MANAGER can mark Pending payments as Completed or Failed inline
 
 ### API Endpoints
 | Method | Path | Access |
@@ -262,14 +262,14 @@ A welcome email is sent to the subscriber automatically.
 6. Only **APPROVED** reviews are shown publicly
 
 ### Backend
-- `POST /api/reviews` — public endpoint, requires a COMPLETED order and the product must be in that order; one review per (orderId, productId) pair
-- `GET /api/reviews/product/:id` — public, returns APPROVED reviews for a product
-- `GET /api/reviews` — authenticated (OWNER/MANAGER), paginated with optional `status` filter
-- `PATCH /api/reviews/:id/moderate` — body `{ action: "approve" | "reject" }`
-- `DELETE /api/reviews/:id` — permanently removes a review
+- `POST /api/reviews`  -  public endpoint, requires a COMPLETED order and the product must be in that order; one review per (orderId, productId) pair
+- `GET /api/reviews/product/:id`  -  public, returns APPROVED reviews for a product
+- `GET /api/reviews`  -  authenticated (OWNER/MANAGER), paginated with optional `status` filter
+- `PATCH /api/reviews/:id/moderate`  -  body `{ action: "approve" | "reject" }`
+- `DELETE /api/reviews/:id`  -  permanently removes a review
 
 ### Dashboard Reviews page
-Located at `/dashboard/[slug]/reviews` — tabs for PENDING / APPROVED / REJECTED.
+Located at `/dashboard/[slug]/reviews`  -  tabs for PENDING / APPROVED / REJECTED.
 Actions: **Approve**, **Reject**, **Delete**. Search by customer name, product name, or comment text.
 
 ### Review counts on product cards

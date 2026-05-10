@@ -89,7 +89,7 @@ export function Topbar({ title, slug }: TopbarProps) {
     if (!canSeeNotifications) return;
     setShowBell((v) => !v);
     if (!showBell) {
-      api.get("/api/audit-logs?page=1&limit=6").then((r) => setRecentLogs(r.data.logs || [])).catch(() => {});
+      api.get("/api/audit-logs?page=1&limit=3").then((r) => setRecentLogs(r.data.logs || [])).catch(() => {});
     }
   };
 
@@ -231,17 +231,15 @@ export function Topbar({ title, slug }: TopbarProps) {
                         {recentLogs.map((log) => (
                           <Link key={log.id} href={`/dashboard/${slug}/audit-logs/${log.id}`}
                             onClick={() => { setShowBell(false); fetchUnread(); }}
-                            className={`flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors ${!log.isRead ? "bg-red-50/40" : ""}`}>
-                            <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${!log.isRead ? "bg-[#DE1010]" : "bg-gray-200"}`} />
-                            <div className="min-w-0 flex-1">
-                              <p className="text-xs font-medium text-[#0a0a0a] truncate">
-                                {log.action} · {log.entity}
-                              </p>
-                              {log.details && <p className="text-[11px] text-gray-500 truncate mt-0.5">{log.details}</p>}
-                              <p className="text-[10px] text-gray-400 mt-0.5">
-                                {log.user?.name || log.user?.email || "System"} · {new Date(log.createdAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })}
-                              </p>
-                            </div>
+                            className={`flex items-center gap-2.5 px-4 py-2.5 hover:bg-gray-50 transition-colors ${!log.isRead ? "bg-red-50/40" : ""}`}>
+                            <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${!log.isRead ? "bg-[#DE1010]" : "bg-gray-200"}`} />
+                            <p className="text-[11px] text-[#0a0a0a] truncate flex-1">
+                              <span className="font-semibold">{log.action}</span>
+                              <span className="text-gray-400"> · </span>
+                              <span className="text-gray-600">{log.user?.name?.split(" ")[0] || log.user?.email?.split("@")[0] || "System"}</span>
+                              <span className="text-gray-400"> · </span>
+                              <span className="text-gray-400">{new Date(log.createdAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })}</span>
+                            </p>
                           </Link>
                         ))}
                       </div>

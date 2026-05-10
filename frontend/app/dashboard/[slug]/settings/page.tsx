@@ -29,9 +29,14 @@ export default function SettingsPage({ params }: { params: { slug: string } }) {
   const [orgData, setOrgData] = useState<any>(null);
 
   const [avatarUploading, setAvatarUploading] = useState(false);
-  const profileForm = useForm({ defaultValues: { name: user?.name || "", email: user?.email || "" } });
+  const profileForm = useForm({ defaultValues: { name: user?.name || "", phone: user?.phone || "" } });
   const pwForm = useForm<{ currentPassword: string; newPassword: string; confirmPassword: string }>();
   const orgForm = useForm({ defaultValues: { phone: "", address: "", website: "", industry: "", size: "", description: "" } });
+
+  // Sync profile form when user data loads
+  useEffect(() => {
+    if (user) profileForm.reset({ name: user.name || "", phone: user.phone || "" });
+  }, [user?.id]);
 
   // Fetch org details once
   useEffect(() => {
@@ -59,7 +64,7 @@ export default function SettingsPage({ params }: { params: { slug: string } }) {
   };
 
   const onSaveProfile = async (data: any) => {
-    try { await api.patch("/api/auth/me", { name: data.name }); await refreshUser(); flash("success", "Profile updated successfully."); }
+    try { await api.patch("/api/auth/me", { name: data.name, phone: data.phone || undefined }); await refreshUser(); flash("success", "Profile updated successfully."); }
     catch (err: any) { flash("error", err.response?.data?.error || "Failed to update profile."); }
   };
 
@@ -142,6 +147,14 @@ export default function SettingsPage({ params }: { params: { slug: string } }) {
                     <Input className="mt-1.5" {...profileForm.register("name")} />
                   </div>
                   <div>
+                    <Label>Role</Label>
+                    <div className="mt-1.5 flex h-10 w-full items-center rounded-md border border-input bg-gray-50 px-3 text-sm text-gray-500 cursor-not-allowed select-none">
+                      {user?.role || "CASHIER"}
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
                     <Label>Email address</Label>
                     <div className="relative mt-1.5">
                       <Input type="email" value={user?.email || ""} disabled className="pr-28" />
@@ -149,6 +162,10 @@ export default function SettingsPage({ params }: { params: { slug: string } }) {
                         <ShieldCheck size={11} /> Verified
                       </span>
                     </div>
+                  </div>
+                  <div>
+                    <Label>Phone number</Label>
+                    <Input className="mt-1.5" type="tel" placeholder="+234 800 000 0000" {...profileForm.register("phone")} />
                   </div>
                 </div>
                 <Button type="submit" size="sm" className="gap-2 mt-2" disabled={profileForm.formState.isSubmitting}>
