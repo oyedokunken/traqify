@@ -5,6 +5,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.7.0] - 2026-05-10
+
+### Added
+- **OTP-first registration flow**: Step 1 now asks for email only and immediately sends a verification code before any personal or org details are collected; `POST /api/auth/send-otp` no longer requires the user to exist in the database
+- **Google auth indicator in Settings**: Security tab shows Google SVG logo and "Signed in with Google" when `signInMethod === "GOOGLE"`; password change form is hidden for Google accounts with a note to manage via Google Account settings
+- **`signInMethod` in login response**: `POST /api/auth/login` now returns `signInMethod` in the user payload so the frontend can correctly detect auth method on every login
+- **Low stock email notifications**: inventory controller triggers `lowStockAlert` email template to org OWNER when stock update falls at or below the low-stock threshold; creates audit log entry
+- **Comprehensive audit logging**: added `createAuditLog` calls to `emailReport` (report controller) and store publish/unpublish toggle (org controller); `changePassword` already had it
+
+### Changed
+- **Register step 2 → step 3 flow fixed**: after account creation the JWT is stored in React state (not `localStorage`) and used to call `POST /api/organizations`; after org creation the app re-logs in to issue a fresh JWT that includes `organizationId`, then redirects directly to `/dashboard/[slug]/overview` — no manual login required
+- **`verifyEmail` endpoint**: handles the case where the user does not exist yet (new OTP-first flow) by validating OTP and returning success without attempting a user update
+- **`verify-email` page redirect**: shows "Redirecting you to complete setup…" when `returnTo=register`; redirects to `/register?verifiedEmail=...` after verification
+- **Product image display**: product cards on the dashboard products page and public store product detail modal changed from `object-contain` with padding to `object-cover` — full image visible without top/bottom cropping
+- **Org logo storage**: logo uploads go directly to the Supabase `avatars` bucket via `POST /api/organizations/:slug/upload-logo`; local `backend/uploads/` folder removed
+- **Backend README**: expanded key routes table with all new auth, review, newsletter, and audit-log endpoints; added Google OAuth and Supabase env vars
+- **Frontend README**: updated project structure with OTP-first register note, unread badge on audit logs, and Google-disabled password change
+
+### Fixed
+- **`sendOTP` 404 on register**: endpoint previously returned 404 if the email had no account — now sends OTP to any email address, looked up only for a personalised greeting
+- **Register skipping org creation**: `handleStep2` was writing tokens to `localStorage` and calling `router.push("/")` immediately, bypassing step 3; now correctly advances to step 3
+- **JWT missing `organizationId` after org creation**: `createOrganization` doesn't reissue a token, so after step 3 the app calls `POST /api/auth/login` to get a fresh token that includes the new org ID before redirecting to the dashboard
+
+---
+
 ## [1.6.0] - 2026-05-08
 
 ### Added

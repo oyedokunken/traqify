@@ -91,6 +91,7 @@ export const updateOrganization = async (req: AuthRequest, res: Response): Promi
     });
 
     if (parsed.data.storePublished !== undefined && parsed.data.storePublished !== wasPublished) {
+      await createAuditLog(req.user!.id, org.id, "UPDATE", "Organization", org.id, `Store ${parsed.data.storePublished ? "published" : "taken offline"}`, req).catch(() => {});
       const owner = await prisma.user.findFirst({ where: { organizationId: org.id, role: "OWNER" } });
       if (owner) {
         const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";

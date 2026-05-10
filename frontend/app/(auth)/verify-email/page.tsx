@@ -17,6 +17,7 @@ function VerifyEmailForm() {
   const { setUser } = useAuth();
 
   const email = params.get("email") || "";
+  const returnTo = params.get("returnTo") || "";
   const orgName = params.get("orgName") || "";
   const orgEmail = params.get("orgEmail") || "";
   const orgPhone = params.get("orgPhone") || "";
@@ -66,11 +67,17 @@ function VerifyEmailForm() {
     if (code.length !== 6) { setError("Please enter the full 6-digit code."); return; }
     setIsVerifying(true);
     try {
-      await api.post("/api/auth/verify-email", { email, otp: code });
+      const verifyRes = await api.post("/api/auth/verify-email", { email, otp: code });
       setVerified(true);
 
-      const loginRes = await api.post("/api/auth/login", { email, password: "" });
+      // If returning to register flow, redirect back with verified email
+      if (returnTo === "register") {
+        await new Promise((r) => setTimeout(r, 1500));
+        router.push(`/register?verifiedEmail=${encodeURIComponent(email)}`);
+        return;
+      }
 
+      // Old flow: create organization if org details provided
       if (orgName) {
         await api.post("/api/organizations", {
           name: orgName,
@@ -85,6 +92,7 @@ function VerifyEmailForm() {
       await new Promise((r) => setTimeout(r, 1500));
       router.push("/login");
     } catch (err: any) {
+      setVerified(false);
       setError(err.response?.data?.error || "Verification failed. Please try again.");
     } finally {
       setIsVerifying(false);
@@ -111,7 +119,9 @@ function VerifyEmailForm() {
           <CheckCircle size={32} className="text-green-500" />
         </div>
         <h2 className="text-xl font-bold text-[#0a0a0a] mb-2">Email verified</h2>
-        <p className="text-gray-500 text-sm">Redirecting you to sign in...</p>
+        <p className="text-gray-500 text-sm">
+          {returnTo === "register" ? "Redirecting you to complete setup..." : "Redirecting you to sign in..."}
+        </p>
       </motion.div>
     );
   }

@@ -32,24 +32,24 @@ Traqify is a full-stack multi-tenant SaaS application.
 
 ## Authentication
 
-### Email / Password
-1. Register with name, email, and password
-2. OTP sent to email (6 digits, 10 min expiry)
-3. Verify OTP to activate account
-4. Login returns `token` + `refreshToken` stored in localStorage
+### Email / Password (OTP-first flow)
+1. **Step 1 — Email**: Enter email address; `POST /api/auth/send-otp` sends a 6-digit code (works even before an account exists)
+2. **Step 2 — Verify**: Enter OTP on `/verify-email`; backend validates code and returns success; redirects to `/register?verifiedEmail=...`
+3. **Step 3 — Account details**: Enter full name and password; `POST /api/auth/register` creates user with `emailVerified: true` and returns a JWT (stored in React state only)
+4. **Step 4 — Org setup**: Enter org name, address, phone, industry; `POST /api/organizations` creates the org using the step-3 JWT; app then calls `POST /api/auth/login` to issue a fresh JWT that includes `organizationId`; redirects to `/dashboard/[slug]/overview`
 5. Token refresh happens automatically via Axios interceptor on 401
 
 ### Google OAuth
-1. Click "Continue with Google" - redirects to `GET /api/auth/google-redirect`
+1. Click "Continue with Google" — redirects to `GET /api/auth/google-redirect`
 2. Backend redirects to Google consent screen
 3. Google redirects to `GET /api/auth/google-callback?code=...`
 4. Backend exchanges code for user info, upserts user, returns tokens
 5. Frontend `/auth-callback` page reads tokens from URL params and stores them
 
 ### Forgot Password
-1. POST `/api/auth/forgot-password` with email
+1. `POST /api/auth/forgot-password` with email
 2. Reset link emailed (valid 1 hour)
-3. POST `/api/auth/reset-password` with token + new password
+3. `POST /api/auth/reset-password` with token + new password
 
 ---
 

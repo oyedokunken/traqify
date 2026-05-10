@@ -668,9 +668,9 @@ export default function PublicStorePage({ params }: { params: { slug: string } }
                 className="bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="relative">
+                <div className="relative overflow-hidden">
                   {detailImages.length > 0 ? (
-                    <img src={detailImages[activeDetailImg]} alt={detailProduct.name} className="w-full h-56 sm:h-64 object-contain bg-gray-50 p-2" />
+                    <img src={detailImages[activeDetailImg]} alt={detailProduct.name} className="w-full h-56 sm:h-64 object-cover" />
                   ) : (
                     <div className="w-full h-56 sm:h-64 bg-gray-100 flex items-center justify-center"><Package size={48} className="text-gray-300" /></div>
                   )}
@@ -690,7 +690,7 @@ export default function PublicStorePage({ params }: { params: { slug: string } }
                     {detailImages.map((img, i) => (
                       <button key={i} onClick={() => setActiveDetailImg(i)}
                         className={`flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden border-2 transition-colors ${i === activeDetailImg ? "border-[#DE1010]" : "border-transparent"}`}>
-                        <img src={img} alt="" className="w-full h-full object-contain p-0.5" />
+                        <img src={img} alt="" className="w-full h-full object-cover" />
                       </button>
                     ))}
                   </div>

@@ -9,10 +9,11 @@ import {
 } from "lucide-react";
 import { cn, getInitials, ROLE_LABELS } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Tooltip } from "react-tooltip";
 import { useSidebar } from "@/lib/sidebar-context";
+import api from "@/lib/api";
 
 const navItems = [
   { href: "overview",    label: "Overview",    icon: LayoutDashboard, roles: ["OWNER","MANAGER","CASHIER","AUDITOR"] },
@@ -48,6 +49,17 @@ export function Sidebar({ slug, collapsed, onCollapse }: SidebarProps) {
   const confirmLogout = () => { setShowLogoutConfirm(false); logout(); router.push("/login"); };
 
   const role = user?.role || "CASHIER";
+
+  const [auditUnread, setAuditUnread] = useState(0);
+  const fetchUnread = useCallback(() => {
+    if (!user?.organizationId || !["OWNER","AUDITOR"].includes(role)) return;
+    api.get("/api/audit-logs/unread-count").then((r) => setAuditUnread(r.data.count ?? 0)).catch(() => {});
+  }, [user?.organizationId, role]);
+  useEffect(() => {
+    fetchUnread();
+    const id = setInterval(fetchUnread, 30000);
+    return () => clearInterval(id);
+  }, [fetchUnread]);
   const allowed = navItems.filter((item) => item.roles.includes(role));
   const firstName = user?.name?.split(" ")[0] || user?.email?.split("@")[0] || "User";
 
@@ -110,20 +122,36 @@ export function Sidebar({ slug, collapsed, onCollapse }: SidebarProps) {
         <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto overflow-x-hidden no-scrollbar">
           {allowed.map((item) => {
             const isActive = pathname.includes(`/dashboard/${slug}/${item.href}`);
+            const isAudit = item.href === "audit-logs";
+            const badge = isAudit && auditUnread > 0;
             return (
               <Link
                 key={item.href}
                 href={`/dashboard/${slug}/${item.href}`}
+                onClick={() => { if (isAudit) setAuditUnread(0); }}
                 data-tooltip-id={collapsed ? "sidebar-tip" : undefined}
-                data-tooltip-content={collapsed ? item.label : undefined}
+                data-tooltip-content={collapsed ? (badge ? `${item.label} (${auditUnread} new)` : item.label) : undefined}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all",
+                  "relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all",
                   isActive ? "bg-[#DE1010] text-white" : "text-gray-400 hover:text-white hover:bg-white/10",
                   collapsed && "justify-center px-2"
                 )}
               >
-                <item.icon size={18} className="flex-shrink-0" />
-                {!collapsed && <span className="truncate">{item.label}</span>}
+                <div className="relative flex-shrink-0">
+                  <item.icon size={18} />
+                  {badge && collapsed && (
+                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-white border border-[#0a0a0a]" />
+                  )}
+                </div>
+                {!collapsed && <span className="truncate flex-1">{item.label}</span>}
+                {badge && !collapsed && (
+                  <span className={cn(
+                    "ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center",
+                    isActive ? "bg-white text-[#DE1010]" : "bg-[#DE1010] text-white"
+                  )}>
+                    {auditUnread > 99 ? "99+" : auditUnread}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -194,18 +222,33 @@ export function Sidebar({ slug, collapsed, onCollapse }: SidebarProps) {
               <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto overflow-x-hidden">
                 {allowed.map((item) => {
                   const isActive = pathname.includes(`/dashboard/${slug}/${item.href}`);
+                  const isAudit = item.href === "audit-logs";
+                  const badge = isAudit && auditUnread > 0;
                   return (
                     <Link
                       key={item.href}
                       href={`/dashboard/${slug}/${item.href}`}
-                      onClick={closeMobile}
+                      onClick={() => { closeMobile(); if (isAudit) setAuditUnread(0); }}
                       className={cn(
                         "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all",
                         isActive ? "bg-[#DE1010] text-white" : "text-gray-400 hover:text-white hover:bg-white/10"
                       )}
                     >
-                      <item.icon size={18} className="flex-shrink-0" />
-                      <span className="truncate">{item.label}</span>
+                      <div className="relative flex-shrink-0">
+                        <item.icon size={18} />
+                        {badge && (
+                          <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-white border border-[#0a0a0a]" />
+                        )}
+                      </div>
+                      <span className="truncate flex-1">{item.label}</span>
+                      {badge && (
+                        <span className={cn(
+                          "ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center",
+                          isActive ? "bg-white text-[#DE1010]" : "bg-[#DE1010] text-white"
+                        )}>
+                          {auditUnread > 99 ? "99+" : auditUnread}
+                        </span>
+                      )}
                     </Link>
                   );
                 })}

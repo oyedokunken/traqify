@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import prisma from "../config/database";
 import { AuthRequest } from "../middleware/auth.middleware";
+import { createAuditLog } from "../utils/audit";
 
 export const submitReview = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -39,6 +40,8 @@ export const submitReview = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
+    const product = await prisma.product.findUnique({ where: { id: productId }, select: { name: true } });
+
     const review = await prisma.review.create({
       data: {
         orderId,
@@ -51,6 +54,11 @@ export const submitReview = async (req: Request, res: Response): Promise<void> =
         status: "PENDING",
       },
     });
+
+    const orgOwner = await prisma.user.findFirst({ where: { organizationId: order.organizationId, role: "OWNER" } });
+    if (orgOwner) {
+      createAuditLog(orgOwner.id, order.organizationId, "CREATE", "Review", review.id, `New ${rating}-star review for "${product?.name || productId}" by ${customerName}`, req).catch(() => {});
+    }
 
     res.status(201).json(review);
   } catch {
@@ -120,10 +128,13 @@ export const moderateReview = async (req: AuthRequest, res: Response): Promise<v
       return;
     }
 
+    const product = await prisma.product.findUnique({ where: { id: review.productId }, select: { name: true } });
     const updated = await prisma.review.update({
       where: { id },
       data: { status: action === "approve" ? "APPROVED" : "REJECTED" },
     });
+
+    createAuditLog(req.user!.id, orgId, "UPDATE", "Review", id, `${action === "approve" ? "Approved" : "Rejected"} review for "${product?.name || review.productId}" by ${review.customerName}`, req).catch(() => {});
 
     res.json(updated);
   } catch {
@@ -142,7 +153,9 @@ export const deleteReview = async (req: AuthRequest, res: Response): Promise<voi
       return;
     }
 
+    const product = await prisma.product.findUnique({ where: { id: review.productId }, select: { name: true } });
     await prisma.review.delete({ where: { id } });
+    createAuditLog(req.user!.id, orgId, "DELETE", "Review", id, `Deleted review for "${product?.name || review.productId}" by ${review.customerName}`, req).catch(() => {});
     res.json({ message: "Review deleted." });
   } catch {
     res.status(500).json({ error: "Failed to delete review." });

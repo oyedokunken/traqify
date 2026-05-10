@@ -4,7 +4,7 @@ import prisma from "../config/database";
 import { signToken, signRefreshToken, verifyRefreshToken } from "../utils/jwt";
 import { createOTP, verifyOTP, generatePasswordResetToken, verifyPasswordResetToken, markPasswordResetTokenUsed } from "../utils/otp";
 import { sendEmail } from "../config/email";
-import { otpEmailTemplate, passwordResetEmailTemplate, welcomeEmailTemplate, passwordChangedEmailTemplate } from "../emails/templates";
+import { otpEmailTemplate, passwordResetEmailTemplate, welcomeEmailTemplate, passwordChangedEmailTemplate, newStaffJoinedEmailTemplate } from "../emails/templates";
 import {
   registerStep1Schema,
   verifyOTPSchema,
@@ -36,14 +36,39 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    await prisma.user.create({
-      data: { email, password: hashedPassword, name, emailVerified: false },
+    const user = await prisma.user.create({
+      data: { email, password: hashedPassword, name, emailVerified: true },
     });
 
-    const otp = await createOTP(email);
-    await sendEmail(email, "Verify your Traqify account", otpEmailTemplate(name, otp));
+    // Create audit log for user registration
+    if (user.organizationId) {
+      createAuditLog(user.id, user.organizationId, "CREATE", "User", user.id, `Registered account: ${user.name}`, req).catch(() => {});
+    }
 
-    res.status(201).json({ message: "Account created. Please check your email for a verification code." });
+    // Return tokens for automatic login (email is pre-verified in new flow)
+    const token = signToken({
+      userId: user.id,
+      email: user.email,
+      organizationId: user.organizationId || undefined,
+      role: user.role,
+    });
+    const refresh = signRefreshToken({ userId: user.id, email: user.email });
+
+    res.status(201).json({
+      message: "Account created successfully.",
+      token,
+      refreshToken: refresh,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        organizationId: user.organizationId,
+        avatarUrl: user.avatarUrl,
+        emailVerified: user.emailVerified,
+        signInMethod: "EMAIL",
+      },
+    });
   } catch (err) {
     console.error("Register error:", err);
     res.status(500).json({ error: "Something went wrong during registration." });
@@ -58,16 +83,14 @@ export const sendOTP = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Look up user if they exist (for personalized greeting), but don't require it
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) {
-      res.status(404).json({ error: "No account found with this email." });
-      return;
-    }
+    const name = user?.name || "there";
 
     const otp = await createOTP(email);
-    await sendEmail(email, "Your Traqify verification code", otpEmailTemplate(user.name || "there", otp));
+    await sendEmail(email, "Your Traqify verification code", otpEmailTemplate(name, otp));
 
-    res.json({ message: "A new verification code has been sent to your email." });
+    res.json({ message: "A verification code has been sent to your email." });
   } catch {
     res.status(500).json({ error: "Failed to send verification code." });
   }
@@ -89,31 +112,35 @@ export const verifyEmail = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    await prisma.user.update({
-      where: { email },
-      data: { emailVerified: true },
-    });
+    // Only mark emailVerified if user exists (for old flow)
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      await prisma.user.update({
+        where: { email },
+        data: { emailVerified: true },
+      });
+    }
 
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) {
-      res.status(404).json({ error: "User not found." });
+    // If user doesn't exist (new register flow), just return success
+    if (!existingUser) {
+      res.json({ message: "Email verified successfully." });
       return;
     }
 
-    const token = signToken({ userId: user.id, email: user.email });
-    const refresh = signRefreshToken({ userId: user.id, email: user.email });
+    const token = signToken({ userId: existingUser.id, email: existingUser.email });
+    const refresh = signRefreshToken({ userId: existingUser.id, email: existingUser.email });
 
     res.json({
       message: "Email verified successfully.",
       token,
       refreshToken: refresh,
       user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        emailVerified: user.emailVerified,
-        organizationId: user.organizationId,
-        role: user.role,
+        id: existingUser.id,
+        email: existingUser.email,
+        name: existingUser.name,
+        emailVerified: existingUser.emailVerified,
+        organizationId: existingUser.organizationId,
+        role: existingUser.role,
       },
     });
   } catch {
@@ -187,6 +214,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         role: user.role,
         organizationId: user.organizationId,
         avatarUrl: user.avatarUrl,
+        signInMethod: user.signInMethod || "EMAIL",
       },
     });
   } catch {
@@ -558,7 +586,17 @@ export const acceptInvite = async (req: Request, res: Response): Promise<void> =
     });
 
     await prisma.staffInvite.update({ where: { id: invite.id }, data: { status: "ACCEPTED" } });
-    await createAuditLog(user.id, invite.organizationId, "CREATE", "User", user.id, `Accepted invitation to join ${org?.name}`);
+    await createAuditLog(user.id, invite.organizationId, "CREATE", "User", user.id, `${name} accepted invitation and joined as ${invite.role}`);
+
+    const owner = await prisma.user.findFirst({ where: { organizationId: invite.organizationId, role: "OWNER" }, select: { email: true, name: true } });
+    if (owner && org) {
+      const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+      sendEmail(
+        owner.email,
+        `New team member joined: ${name} (${org.name})`,
+        newStaffJoinedEmailTemplate(owner.name || "there", name, invite.email, invite.role, org.name, `${frontendUrl}/dashboard/${org.slug}/staff`)
+      ).catch(() => {});
+    }
 
     const authToken = signToken({
       userId: user.id,

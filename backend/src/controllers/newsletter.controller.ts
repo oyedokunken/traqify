@@ -1,6 +1,8 @@
 import { Request, Response } from "express";
 import prisma from "../config/database";
 import { sendEmail } from "../config/email";
+import { createAuditLog } from "../utils/audit";
+import { AuthRequest } from "../middleware/auth.middleware";
 
 export const subscribe = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -33,11 +35,15 @@ export const subscribe = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
-export const getSubscribers = async (_req: Request, res: Response): Promise<void> => {
+export const getSubscribers = async (req: Request, res: Response): Promise<void> => {
   try {
     const subscribers = await prisma.newsletterSubscriber.findMany({
       orderBy: { createdAt: "desc" },
     });
+    const authReq = req as AuthRequest;
+    if (authReq.user?.id && authReq.user?.organizationId) {
+      createAuditLog(authReq.user.id, authReq.user.organizationId, "EXPORT", "Newsletter", undefined, `Viewed newsletter subscribers (${subscribers.length} total)`, req).catch(() => {});
+    }
     res.json(subscribers);
   } catch {
     res.status(500).json({ error: "Failed to fetch subscribers." });

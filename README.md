@@ -81,9 +81,12 @@ The system follows a clean **separation of concerns** between a Next.js 14 App R
 
   AUTHENTICATION FLOWS
   ----------------------
-  Email/Password:
-    POST /register -> OTP email -> POST /verify-email -> JWT issued
-    POST /login -> compare bcrypt -> JWT + refresh token
+  Email/Password (OTP-first flow):
+    1. POST /send-otp -> OTP email (works before user exists)
+    2. POST /verify-email -> validate code -> redirect /register?verifiedEmail=...
+    3. POST /register -> create user (emailVerified:true) -> JWT (React state only)
+    4. POST /organizations -> create org -> POST /login -> fresh JWT with orgId
+       -> redirect /dashboard/[slug]/overview
 
   Google OAuth 2.0:
     GET /google-redirect -> accounts.google.com

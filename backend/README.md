@@ -60,12 +60,24 @@ Named middleware guards:
 
 | Method | Path | Guard | Description |
 |--------|------|-------|-------------|
-| POST | /api/auth/register | public | Register OWNER + org |
+| POST | /api/auth/send-otp | public | Send OTP for email verification |
+| POST | /api/auth/verify-email | public | Verify OTP (supports pre-registration flow) |
+| POST | /api/auth/register | public | Register user (email pre-verified in new flow) |
 | POST | /api/auth/login | public | Login → tokens |
+| GET | /api/auth/google | public | Google OAuth redirect |
+| GET | /api/auth/google/callback | public | Google OAuth callback |
 | GET | /api/reports/overview | isAtLeastAuditor | Dashboard stats |
 | GET | /api/reviews/product/:id | public | Approved reviews for product |
 | POST | /api/reviews | public | Submit review (COMPLETED order required) |
+| GET | /api/reviews | isOwnerOrManager | Paginated reviews with status filter |
 | PATCH | /api/reviews/:id/moderate | isOwnerOrManager | Approve / reject |
+| DELETE | /api/reviews/:id | isOwnerOrManager | Delete review |
+| POST | /api/newsletter/subscribe | public | Subscribe to newsletter |
+| GET | /api/newsletter/subscribers | isOwnerOrManager | All subscribers |
+| GET | /api/audit-logs | isAtLeastAuditor | Paginated audit logs with filters |
+| GET | /api/audit-logs/unread-count | isAtLeastAuditor | Unread audit log count |
+| PATCH | /api/audit-logs/mark-read | isAtLeastAuditor | Mark logs as read/unread |
+| POST | /api/store/:slug/checkout | public | Public store checkout |
 | GET | /api/store/:slug | public | Public store products + org info |
 
 ## Environment variables
@@ -75,3 +87,6 @@ See `.env.example` for the full list. Required:
 - `JWT_SECRET`, `JWT_REFRESH_SECRET`
 - `SMTP_*` (Nodemailer)
 - `FRONTEND_URL`
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (Google OAuth)
+- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (File storage)
+- `PAYSTACK_SECRET_KEY` (Payments)
