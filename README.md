@@ -25,47 +25,9 @@
 
 Traqify is a **production-deployed, multi-tenant enterprise store management platform** built for retail businesses that need structure, auditability, and role-based control across their operations.
 
-It is a full-stack TypeScript monorepo — a Next.js 14 App Router frontend + RESTful Express.js backend — covering the complete retail lifecycle: product catalogue, POS order creation, inventory control, customer records, payment tracking, staff access management, public storefronts with Paystack checkout, financial reports, and a real-time analytics dashboard.
+It is a full-stack TypeScript monorepo (a Next.js 14 App Router frontend + RESTful Express.js backend covering the complete retail lifecycle: product catalogue, POS order creation, inventory control, customer records, payment tracking, staff access management, public storefronts with Paystack checkout, financial reports, and a real-time analytics dashboard.
 
 The system is live at **[https://traqify.vercel.app](https://traqify.vercel.app)** and its API at **[https://traqify-api.vercel.app](https://traqify-api.vercel.app)**.
-
----
-
-## Evaluator Quick Start
-
-> For hackathon facilitators and reviewers: the fastest path to seeing everything working.
-
-### Option A: Use the live demo
-
-| URL | Purpose |
-|-----|---------|
-| [https://traqify.vercel.app/login](https://traqify.vercel.app/login) | Sign in |
-| [https://traqify.vercel.app/register](https://traqify.vercel.app/register) | Create a new organization |
-| [https://traqify.vercel.app/store/rexta-technologies](https://traqify.vercel.app/store/rexta-technologies) | Live public storefront |
-| [https://traqify-api.vercel.app/health](https://traqify-api.vercel.app/health) | API health check |
-
-### Option B: Test the full staff invite flow
-
-1. Register an account and create an organization
-2. Go to **Staff** and invite a new email address as Manager
-3. Check that email for the invitation link (expires in 3 days)
-4. Accept the invite in a different browser / incognito window
-5. Observe the invited user's role-specific welcome modal and read-only company details in Settings
-6. Back in the owner account, observe the **Pending** row in the Staff table
-
-### Option C: Test the public checkout flow
-
-1. Visit any live store: `https://traqify.vercel.app/store/[slug]`
-2. Add a product to cart
-3. Checkout with a test Paystack card: `4084 0840 8408 4081`, exp `01/25`, CVV `408`
-4. Watch the order appear in the dashboard under Orders, and a corresponding **Payment** record appear under Payments
-
-### What to look for
-
-- **RBAC enforcement**: try accessing `/dashboard/[slug]/staff` as a Cashier — you will be redirected
-- **Audit trail**: every action (login, product create, order approve, invite send) is logged under Audit Logs
-- **PDF reports**: go to Reports, pick a type and date range, click Download
-- **Multi-tenancy**: two organizations cannot see each other's data — enforced at the API layer on every query
 
 ---
 
