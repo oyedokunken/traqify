@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import {
   register,
+  checkEmail,
   sendOTP,
   verifyEmail,
   login,
@@ -23,6 +24,7 @@ import prisma from "../config/database";
 const router = Router();
 
 router.post("/register", register);
+router.post("/check-email", checkEmail);
 router.post("/send-otp", sendOTP);
 router.post("/verify-email", verifyEmail);
 router.post("/login", login);

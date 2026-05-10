@@ -127,6 +127,7 @@ function VerifyEmailForm() {
   }
 
   return (
+    <>
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="px-8 pt-8 pb-4">
@@ -177,6 +178,8 @@ function VerifyEmailForm() {
         <Link href="/register" className="text-[#DE1010] font-medium hover:underline">Go back</Link>
       </p>
     </motion.div>
+    <ErrorModal isOpen={!!error} onClose={() => setError("")} message={error} />
+    </>
   );
 }
 
@@ -188,7 +191,6 @@ export default function VerifyEmailPage() {
           <VerifyEmailForm />
         </Suspense>
       </div>
-      <ErrorModal isOpen={false} onClose={() => {}} message="" />
     </div>
   );
 }

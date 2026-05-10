@@ -88,6 +88,15 @@ function RegisterForm() {
 
   const handleEmailStep = async (data: EmailData) => {
     try {
+      const checkRes = await api.post("/api/auth/check-email", { email: data.email });
+      if (checkRes.data.exists) {
+        if (checkRes.data.signInMethod === "GOOGLE") {
+          setError("This email is already registered with Google. Please use 'Continue with Google' to sign in.");
+          return;
+        }
+        router.push(`/login?email=${encodeURIComponent(data.email)}&hint=exists`);
+        return;
+      }
       await api.post("/api/auth/send-otp", { email: data.email });
       setEmailData(data);
       router.push(`/verify-email?email=${encodeURIComponent(data.email)}&returnTo=register`);
