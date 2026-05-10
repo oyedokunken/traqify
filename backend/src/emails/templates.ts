@@ -88,7 +88,7 @@ const wrapEmail = (content: string) => `
     ${content}
     <div style="${footerStyle}">
       <p>This email was sent by Traqify. If you did not request this, you can safely ignore it.</p>
-      <p style="margin-top: 8px;">Traqify &mdash; an enterprise store management system</p>
+      <p style="margin-top: 8px;">Traqify: an enterprise store management system</p>
     </div>
   </div>
 </body>
