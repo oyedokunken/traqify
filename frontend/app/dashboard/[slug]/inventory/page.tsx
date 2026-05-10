@@ -21,7 +21,10 @@ interface InventoryItem {
 export default function InventoryPage({ params }: { params: { slug: string } }) {
   const { user } = useAuth();
   const [items, setItems] = useState<InventoryItem[]>([]);
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [stockFilter, setStockFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
@@ -29,6 +32,10 @@ export default function InventoryPage({ params }: { params: { slug: string } }) 
   const [saving, setSaving] = useState(false);
 
   const canEdit = ["OWNER", "MANAGER"].includes(user?.role || "");
+
+  useEffect(() => {
+    api.get("/api/categories").then((r) => setCategories(r.data || [])).catch(() => {});
+  }, []);
 
   const fetchInventory = () => {
     api.get("/api/inventory")
@@ -57,20 +64,49 @@ export default function InventoryPage({ params }: { params: { slug: string } }) 
     finally { setSaving(false); }
   };
 
-  const filtered = items.filter((i) =>
-    i.product.name.toLowerCase().includes(search.toLowerCase()) ||
-    i.product.sku.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = items.filter((i) => {
+    const matchSearch =
+      i.product.name.toLowerCase().includes(search.toLowerCase()) ||
+      i.product.sku.toLowerCase().includes(search.toLowerCase());
+    const matchCategory = !categoryFilter || i.product.productCategory?.name === categoryFilter;
+    const isOut = i.quantity === 0;
+    const isLow = !isOut && i.quantity <= i.lowStockAlert;
+    const isIn  = !isOut && !isLow;
+    const matchStock =
+      !stockFilter ||
+      (stockFilter === "in" && isIn) ||
+      (stockFilter === "low" && isLow) ||
+      (stockFilter === "out" && isOut);
+    return matchSearch && matchCategory && matchStock;
+  });
 
   return (
     <div>
       <Topbar title="Inventory" slug={params.slug} />
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="relative w-64">
+        <div className="flex flex-wrap items-center gap-2 mb-6">
+          <div className="relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <Input placeholder="Search inventory..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <Input placeholder="Search inventory..." className="pl-9 w-52" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
+          <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}
+            className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <option value="">All categories</option>
+            {categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+          </select>
+          <select value={stockFilter} onChange={(e) => setStockFilter(e.target.value)}
+            className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <option value="">All stock levels</option>
+            <option value="in">In Stock</option>
+            <option value="low">Low Stock</option>
+            <option value="out">Out of Stock</option>
+          </select>
+          {(search || categoryFilter || stockFilter) && (
+            <button onClick={() => { setSearch(""); setCategoryFilter(""); setStockFilter(""); }}
+              className="text-xs text-gray-400 hover:text-gray-700 px-2 py-1 rounded hover:bg-gray-100 transition-colors">
+              Clear filters
+            </button>
+          )}
         </div>
 
         {loading ? (

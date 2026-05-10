@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ErrorModal } from "@/components/shared/error-modal";
 import api from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import { INDUSTRY_OPTIONS, ORG_SIZE_OPTIONS } from "@/lib/utils";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
@@ -51,6 +52,7 @@ const steps = ["Email", "Your details", "Your organization", "You're all set"];
 function RegisterForm() {
   const router = useRouter();
   const params = useSearchParams();
+  const { login } = useAuth();
   const verifiedEmail = params.get("verifiedEmail");
   
   const [step, setStep] = useState(verifiedEmail ? 2 : 1);
@@ -120,7 +122,6 @@ function RegisterForm() {
       const res = await api.post("/api/auth/register", { ...data, email: emailData.email });
       setStep2Data(data);
       if (res.data.token) {
-        // Save token temporarily — we need it to call /api/organizations
         setPendingToken(res.data.token);
         api.defaults.headers.common["Authorization"] = `Bearer ${res.data.token}`;
       }
@@ -143,20 +144,11 @@ function RegisterForm() {
         industry: data.industry || undefined,
         size: data.size || undefined,
       });
-      // Re-login to get a fresh JWT that includes the new organizationId
+      // Re-login via auth context to get a fresh JWT that includes the new organizationId
       if (emailData && step2Data) {
-        const loginRes = await api.post("/api/auth/login", {
-          email: emailData.email,
-          password: step2Data.password,
-        });
-        api.defaults.headers.common["Authorization"] = `Bearer ${loginRes.data.token}`;
-        localStorage.setItem("traqify_token", loginRes.data.token);
-        localStorage.setItem("traqify_refresh_token", loginRes.data.refreshToken);
-        localStorage.setItem("traqify_user", JSON.stringify(loginRes.data.user));
-        router.push(`/dashboard/${orgRes.data.slug}/overview`);
-      } else {
-        router.push("/login");
+        await login(emailData.email, step2Data.password);
       }
+      router.push(`/dashboard/${orgRes.data.slug}/overview`);
     } catch (err: any) {
       setError(err.response?.data?.error || "Failed to create organization.");
     }

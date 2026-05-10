@@ -5,6 +5,33 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.9.0] - 2026-05-10
+
+### Added
+- **Payments module**: New `Payment` Prisma model (`PaymentStatus`: PENDING/COMPLETED/FAILED/REFUNDED) with `amount`, `currency`, `method`, `reference`, `notes`, `orderId` FK; backend controller (`getPayments`, `getPaymentById`, `createPayment`, `updatePayment`) at `GET/POST/PATCH /api/payments`; frontend `/dashboard/[slug]/payments` page with 4 summary cards (total, completed, pending, failed+refunded), search/filter, paginated table with clickable detail modal and inline status updates
+- **Payments report**: "Payments Report" card added to `/dashboard/[slug]/reports` page (PDF download + email)
+- **Single audit log detail page**: `/dashboard/[slug]/audit-logs/[id]` — shows action, entity, details, performed-by card with user avatar/role, timestamp, log ID, network info (IP, user agent); auto-marks log as read on open; `GET /api/audit-logs/:id` backend endpoint added
+- **Notification bell dropdown**: topbar bell now opens a dropdown with the 6 most recent audit logs; unread logs highlighted in red; persistent unread count badge using real `GET /api/audit-logs/unread-count` API (polls every 30 s); "Mark all read" button; "View all notifications" link to audit-logs page; each notification clickable to its single detail page; bell hidden for CASHIER role
+- **Inventory filters**: category dropdown and stock-status filter (In Stock / Low Stock / Out of Stock) with "Clear filters" button added to inventory page
+- **Store publish validation**: clicking "Publish store" now checks logo, description, business email, published products, and categories; shows an explicit numbered error modal listing every missing item before proceeding
+- **Customer source badge**: `source` field (`MANUAL` | `PURCHASE`) added to `Customer` Prisma model; customers table shows green "Auto" pill for purchase-created customers and gray "Manual" pill for admin-added ones
+- **Go to Categories CTA in product gate**: products page category-gate dialog now has a "Go to Categories" button linking directly to the categories page
+
+### Changed
+- **Registration flow**: `handleStep3` now calls `login(email, password)` from auth context after org creation to get a fresh JWT with `organizationId`; eliminates re-login requirement and wrong localStorage key usage
+- **Create-organization flow**: `onSubmit` attempts JWT refresh (via refresh token) before `refreshUser()` so new org members have a valid token before dashboard redirect
+- **Overview welcome modal**: guarded by `user?.organizationId` dependency so new users see the first-time modal (not the "welcome back" modal) on their very first visit
+- **Overview layout**: "Open Storefront" button now renders above the live clock instead of beside it
+- **Products page**: initial load errors are silently swallowed (empty state shown instead of error modal) since 0 products is a valid state
+- **Sidebar nav order**: enterprise-logical ordering — Overview → Orders → Products → Inventory → Categories → Payments → Customers → Staff → Storefront → Logistics → Newsletter → Reviews → Reports → Audit Logs → Settings
+- **Sidebar Audit Logs**: MANAGER added to allowed roles (consistent with `isAtLeastAuditor` API middleware)
+
+### Fixed
+- **Store `togglePublish` syntax**: missing closing `}` on async function corrected
+- **Products page missing `Link` import**: `next/link` import added after categories modal CTA was added
+
+---
+
 ## [1.7.0] - 2026-05-10
 
 ### Added

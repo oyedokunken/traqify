@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { Bell, Search, Settings, LogOut, X, Menu } from "lucide-react";
+import { Bell, Search, Settings, LogOut, X, Menu, CheckCheck } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
@@ -22,6 +22,16 @@ interface SearchResult {
   href: string;
 }
 
+interface AuditLog {
+  id: string;
+  action: string;
+  entity: string;
+  details: string | null;
+  isRead: boolean;
+  createdAt: string;
+  user?: { name: string | null; email: string };
+}
+
 export function Topbar({ title, slug }: TopbarProps) {
   const { user, logout } = useAuth();
   const router = useRouter();
@@ -32,8 +42,11 @@ export function Topbar({ title, slug }: TopbarProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [showBell, setShowBell] = useState(false);
+  const [recentLogs, setRecentLogs] = useState<AuditLog[]>([]);
   const searchRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const bellRef = useRef<HTMLDivElement>(null);
 
   // "/" keybinding to open search
   useEffect(() => {
@@ -49,33 +62,48 @@ export function Topbar({ title, slug }: TopbarProps) {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  // Close user menu on outside click
+  // Close user menu and bell on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowUserMenu(false);
+      if (bellRef.current && !bellRef.current.contains(e.target as Node)) setShowBell(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Fetch unread audit log count
+  const canSeeNotifications = ["OWNER","MANAGER","AUDITOR"].includes(user?.role || "");
+
+  const fetchUnread = useCallback(() => {
+    if (!canSeeNotifications || !user?.organizationId) return;
+    api.get("/api/audit-logs/unread-count").then((r) => setUnreadCount(r.data.count ?? 0)).catch(() => {});
+  }, [canSeeNotifications, user?.organizationId]);
+
   useEffect(() => {
-    const key = `traqify_audit_read_${slug}`;
-    api.get(`/api/audit-logs?page=1&limit=1`)
-      .then((r) => {
-        const total = r.data.total || 0;
-        const lastRead = parseInt(localStorage.getItem(key) || "0");
-        setUnreadCount(Math.max(0, total - lastRead));
-      })
-      .catch(() => {});
-  }, [slug]);
+    fetchUnread();
+    const id = setInterval(fetchUnread, 30000);
+    return () => clearInterval(id);
+  }, [fetchUnread]);
+
+  const openBell = () => {
+    if (!canSeeNotifications) return;
+    setShowBell((v) => !v);
+    if (!showBell) {
+      api.get("/api/audit-logs?page=1&limit=6").then((r) => setRecentLogs(r.data.logs || [])).catch(() => {});
+    }
+  };
+
+  const markAllRead = async () => {
+    try {
+      await api.patch("/api/audit-logs/mark-read", { all: true, isRead: true });
+      setUnreadCount(0);
+      setRecentLogs((prev) => prev.map((l) => ({ ...l, isRead: true })));
+    } catch {}
+  };
 
   const markRead = () => {
-    api.get(`/api/audit-logs?page=1&limit=1`).then((r) => {
-      const total = r.data.total || 0;
-      localStorage.setItem(`traqify_audit_read_${slug}`, String(total));
-      setUnreadCount(0);
-    }).catch(() => {});
+    api.patch("/api/audit-logs/mark-read", { all: true, isRead: true }).catch(() => {});
+    setUnreadCount(0);
   };
 
   // Real-time search
@@ -169,15 +197,64 @@ export function Topbar({ title, slug }: TopbarProps) {
           </div>
 
           {/* Bell */}
-          <Link href={`/dashboard/${slug}/audit-logs`} onClick={markRead}
-            className="relative w-9 h-9 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0">
-            <Bell size={18} />
-            {unreadCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 bg-[#DE1010] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                {unreadCount > 99 ? "99+" : unreadCount}
-              </span>
-            )}
-          </Link>
+          {canSeeNotifications && (
+            <div className="relative flex-shrink-0" ref={bellRef}>
+              <button onClick={openBell}
+                className="relative w-9 h-9 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                <Bell size={18} />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 bg-[#DE1010] text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
+              </button>
+              <AnimatePresence>
+                {showBell && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: -4 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                    className="absolute right-0 top-full mt-2 w-80 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden z-50"
+                  >
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                      <p className="text-sm font-semibold text-[#0a0a0a]">Notifications</p>
+                      <div className="flex items-center gap-2">
+                        {unreadCount > 0 && (
+                          <button onClick={markAllRead} className="text-[11px] text-gray-400 hover:text-gray-700 flex items-center gap-1 transition-colors">
+                            <CheckCheck size={12} /> Mark all read
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    {recentLogs.length === 0 ? (
+                      <p className="px-4 py-6 text-sm text-gray-400 text-center">No notifications yet.</p>
+                    ) : (
+                      <div className="divide-y divide-gray-50">
+                        {recentLogs.map((log) => (
+                          <Link key={log.id} href={`/dashboard/${slug}/audit-logs/${log.id}`}
+                            onClick={() => { setShowBell(false); fetchUnread(); }}
+                            className={`flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors ${!log.isRead ? "bg-red-50/40" : ""}`}>
+                            <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${!log.isRead ? "bg-[#DE1010]" : "bg-gray-200"}`} />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-medium text-[#0a0a0a] truncate">
+                                {log.action} · {log.entity}
+                              </p>
+                              {log.details && <p className="text-[11px] text-gray-500 truncate mt-0.5">{log.details}</p>}
+                              <p className="text-[10px] text-gray-400 mt-0.5">
+                                {log.user?.name || log.user?.email || "System"} · {new Date(log.createdAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })}
+                              </p>
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                    <div className="border-t border-gray-100 px-4 py-2.5">
+                      <Link href={`/dashboard/${slug}/audit-logs`} onClick={() => { setShowBell(false); markRead(); }}
+                        className="text-xs text-[#DE1010] font-medium hover:underline">View all notifications</Link>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
 
           {/* Avatar */}
           <div className="relative flex-shrink-0" ref={menuRef}>

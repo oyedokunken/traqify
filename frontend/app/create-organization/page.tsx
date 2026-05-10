@@ -61,6 +61,17 @@ export default function CreateOrganizationPage() {
     }
     try {
       const res = await api.post("/api/organizations", data);
+      // Refresh JWT to embed the new organizationId (Google OAuth / any OAuth user)
+      try {
+        const rfr = typeof window !== "undefined" ? localStorage.getItem("traqify_refresh") : null;
+        if (rfr) {
+          const rfRes = await api.post("/api/auth/refresh", { refreshToken: rfr });
+          if (rfRes.data.token) {
+            localStorage.setItem("traqify_token", rfRes.data.token);
+            api.defaults.headers.common["Authorization"] = `Bearer ${rfRes.data.token}`;
+          }
+        }
+      } catch {}
       await refreshUser();
       router.push(`/dashboard/${res.data.slug}/overview`);
     } catch (err: any) {

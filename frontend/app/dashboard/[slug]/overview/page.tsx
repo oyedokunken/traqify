@@ -69,6 +69,7 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
   // First-time welcome: shown once ever (localStorage)
   // Welcome back: shown once per login session (sessionStorage)
   useEffect(() => {
+    if (!user?.organizationId) return;
     const firstKey = `traqify_welcomed_${params.slug}`;
     const sessionKey = `traqify_session_${params.slug}`;
     if (!localStorage.getItem(firstKey)) {
@@ -78,7 +79,7 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
       setShowWelcomeBack(true);
       sessionStorage.setItem(sessionKey, "1");
     }
-  }, [params.slug]);
+  }, [params.slug, user?.organizationId]);
 
   useEffect(() => {
     api.get("/api/reports/overview")
@@ -176,14 +177,14 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
             <p className="text-sm text-gray-400 mt-0.5">{dateStr}</p>
           </div>
           <div className="flex flex-col sm:items-end gap-2">
-            <div className="text-right">
-              <p className="text-2xl font-bold text-[#0a0a0a] tracking-tight tabular-nums">{timeStr}</p>
-              <p className="text-xs text-gray-400">{tz.replace(/_/g, " ")}</p>
-            </div>
             <button onClick={openStorefront}
               className="flex items-center gap-2 px-4 py-2 bg-[#0a0a0a] hover:bg-black/80 text-white text-sm font-medium rounded-lg transition-colors">
               <ExternalLink size={14} /> Open Storefront
             </button>
+            <div className="text-right">
+              <p className="text-2xl font-bold text-[#0a0a0a] tracking-tight tabular-nums">{timeStr}</p>
+              <p className="text-xs text-gray-400">{tz.replace(/_/g, " ")}</p>
+            </div>
           </div>
         </div>
 

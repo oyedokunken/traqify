@@ -21,6 +21,8 @@ export default function StorePage({ params }: { params: { slug: string } }) {
   const [error, setError] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
+  const [publishErrors, setPublishErrors] = useState<string[]>([]);
+  const [showPublishError, setShowPublishError] = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
   const [logoError, setLogoError] = useState("");
   const storeUrl = `${typeof window !== "undefined" ? window.location.origin : "http://localhost:3000"}/store/${params.slug}`;
@@ -37,8 +39,22 @@ export default function StorePage({ params }: { params: { slug: string } }) {
 
   const togglePublish = async () => {
     setToggling(true); setError("");
+    const publishing = !isPublished;
+    if (publishing) {
+      const issues: string[] = [];
+      if (!storeData?.logoUrl) issues.push("No store logo uploaded — upload a logo to represent your brand.");
+      if (!storeData?.description) issues.push("No store description set — add a description in Settings.");
+      if (!storeData?.email) issues.push("No business email configured — set it in Settings.");
+      if (productCount === 0) issues.push("No published products — add at least one published product.");
+      if (categoryCount === 0) issues.push("No product categories — create at least one category.");
+      if (issues.length > 0) {
+        setPublishErrors(issues);
+        setShowPublishError(true);
+        setToggling(false);
+        return;
+      }
+    }
     try {
-      const publishing = !isPublished;
       await api.patch(`/api/organizations/${params.slug}`, { storePublished: publishing });
       fetchStore();
       setSuccessMsg(publishing ? "Your store is now live and accepting orders." : "Your store has been taken offline.");
@@ -275,6 +291,37 @@ export default function StorePage({ params }: { params: { slug: string } }) {
               <button onClick={() => setShowSuccess(false)}
                 className="w-full px-4 py-2 bg-[#0a0a0a] text-white rounded-lg text-sm font-medium hover:bg-black/80 transition-colors">
                 Got it
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* Publish validation error modal */}
+      <AnimatePresence>
+        {showPublishError && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
+              className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
+              <div className="flex items-start justify-between mb-3">
+                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                  <X size={18} className="text-amber-600" />
+                </div>
+                <button onClick={() => setShowPublishError(false)} className="p-1 rounded-lg text-gray-400 hover:bg-gray-100"><X size={16} /></button>
+              </div>
+              <h3 className="font-bold text-[#0a0a0a] mb-1">Store isn't ready to publish</h3>
+              <p className="text-gray-500 text-sm mb-4">Please fix the following issues before going live:</p>
+              <ul className="space-y-2 mb-5">
+                {publishErrors.map((issue, i) => (
+                  <li key={i} className="flex items-start gap-2.5 text-sm">
+                    <span className="w-5 h-5 rounded-full bg-red-100 text-[#DE1010] flex items-center justify-center text-[10px] font-bold flex-shrink-0 mt-0.5">{i + 1}</span>
+                    <span className="text-gray-700">{issue}</span>
+                  </li>
+                ))}
+              </ul>
+              <button onClick={() => setShowPublishError(false)}
+                className="w-full px-4 py-2 bg-[#0a0a0a] text-white rounded-lg text-sm font-medium hover:bg-black/80 transition-colors">
+                Got it, I'll fix these
               </button>
             </motion.div>
           </motion.div>
