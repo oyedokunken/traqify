@@ -152,6 +152,18 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
 
     await createAuditLog(req.user!.id, orgId, "CREATE", "Order", order.id, `Created order ${order.orderNumber}`, req);
 
+    // Auto-create a COMPLETED payment record for this dashboard order
+    (prisma as any).payment.create({
+      data: {
+        amount: totalAmount,
+        currency: "NGN",
+        status: "COMPLETED",
+        method: paymentMethod || "TRANSFER",
+        organizationId: orgId,
+        orderId: order.id,
+      },
+    }).catch(() => {});
+
     // Notify org owner
     const orgOwner = await prisma.user.findFirst({ where: { organizationId: orgId, role: "OWNER" } });
     if (orgOwner) {

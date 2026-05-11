@@ -5,6 +5,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v1.14.0] - 2025-05-11
+
+### Added
+- **Payment auto-backfill**: `GET /api/payments` now auto-creates `Payment` records for any `COMPLETED`/`APPROVED` orders that have no payment record; runs on every payments-page load until fully caught up, then becomes a no-op
+- **Dashboard order payment**: creating an order manually from the dashboard now immediately creates a `COMPLETED` Payment record alongside it, so the payments page and revenue chart stay in sync from day one
+
+### Changed
+- **Overview revenue source**: `getOverview`, `getRevenueChart` now aggregate `Payment.amount` where `status = COMPLETED` instead of `Order.totalAmount` where `status = COMPLETED`; manually recorded payments and store-checkout payments both flow into the revenue stats and chart
+- **Revenue/Order charts: full date range**: `getRevenueChart` now returns every day in the selected period filled with `{ revenue: 0, orders: 0 }` for days with no data, producing a smooth growth curve instead of scattered dots
+- **Customer chart: full date range + baseline**: `getCustomerChart` now seeds the cumulative count with all customers created before the period start, then fills every day in the range, so the line never starts from 0 when pre-period customers exist
+- **Y-axis starts from 0**: all three charts (`Revenue`, `Order growth`, `Customer growth`) now have `domain={[0, "auto"]}` on their `YAxis` so the area always starts from the zero baseline
+- **Period change refreshes overview stats**: switching the 7/30/90-day period now also re-fetches the overview KPI cards, not just the charts
+- **Window focus refresh**: returning to the Overview tab after adding an order, customer, or payment in another tab/window now silently re-fetches all overview data and charts
+
+### Fixed
+- **Payments page empty for existing orders**: older orders placed before the Payment model was introduced now appear automatically on the first visit to the payments page after deployment
+- **Revenue chart missing store-checkout revenue**: store orders (`APPROVED`) now have Payment records (created at checkout) and appear in the revenue chart
+- **Customer chart starting above 0**: cumulative customer line no longer resets to 0 at the start of each period; it carries forward the pre-period customer count as the baseline
+
+---
+
 ## [v1.13.0] - 2025-05-13
 
 ### Added

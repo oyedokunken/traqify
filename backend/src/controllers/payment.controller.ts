@@ -5,6 +5,28 @@ import { AuthRequest } from "../middleware/auth.middleware";
 export const getPayments = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const orgId = req.user!.organizationId!;
+
+    // Auto-backfill: create Payment records for orders that don't have any yet
+    try {
+      const ordersWithoutPayments = await (prisma as any).order.findMany({
+        where: { organizationId: orgId, payments: { none: {} }, status: { in: ["COMPLETED", "APPROVED"] } },
+        select: { id: true, totalAmount: true, paymentMethod: true, status: true },
+        take: 200,
+      });
+      if (ordersWithoutPayments.length > 0) {
+        await (prisma as any).payment.createMany({
+          data: ordersWithoutPayments.map((o: any) => ({
+            amount: o.totalAmount,
+            currency: "NGN",
+            status: o.status === "COMPLETED" ? "COMPLETED" : "PENDING",
+            method: o.paymentMethod || "TRANSFER",
+            organizationId: orgId,
+            orderId: o.id,
+          })),
+        });
+      }
+    } catch { /* backfill is best-effort */ }
+
     const { status, search, from, to, page = "1", limit = "25" } = req.query;
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
 
