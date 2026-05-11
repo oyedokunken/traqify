@@ -87,27 +87,33 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
     }
   }, [params.slug, user?.organizationId]);
 
+  const fetchAll = (p: number) => {
+    api.get("/api/reports/overview").then((r) => setData(r.data)).catch(() => {}).finally(() => setLoading(false));
+    api.get(`/api/reports/revenue-chart?period=${p}`).then((r) => setChart(r.data || [])).catch(() => {});
+    api.get(`/api/reports/customer-chart?period=${p}`).then((r) => setCustomerChart(r.data || [])).catch(() => {});
+  };
+
   useEffect(() => {
-    api.get("/api/reports/overview")
-      .then((r) => setData(r.data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-    api.get(`/api/reports/revenue-chart?period=${period}`)
-      .then((r) => setChart(r.data || []))
-      .catch(() => {});
-    api.get(`/api/reports/customer-chart?period=${period}`)
-      .then((r) => setCustomerChart(r.data || []))
-      .catch(() => {});
+    fetchAll(period);
   }, []);
+
+  // Refresh charts when user returns to the tab (e.g. after adding orders/customers)
+  useEffect(() => {
+    const onFocus = () => fetchAll(period);
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [period]);
 
   const changePeriod = async (p: number) => {
     setPeriod(p);
     setChartLoading(true);
     try {
-      const [chartData, customerData] = await Promise.all([
+      const [overviewData, chartData, customerData] = await Promise.all([
+        api.get("/api/reports/overview"),
         api.get(`/api/reports/revenue-chart?period=${p}`),
         api.get(`/api/reports/customer-chart?period=${p}`),
       ]);
+      setData(overviewData.data);
       setChart(chartData.data || []);
       setCustomerChart(customerData.data || []);
     } catch {} finally { setChartLoading(false); }
@@ -254,7 +260,7 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} tickFormatter={fmtChartDate} />
-                    <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} tickFormatter={(v) => `₦${(v / 1000).toFixed(0)}k`} />
+                    <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} domain={[0, "auto"]} tickFormatter={(v) => `₦${(v / 1000).toFixed(0)}k`} />
                     <Tooltip
                       contentStyle={{ border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 12 }}
                       labelFormatter={fmtChartDate}
@@ -283,7 +289,7 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} tickFormatter={fmtChartDate} />
-                    <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} domain={[0, "auto"]} />
                     <Tooltip contentStyle={{ border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 12 }} labelFormatter={fmtChartDate} formatter={(v: number) => [v, "Orders"]} />
                     <Area type="monotone" dataKey="orders" stroke="#DE1010" strokeWidth={2} fill="url(#ordGrad)" name="Orders" dot={false} />
                   </AreaChart>
@@ -300,7 +306,7 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
                   <LineChart data={customerChart} margin={{ top: 4, right: 0, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} tickFormatter={fmtChartDate} />
-                    <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} domain={[0, "auto"]} />
                     <Tooltip contentStyle={{ border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 12 }} labelFormatter={fmtChartDate} />
                     <Line type="monotone" dataKey="customers" stroke="#0a0a0a" strokeWidth={2} dot={false} name="Customers" />
                   </LineChart>

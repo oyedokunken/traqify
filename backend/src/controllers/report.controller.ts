@@ -25,9 +25,9 @@ export const getOverview = async (req: AuthRequest, res: Response): Promise<void
       totalProducts,
       totalCustomers,
     ] = await Promise.all([
-      prisma.order.aggregate({ where: { organizationId: orgId, status: "COMPLETED" }, _sum: { totalAmount: true } }),
-      prisma.order.aggregate({ where: { organizationId: orgId, status: "COMPLETED", createdAt: { gte: startOfMonth } }, _sum: { totalAmount: true } }),
-      prisma.order.aggregate({ where: { organizationId: orgId, status: "COMPLETED", createdAt: { gte: startOfLastMonth, lte: endOfLastMonth } }, _sum: { totalAmount: true } }),
+      prisma.payment.aggregate({ where: { organizationId: orgId, status: "COMPLETED" }, _sum: { amount: true } }),
+      prisma.payment.aggregate({ where: { organizationId: orgId, status: "COMPLETED", createdAt: { gte: startOfMonth } }, _sum: { amount: true } }),
+      prisma.payment.aggregate({ where: { organizationId: orgId, status: "COMPLETED", createdAt: { gte: startOfLastMonth, lte: endOfLastMonth } }, _sum: { amount: true } }),
       prisma.order.count({ where: { organizationId: orgId } }),
       prisma.order.count({ where: { organizationId: orgId, createdAt: { gte: startOfMonth } } }),
       prisma.product.count({ where: { organizationId: orgId, isActive: true } }),
@@ -40,12 +40,12 @@ export const getOverview = async (req: AuthRequest, res: Response): Promise<void
     });
     const lowStockCount = allInventory.filter((i) => i.quantity <= i.lowStockAlert).length;
 
-    const monthRev = monthRevenue._sum.totalAmount || 0;
-    const lastMonthRev = lastMonthRevenue._sum.totalAmount || 0;
+    const monthRev = monthRevenue._sum.amount || 0;
+    const lastMonthRev = lastMonthRevenue._sum.amount || 0;
     const revenueGrowth = lastMonthRev > 0 ? ((monthRev - lastMonthRev) / lastMonthRev) * 100 : 0;
 
     res.json({
-      totalRevenue: totalRevenue._sum.totalAmount || 0,
+      totalRevenue: totalRevenue._sum.amount || 0,
       monthRevenue: monthRev,
       revenueGrowth: Math.round(revenueGrowth * 10) / 10,
       totalOrders,
@@ -125,24 +125,42 @@ export const getRevenueChart = async (req: AuthRequest, res: Response): Promise<
   try {
     const orgId = req.user!.organizationId!;
     const { period = "30" } = req.query;
-
     const days = parseInt(period as string);
-    const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-    const data = await prisma.$queryRaw<{ date: string; revenue: number; orders: bigint }[]>`
-      SELECT 
-        DATE(o."createdAt") as date,
-        SUM(o."totalAmount") as revenue,
+    const todayUTC = new Date();
+    todayUTC.setUTCHours(23, 59, 59, 999);
+    const startDate = new Date(todayUTC);
+    startDate.setUTCDate(startDate.getUTCDate() - (days - 1));
+    startDate.setUTCHours(0, 0, 0, 0);
+
+    const raw = await prisma.$queryRaw<{ date: string; revenue: number; orders: bigint }[]>`
+      SELECT
+        DATE(p."createdAt") as date,
+        COALESCE(SUM(p."amount"), 0) as revenue,
         COUNT(*) as orders
-      FROM orders o
-      WHERE o."organizationId" = ${orgId}
-        AND o.status = 'COMPLETED'
-        AND o."createdAt" >= ${startDate}
-      GROUP BY DATE(o."createdAt")
+      FROM payments p
+      WHERE p."organizationId" = ${orgId}
+        AND p."status" = 'COMPLETED'
+        AND p."createdAt" >= ${startDate}
+      GROUP BY DATE(p."createdAt")
       ORDER BY date ASC
     `;
 
-    res.json(data.map((d: any) => ({ ...d, orders: Number(d.orders) })));
+    const dataMap = new Map<string, { revenue: number; orders: number }>();
+    for (const d of raw) {
+      dataMap.set(String(d.date).substring(0, 10), { revenue: Number(d.revenue), orders: Number(d.orders) });
+    }
+
+    const result = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(todayUTC);
+      d.setUTCDate(d.getUTCDate() - i);
+      const key = d.toISOString().substring(0, 10);
+      const entry = dataMap.get(key) || { revenue: 0, orders: 0 };
+      result.push({ date: key, ...entry });
+    }
+
+    res.json(result);
   } catch {
     res.status(500).json({ error: "Failed to fetch revenue chart data." });
   }
@@ -153,22 +171,41 @@ export const getCustomerChart = async (req: AuthRequest, res: Response): Promise
     const orgId = req.user!.organizationId!;
     const { period = "30" } = req.query;
     const days = parseInt(period as string);
-    const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-    const data = await prisma.$queryRaw<{ date: Date; count: bigint }[]>`
-      SELECT DATE(c."createdAt") as date, COUNT(*) as count
-      FROM customers c
-      WHERE c."organizationId" = ${orgId}
-        AND c."createdAt" >= ${startDate}
-      GROUP BY DATE(c."createdAt")
-      ORDER BY date ASC
-    `;
+    const todayUTC = new Date();
+    todayUTC.setUTCHours(23, 59, 59, 999);
+    const startDate = new Date(todayUTC);
+    startDate.setUTCDate(startDate.getUTCDate() - (days - 1));
+    startDate.setUTCHours(0, 0, 0, 0);
 
-    let cumulative = 0;
-    res.json(data.map((d: any) => {
-      cumulative += Number(d.count);
-      return { date: String(d.date).substring(0, 10), customers: cumulative };
-    }));
+    const [baseline, raw] = await Promise.all([
+      prisma.customer.count({ where: { organizationId: orgId, createdAt: { lt: startDate } } }),
+      prisma.$queryRaw<{ date: Date; count: bigint }[]>`
+        SELECT DATE(c."createdAt") as date, COUNT(*) as count
+        FROM customers c
+        WHERE c."organizationId" = ${orgId}
+          AND c."createdAt" >= ${startDate}
+        GROUP BY DATE(c."createdAt")
+        ORDER BY date ASC
+      `,
+    ]);
+
+    const dataMap = new Map<string, number>();
+    for (const d of raw) {
+      dataMap.set(String(d.date).substring(0, 10), Number(d.count));
+    }
+
+    let cumulative = baseline;
+    const result = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(todayUTC);
+      d.setUTCDate(d.getUTCDate() - i);
+      const key = d.toISOString().substring(0, 10);
+      cumulative += (dataMap.get(key) || 0);
+      result.push({ date: key, customers: cumulative });
+    }
+
+    res.json(result);
   } catch {
     res.status(500).json({ error: "Failed to fetch customer chart data." });
   }

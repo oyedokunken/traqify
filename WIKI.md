@@ -290,11 +290,15 @@ Approved reviews appear as a card grid on `/store/[slug]/products/[id]` below th
 
 ### Overview Dashboard
 - Live 12h clock and greeting with the current user's first name
-- **Period filter**: toggle between 7 / 30 / 90 days for all three charts
+- **Period filter**: toggle between 7 / 30 / 90 days for all three charts; switching the period also re-fetches the KPI cards
 - **Open Storefront button**: opens `/store/[slug]` in a new tab; shows an error modal if the store is unpublished
-- Revenue area chart, order growth area chart, customer growth line chart
+- **Revenue area chart**: aggregates `COMPLETED` Payment records; every calendar day in the period is present (0-filled if no data), so the chart always shows a smooth curve from the zero baseline
+- **Order growth area chart**: daily order counts for the period; same full date-range filling
+- **Customer growth line chart**: cumulative; seeds from the count of customers created before the period, then grows day-by-day so the line never artificially restarts at 0
+- Revenue KPI card ("Revenue this month") is also driven by `COMPLETED` payments, keeping it in sync with the revenue chart
 - Four KPI cards: revenue this month, orders this month, active products, total customers
 - Low-stock alert banner if any products are at or below their alert threshold
+- **Auto-refresh on focus**: navigating away to create an order, customer, or payment, then switching back to the Overview tab silently re-fetches all charts and KPI cards
 
 ### Report Types
 Nine downloadable / emailable report types:
