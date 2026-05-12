@@ -4,7 +4,7 @@ import { orderSchema } from "../utils/validators";
 import { createAuditLog } from "../utils/audit";
 import { AuthRequest } from "../middleware/auth.middleware";
 import { sendEmail } from "../config/email";
-import { orderApprovedEmailTemplate, orderCompletedEmailTemplate, newOrderEmailTemplate } from "../emails/templates";
+import { orderApprovedEmailTemplate, orderCompletedEmailTemplate, newOrderEmailTemplate, storeOrderConfirmationEmailTemplate } from "../emails/templates";
 
 const generateOrderNumber = (): string => {
   const timestamp = Date.now().toString(36).toUpperCase();
@@ -83,7 +83,30 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
       return;
     }
 
-    const { items, customerId, notes, paymentMethod } = parsed.data;
+    const { items, customerId: rawCustomerId, newCustomer, notes, paymentMethod } = parsed.data;
+
+    let resolvedCustomerId: string | undefined = rawCustomerId;
+
+    if (!resolvedCustomerId && newCustomer?.name) {
+      const email = newCustomer.email || null;
+      let customer = email
+        ? await prisma.customer.findFirst({ where: { email, organizationId: orgId } })
+        : null;
+      if (!customer) {
+        customer = await prisma.customer.create({
+          data: {
+            name: newCustomer.name,
+            email: email || undefined,
+            phone: newCustomer.phone || undefined,
+            address: newCustomer.address || undefined,
+            organizationId: orgId,
+            source: "MANUAL",
+          },
+        });
+        await createAuditLog(req.user!.id, orgId, "CREATE", "Customer", customer.id, `Customer ${customer.name} added via manual order`, req);
+      }
+      resolvedCustomerId = customer.id;
+    }
 
     const products = await prisma.product.findMany({
       where: {
@@ -127,7 +150,7 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
           orderNumber: generateOrderNumber(),
           organizationId: orgId,
           createdById: req.user!.id,
-          customerId: customerId || undefined,
+          customerId: resolvedCustomerId || undefined,
           notes,
           paymentMethod,
           totalAmount,
@@ -164,21 +187,37 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
       },
     }).catch(() => {});
 
-    // Notify org owner
+    // Notify org owner and customer
     const orgOwner = await prisma.user.findFirst({ where: { organizationId: orgId, role: "OWNER" } });
+    const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { name: true, slug: true, email: true, phone: true, address: true, logoUrl: true } });
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+    const emailItems = order.orderItems.map((i: any) => ({
+      name: i.product?.name || "Item",
+      qty: i.quantity,
+      subtotal: i.subtotal ?? i.unitPrice * i.quantity,
+    }));
     if (orgOwner) {
-      const org = await prisma.organization.findUnique({ where: { id: orgId } });
-      const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
-      const emailItems = order.orderItems.map((i: any) => ({
-        name: i.product?.name || "Item",
-        qty: i.quantity,
-        subtotal: i.subtotal ?? i.unitPrice * i.quantity,
-      }));
       sendEmail(
         orgOwner.email,
         `New order received: ${org?.name}`,
         newOrderEmailTemplate(org?.name || "", order.id, order.customer?.name || "Walk-in", order.totalAmount, emailItems, `${frontendUrl}/dashboard/${org?.slug || ""}/orders`)
       ).catch((e) => console.error("[Email] New order notification failed:", e.message));
+    }
+    if (order.customer?.email) {
+      sendEmail(
+        order.customer.email,
+        `Order ${order.orderNumber} confirmed - ${org?.name}`,
+        storeOrderConfirmationEmailTemplate(
+          order.customer.name || "Customer",
+          order.orderNumber,
+          org?.name || "",
+          order.totalAmount,
+          emailItems,
+          { email: org?.email || null, phone: org?.phone || null, address: org?.address || null },
+          org?.logoUrl || null,
+          paymentMethod || "TRANSFER"
+        )
+      ).catch((e) => console.error("[Email] Customer order confirmation failed:", e.message));
     }
 
     res.status(201).json(order);
@@ -210,7 +249,7 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
       include: {
         customer: true,
         orderItems: { include: { product: { select: { name: true } } } },
-        organization: { select: { name: true, logoUrl: true } },
+        organization: { select: { name: true, logoUrl: true, email: true, phone: true, address: true } },
       },
     }) as any;
 
@@ -222,17 +261,22 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
         qty: i.quantity,
         subtotal: i.subtotal,
       }));
+      const orgContact = {
+        email: updated.organization?.email || null,
+        phone: updated.organization?.phone || null,
+        address: updated.organization?.address || null,
+      };
       if (status === "APPROVED") {
         sendEmail(
           updated.customer.email,
           `Order ${updated.orderNumber} approved: ${updated.organization?.name}`,
-          orderApprovedEmailTemplate(updated.customer.name, updated.orderNumber, updated.organization?.name || "", updated.totalAmount, items, updated.organization?.logoUrl)
+          orderApprovedEmailTemplate(updated.customer.name, updated.orderNumber, updated.organization?.name || "", updated.totalAmount, items, updated.organization?.logoUrl || null, orgContact, updated.customer.email)
         ).catch((e) => console.error("[Email] Order approved email failed:", e.message));
       } else if (status === "COMPLETED") {
         sendEmail(
           updated.customer.email,
           `Order ${updated.orderNumber} delivered: ${updated.organization?.name}`,
-          orderCompletedEmailTemplate(updated.customer.name, updated.orderNumber, updated.organization?.name || "", updated.totalAmount, updated.organization?.logoUrl)
+          orderCompletedEmailTemplate(updated.customer.name, updated.orderNumber, updated.organization?.name || "", updated.totalAmount, updated.organization?.logoUrl || null, orgContact, updated.customer.email)
         ).catch((e) => console.error("[Email] Order completed email failed:", e.message));
       }
     }

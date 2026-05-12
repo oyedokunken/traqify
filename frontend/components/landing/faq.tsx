@@ -70,7 +70,7 @@ function FAQItem({ faq, index, open, setOpen }: {
 }
 
 export function FAQ() {
-  const [open, setOpen] = useState<number | null>(0);
+  const [open, setOpen] = useState<number | null>(null);
   const col1 = faqs.slice(0, 4);
   const col2 = faqs.slice(4);
 
@@ -78,10 +78,10 @@ export function FAQ() {
     <section id="faq" className="bg-white py-20">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
-          <motion.span initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }}
-            className="text-xs font-semibold text-[#DE1010] uppercase tracking-widest">
-            FAQ
-          </motion.span>
+          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }}
+            className="inline-flex items-center bg-[#DE1010]/10 text-[#DE1010] text-xs font-semibold px-3 py-1.5 rounded-full border border-[#DE1010]/20 mb-3">
+            FAQs
+          </motion.div>
           <motion.h2 initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }} transition={{ delay: 0.1 }}
             className="text-3xl sm:text-4xl font-bold text-[#0a0a0a] mt-3">

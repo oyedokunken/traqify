@@ -21,16 +21,30 @@ export const getProducts = async (req: AuthRequest, res: Response): Promise<void
       ...(productType && productType !== "" && { productType: productType as string }),
     };
 
-    const [products, total] = await Promise.all([
+    const [rawProducts, total] = await Promise.all([
       prisma.product.findMany({
         where,
-        include: { inventory: true, variants: true, productCategory: true, _count: { select: { orderItems: true, reviews: true } } },
+        include: {
+          inventory: true,
+          variants: true,
+          productCategory: true,
+          _count: { select: { orderItems: true, reviews: true } },
+          reviews: { where: { status: "APPROVED" }, select: { rating: true } },
+        },
         orderBy: { createdAt: "desc" },
         skip,
         take,
       }),
       prisma.product.count({ where }),
     ]);
+
+    const products = rawProducts.map((p: any) => {
+      const { reviews: reviewArr, ...rest } = p;
+      const averageRating = reviewArr.length > 0
+        ? Math.round((reviewArr.reduce((s: number, r: any) => s + r.rating, 0) / reviewArr.length) * 10) / 10
+        : null;
+      return { ...rest, averageRating };
+    });
 
     res.json({ products, total });
   } catch {

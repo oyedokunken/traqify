@@ -273,26 +273,35 @@ export default function ProductPage({ params }: { params: { slug: string; id: st
 
         {/* Upsells */}
         {/* Customer reviews */}
-        {reviews.length > 0 && (
-          <section className="mb-12">
-            <h2 className="text-lg font-bold text-[#0a0a0a] mb-5">Customer reviews</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {reviews.map((r) => (
-                <div key={r.id} className="bg-white rounded-xl border border-gray-100 p-4">
-                  <div className="flex items-center gap-0.5 mb-2">
-                    {[1,2,3,4,5].map((n) => (
-                      <Star key={n} size={13} className={n <= r.rating ? "fill-amber-400 text-amber-400" : "fill-gray-200 text-gray-200"} />
-                    ))}
-                    <span className="text-xs text-gray-400 ml-1">{r.rating}/5</span>
+        {reviews.length > 0 && (() => {
+          const avgRating = reviews.reduce((s, r) => s + r.rating, 0) / reviews.length;
+          return (
+            <section className="mb-12">
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-lg font-bold text-[#0a0a0a]">Customer reviews</h2>
+                <span className="inline-flex items-center gap-1 text-sm font-semibold text-amber-600 bg-amber-50 px-3 py-1 rounded-full border border-amber-100">
+                  <Star size={13} className="fill-amber-400 text-amber-400" />
+                  {avgRating.toFixed(1)}/5.0 &middot; {reviews.length} review{reviews.length !== 1 ? "s" : ""}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {reviews.map((r) => (
+                  <div key={r.id} className="bg-white rounded-xl border border-gray-100 p-4">
+                    <div className="flex items-center gap-0.5 mb-2">
+                      {[1,2,3,4,5].map((n) => (
+                        <Star key={n} size={13} className={n <= r.rating ? "fill-amber-400 text-amber-400" : "fill-gray-200 text-gray-200"} />
+                      ))}
+                      <span className="text-xs text-gray-400 ml-1">{r.rating.toFixed(1)}/5.0</span>
+                    </div>
+                    {r.comment && <p className="text-sm text-gray-700 leading-relaxed mb-2">&ldquo;{r.comment}&rdquo;</p>}
+                    <p className="text-xs font-medium text-[#0a0a0a]">{r.customerName}</p>
+                    <p className="text-[10px] text-gray-400">{new Date(r.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</p>
                   </div>
-                  {r.comment && <p className="text-sm text-gray-700 leading-relaxed mb-2">&ldquo;{r.comment}&rdquo;</p>}
-                  <p className="text-xs font-medium text-[#0a0a0a]">{r.customerName}</p>
-                  <p className="text-[10px] text-gray-400">{new Date(r.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</p>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
+                ))}
+              </div>
+            </section>
+          );
+        })()}
 
         {upsells.length > 0 && (
           <section>

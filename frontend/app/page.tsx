@@ -5,6 +5,7 @@ import { About } from "@/components/landing/about";
 import { Features } from "@/components/landing/features";
 import { Stats } from "@/components/landing/stats";
 import { HowItWorks } from "@/components/landing/how-it-works";
+import { WhyTraqify } from "@/components/landing/why-traqify";
 import { Testimonials } from "@/components/landing/testimonials";
 import { Everything } from "@/components/landing/everything";
 import { FAQ } from "@/components/landing/faq";
@@ -21,6 +22,7 @@ export default function LandingPage() {
       <Features />
       <Stats />
       <HowItWorks />
+      <WhyTraqify />
       <Testimonials />
       <Everything />
       <FAQ />

@@ -71,10 +71,10 @@ export function Everything() {
     <section id="roles" className="bg-gray-50 py-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-14">
-          <motion.span initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }}
-            className="text-xs font-semibold text-[#DE1010] uppercase tracking-widest">
+          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }}
+            className="inline-flex items-center bg-white text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-full border border-gray-200 shadow-sm">
             Built for every role
-          </motion.span>
+          </motion.div>
           <motion.h2 initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }} transition={{ delay: 0.1 }}
             className="text-3xl sm:text-4xl font-bold text-[#0a0a0a] mt-3">

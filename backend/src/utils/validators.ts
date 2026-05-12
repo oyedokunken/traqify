@@ -129,6 +129,12 @@ export const customerSchema = z.object({
 
 export const orderSchema = z.object({
   customerId: z.string().optional(),
+  newCustomer: z.object({
+    name: z.string().min(1, "Customer name is required."),
+    email: z.string().email("Invalid email address.").optional().or(z.literal("")),
+    phone: z.string().optional(),
+    address: z.string().optional(),
+  }).optional(),
   notes: z.string().optional(),
   paymentMethod: z.string().optional(),
   items: z
