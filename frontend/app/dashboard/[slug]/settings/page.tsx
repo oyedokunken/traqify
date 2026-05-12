@@ -90,7 +90,7 @@ export default function SettingsPage({ params }: { params: { slug: string } }) {
   return (
     <div>
       <Topbar title="Settings" slug={params.slug} />
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
 
           {/* Tab bar */}

@@ -182,7 +182,7 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
   return (
     <div>
       <Topbar title="Overview" slug={params.slug} />
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         {/* Greeting + clock + Storefront button */}
         <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-6 gap-4">
           <div>

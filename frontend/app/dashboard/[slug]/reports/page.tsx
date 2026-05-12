@@ -84,7 +84,7 @@ export default function ReportsPage({ params }: { params: { slug: string } }) {
   return (
     <div>
       <Topbar title="Reports" slug={params.slug} />
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         <div className="mb-6">
           <h2 className="text-lg font-semibold text-[#0a0a0a]">Generate reports</h2>
           <p className="text-sm text-gray-400 mt-0.5">Download or email any report as a PDF. All reports reflect your current data.</p>

@@ -83,7 +83,7 @@ export default function InventoryPage({ params }: { params: { slug: string } }) 
   return (
     <div>
       <Topbar title="Inventory" slug={params.slug} />
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="p-6">
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="p-4 md:p-6">
         <div className="flex flex-wrap items-center gap-2 mb-6">
           <div className="relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -120,7 +120,8 @@ export default function InventoryPage({ params }: { params: { slug: string } }) 
           </div>
         ) : (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <table className="w-full">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[540px]">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
                   <th className="text-left text-xs font-semibold text-gray-500 px-5 py-3">Product</th>
@@ -199,6 +200,7 @@ export default function InventoryPage({ params }: { params: { slug: string } }) 
                 })}
               </tbody>
             </table>
+            </div>
           </motion.div>
         )}
         <ErrorModal isOpen={!!error} onClose={() => setError("")} message={error} />

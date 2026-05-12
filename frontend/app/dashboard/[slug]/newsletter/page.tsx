@@ -90,7 +90,7 @@ export default function NewsletterPage({ params }: { params: { slug: string } })
     <>
     <div>
       <Topbar title="Newsletter" slug={params.slug} />
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="p-6">
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="p-4 md:p-6">
 
         {/* Stats row */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
@@ -141,7 +141,7 @@ export default function NewsletterPage({ params }: { params: { slug: string } })
           <div className="flex flex-wrap items-center justify-between gap-3 p-4 border-b border-gray-100">
             <div className="relative">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <Input placeholder="Search subscribers..." className="pl-9 w-56" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <Input placeholder="Search subscribers..." className="pl-9 w-full sm:w-56" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" className="gap-2" onClick={() => fetchSubscribers(true)} disabled={refreshing}>
@@ -166,7 +166,8 @@ export default function NewsletterPage({ params }: { params: { slug: string } })
               </p>
             </div>
           ) : (
-            <table className="w-full">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[400px]">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
                   <th className="text-left text-xs font-semibold text-gray-500 px-5 py-3">Name</th>
@@ -197,6 +198,7 @@ export default function NewsletterPage({ params }: { params: { slug: string } })
                 ))}
               </tbody>
             </table>
+            </div>
           )}
 
           {filtered.length > 0 && (

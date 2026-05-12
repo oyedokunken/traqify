@@ -58,11 +58,11 @@ export default function CategoriesPage({ params }: { params: { slug: string } })
   return (
     <div>
       <Topbar title="Product Categories" slug={params.slug} />
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         {error && <p className="text-sm text-[#DE1010] bg-red-50 px-3 py-2 rounded-lg mb-4">{error}</p>}
 
-        <div className="flex items-center justify-between mb-6 gap-4">
-          <div className="relative w-64">
+        <div className="flex flex-wrap items-center justify-between mb-6 gap-3">
+          <div className="relative w-full sm:w-64">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <Input placeholder="Search categories..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>

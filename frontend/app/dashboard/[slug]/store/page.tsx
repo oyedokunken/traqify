@@ -89,7 +89,7 @@ export default function StorePage({ params }: { params: { slug: string } }) {
     <>
     <div>
       <Topbar title="Store" slug={params.slug} />
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Left column: controls */}
         <div className="xl:col-span-2">

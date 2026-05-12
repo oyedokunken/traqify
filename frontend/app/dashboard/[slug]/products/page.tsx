@@ -14,7 +14,6 @@ import { ErrorModal } from "@/components/shared/error-modal";
 import api from "@/lib/api";
 import { formatCurrency, truncate } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
-import { ProductModal } from "@/components/dashboard/product-modal";
 
 const TYPE_LABELS: Record<string, string> = { SIMPLE: "Simple", DOWNLOADABLE: "Downloadable", VARIABLE: "Variable" };
 const TYPE_VARIANTS: Record<string, "default" | "secondary" | "info" | "warning" | "outline"> = { SIMPLE: "secondary", DOWNLOADABLE: "info", VARIABLE: "warning" };
@@ -44,8 +43,6 @@ export default function ProductsPage({ params }: { params: { slug: string } }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showNoCatModal, setShowNoCatModal] = useState(false);
-  const [showModal, setShowModal] = useState(false);
-  const [editProduct, setEditProduct] = useState<Product | null>(null);
 
   const canEdit = user?.role === "OWNER" || user?.role === "MANAGER";
 
@@ -90,12 +87,12 @@ export default function ProductsPage({ params }: { params: { slug: string } }) {
   return (
     <div>
       <Topbar title="Products" slug={params.slug} />
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <div className="relative w-full sm:w-auto">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <Input placeholder="Search products..." className="pl-9 w-52" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <Input placeholder="Search products..." className="pl-9 w-full sm:w-52" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
             <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}
               className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
@@ -170,7 +167,7 @@ export default function ProductsPage({ params }: { params: { slug: string } }) {
                     {canEdit && (
                       <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
-                          onClick={() => { setEditProduct(product); setShowModal(true); }}
+                          onClick={() => router.push(`/dashboard/${params.slug}/products/${product.id}/edit`)}
                           className="w-7 h-7 bg-white rounded-md flex items-center justify-center shadow-sm hover:bg-gray-50"
                         >
                           <Edit size={13} className="text-gray-600" />
@@ -230,13 +227,6 @@ export default function ProductsPage({ params }: { params: { slug: string } }) {
         )}
       </div>
 
-      {showModal && (
-        <ProductModal
-          product={editProduct}
-          onClose={() => setShowModal(false)}
-          onSaved={() => { setShowModal(false); fetchProducts(); }}
-        />
-      )}
       <AnimatePresence>
         {deleteTarget && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}

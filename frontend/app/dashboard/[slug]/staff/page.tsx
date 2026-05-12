@@ -115,7 +115,7 @@ export default function StaffPage({ params }: { params: { slug: string } }) {
   return (
     <div>
       <Topbar title="Staff" slug={params.slug} />
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         <AnimatePresence>
           {successMsg && (
             <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
@@ -129,7 +129,7 @@ export default function StaffPage({ params }: { params: { slug: string } }) {
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <Input placeholder="Search staff..." className="pl-9 w-52" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <Input placeholder="Search staff..." className="pl-9 w-full sm:w-52" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
             <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}
               className="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
@@ -163,7 +163,8 @@ export default function StaffPage({ params }: { params: { slug: string } }) {
           </div>
         ) : (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <table className="w-full">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px]">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
                   <th className="text-left text-xs font-semibold text-gray-500 px-5 py-3">Member</th>
@@ -255,6 +256,7 @@ export default function StaffPage({ params }: { params: { slug: string } }) {
                 )}
               </tbody>
             </table>
+            </div>
           </motion.div>
         )}
       </div>
