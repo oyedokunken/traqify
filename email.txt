@@ -1,0 +1,32 @@
+Subject: Technical Challenge Submission - Oyedokun Kehinde
+
+Good day Imam Muhammed,
+
+I am submitting my completed technical challenge as discussed. Please find the details below.
+
+The application is called Traqify. It is a production-deployed, multi-tenant enterprise store management platform built for retail businesses that need structure, auditability, and role-based control across their operations.
+
+Live application: https://traqify.vercel.app
+Backend API: https://traqify-api.vercel.app
+GitHub repository: https://github.com/oyedokunken/traqify
+
+About the project:
+
+Traqify is a full-stack SaaS platform that allows businesses to manage their store end-to-end. Each organisation gets its own isolated workspace with full role-based access control across four roles: Owner, Manager, Cashier, and Auditor. The platform includes a customer-facing storefront, a dashboard for internal operations, and a complete audit trail of every action taken within the system.
+
+Key features include product and inventory management, manual and storefront order processing, payment recording and tracking, customer management with purchase history, staff invitation and access control, PDF report generation across nine report types, revenue and customer growth charts, automated transactional emails, and a public storefront with Paystack payment integration.
+
+Tech stack:
+
+Frontend: Next.js 14, TypeScript, Tailwind CSS, Framer Motion, Recharts, shadcn/ui
+Backend: Node.js, Express, TypeScript, Prisma ORM, PostgreSQL (Supabase)
+Infrastructure: Vercel (frontend and backend), Supabase (database), Resend (email delivery), Cloudinary (image storage)
+
+I built this end-to-end from scratch over the course of the challenge period. The codebase is clean, the system is live, and I am confident it demonstrates both the technical depth and product thinking you are looking for.
+
+I look forward to your review and to speaking with the team again.
+
+Best regards,
+Oyedokun Kehinde
++234 8028134942
+https://github.com/oyedokunken/traqify

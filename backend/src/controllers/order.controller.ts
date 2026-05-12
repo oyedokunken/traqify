@@ -170,22 +170,21 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
         });
       }
 
+      await tx.payment.create({
+        data: {
+          amount: totalAmount,
+          currency: "NGN",
+          status: "COMPLETED",
+          method: paymentMethod || "TRANSFER",
+          organizationId: orgId,
+          orderId: newOrder.id,
+        },
+      });
+
       return newOrder;
     });
 
     await createAuditLog(req.user!.id, orgId, "CREATE", "Order", order.id, `Created order ${order.orderNumber}`, req);
-
-    // Auto-create a COMPLETED payment record for this dashboard order
-    prisma.payment.create({
-      data: {
-        amount: totalAmount,
-        currency: "NGN",
-        status: "COMPLETED",
-        method: paymentMethod || "TRANSFER",
-        organizationId: orgId,
-        orderId: order.id,
-      },
-    }).catch(() => {});
 
     // Notify org owner and customer
     const orgOwner = await prisma.user.findFirst({ where: { organizationId: orgId, role: "OWNER" } });

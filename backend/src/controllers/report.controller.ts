@@ -42,12 +42,14 @@ export const getOverview = async (req: AuthRequest, res: Response): Promise<void
 
     const monthRev = monthRevenue._sum.amount || 0;
     const lastMonthRev = lastMonthRevenue._sum.amount || 0;
-    const revenueGrowth = lastMonthRev > 0 ? ((monthRev - lastMonthRev) / lastMonthRev) * 100 : 0;
+    const revenueGrowth = lastMonthRev > 0
+      ? Math.round(((monthRev - lastMonthRev) / lastMonthRev) * 100 * 10) / 10
+      : (monthRev > 0 ? null : 0);
 
     res.json({
       totalRevenue: totalRevenue._sum.amount || 0,
       monthRevenue: monthRev,
-      revenueGrowth: Math.round(revenueGrowth * 10) / 10,
+      revenueGrowth,
       totalOrders,
       monthOrders,
       totalProducts,
@@ -133,38 +135,27 @@ export const getRevenueChart = async (req: AuthRequest, res: Response): Promise<
     startDate.setUTCDate(startDate.getUTCDate() - (days - 1));
     startDate.setUTCHours(0, 0, 0, 0);
 
-    const [rawPayments, rawOrders] = await Promise.all([
-      prisma.$queryRaw<{ date: string; revenue: number }[]>`
-        SELECT
-          DATE(p."createdAt") as date,
-          COALESCE(SUM(p."amount"), 0) as revenue
-        FROM payments p
-        WHERE p."organizationId" = ${orgId}
-          AND p."status" = 'COMPLETED'
-          AND p."createdAt" >= ${startDate}
-        GROUP BY DATE(p."createdAt")
-        ORDER BY date ASC
-      `,
-      prisma.$queryRaw<{ date: string; orders: bigint }[]>`
-        SELECT
-          DATE(o."createdAt") as date,
-          COUNT(*) as orders
-        FROM orders o
-        WHERE o."organizationId" = ${orgId}
-          AND o."createdAt" >= ${startDate}
-        GROUP BY DATE(o."createdAt")
-        ORDER BY date ASC
-      `,
+    const [paymentsRaw, ordersRaw] = await Promise.all([
+      prisma.payment.findMany({
+        where: { organizationId: orgId, status: "COMPLETED", createdAt: { gte: startDate } },
+        select: { createdAt: true, amount: true },
+      }),
+      prisma.order.findMany({
+        where: { organizationId: orgId, createdAt: { gte: startDate } },
+        select: { createdAt: true },
+      }),
     ]);
 
     const dataMap = new Map<string, { revenue: number; orders: number }>();
-    for (const d of rawPayments) {
-      dataMap.set(String(d.date).substring(0, 10), { revenue: Number(d.revenue), orders: 0 });
-    }
-    for (const d of rawOrders) {
-      const key = String(d.date).substring(0, 10);
+    for (const p of paymentsRaw) {
+      const key = p.createdAt.toISOString().substring(0, 10);
       const existing = dataMap.get(key) || { revenue: 0, orders: 0 };
-      dataMap.set(key, { ...existing, orders: Number(d.orders) });
+      dataMap.set(key, { ...existing, revenue: existing.revenue + p.amount });
+    }
+    for (const o of ordersRaw) {
+      const key = o.createdAt.toISOString().substring(0, 10);
+      const existing = dataMap.get(key) || { revenue: 0, orders: 0 };
+      dataMap.set(key, { ...existing, orders: existing.orders + 1 });
     }
 
     const result = [];
@@ -194,21 +185,23 @@ export const getCustomerChart = async (req: AuthRequest, res: Response): Promise
     startDate.setUTCDate(startDate.getUTCDate() - (days - 1));
     startDate.setUTCHours(0, 0, 0, 0);
 
-    const raw = await prisma.$queryRaw<{ date: Date; count: bigint }[]>`
-      SELECT DATE(c."createdAt") as date, COUNT(*) as count
-      FROM customers c
-      WHERE c."organizationId" = ${orgId}
-        AND c."createdAt" >= ${startDate}
-      GROUP BY DATE(c."createdAt")
-      ORDER BY date ASC
-    `;
+    const [customersRaw, prePeriodCount] = await Promise.all([
+      prisma.customer.findMany({
+        where: { organizationId: orgId, createdAt: { gte: startDate } },
+        select: { createdAt: true },
+      }),
+      prisma.customer.count({
+        where: { organizationId: orgId, createdAt: { lt: startDate } },
+      }),
+    ]);
 
     const dataMap = new Map<string, number>();
-    for (const d of raw) {
-      dataMap.set(String(d.date).substring(0, 10), Number(d.count));
+    for (const c of customersRaw) {
+      const key = c.createdAt.toISOString().substring(0, 10);
+      dataMap.set(key, (dataMap.get(key) || 0) + 1);
     }
 
-    let cumulative = 0;
+    let cumulative = prePeriodCount;
     const result = [];
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date(todayUTC);

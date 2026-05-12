@@ -56,7 +56,7 @@ export function WhyTraqify() {
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
-            className="inline-flex items-center bg-white text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-full border border-gray-200 shadow-sm"
+            className="inline-flex items-center bg-[#DE1010] text-white text-xs font-semibold px-3 py-1.5 rounded-full"
           >
             Why Traqify
           </motion.div>
