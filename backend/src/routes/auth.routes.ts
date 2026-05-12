@@ -1,4 +1,5 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
+import multer from "multer";
 import {
   register,
   checkEmail,
@@ -38,15 +39,33 @@ router.post("/accept-invite", acceptInvite);
 router.get("/me", authenticate, getMe);
 router.patch("/me", authenticate, updateProfile);
 router.post("/change-password", authenticate, changePassword);
-router.post("/upload-avatar", authenticate, upload.single("avatar"), async (req: Request, res: Response) => {
-  try {
-    if (!req.file) { res.status(400).json({ error: "No image provided." }); return; }
-    const userId = (req as AuthRequest).user!.id;
-    const filePath = getSupabasePath("avatars", req.file.originalname);
-    const avatarUrl = await uploadFile("avatars", filePath, req.file.buffer, req.file.mimetype);
-    await prisma.user.update({ where: { id: userId }, data: { avatarUrl } });
-    res.json({ url: avatarUrl });
-  } catch (err: any) { res.status(500).json({ error: err.message || "Upload failed." }); }
-});
+router.post(
+  "/upload-avatar",
+  authenticate,
+  (req: Request, res: Response, next: NextFunction) => {
+    upload.single("avatar")(req, res, (err: any) => {
+      if (err instanceof multer.MulterError) {
+        res.status(400).json({ error: err.message }); return;
+      }
+      if (err) {
+        res.status(400).json({ error: err.message || "Invalid file." }); return;
+      }
+      next();
+    });
+  },
+  async (req: Request, res: Response) => {
+    try {
+      if (!req.file) { res.status(400).json({ error: "No image provided." }); return; }
+      const userId = (req as AuthRequest).user!.id;
+      const filePath = getSupabasePath("avatars", req.file.originalname);
+      const avatarUrl = await uploadFile("avatars", filePath, req.file.buffer, req.file.mimetype);
+      await prisma.user.update({ where: { id: userId }, data: { avatarUrl } });
+      res.json({ url: avatarUrl });
+    } catch (err: any) {
+      console.error("[upload-avatar] Error:", err);
+      res.status(500).json({ error: err?.message || "Upload failed." });
+    }
+  }
+);
 
 export default router;
