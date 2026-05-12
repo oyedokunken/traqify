@@ -65,8 +65,8 @@ router.post(
   async (req: Request, res: Response) => {
     try {
       if (!req.file) { res.status(400).json({ error: "No file provided." }); return; }
-      const filePath = getSupabasePath("products", req.file.originalname);
-      const url = await uploadFile("products", filePath, req.file.buffer, req.file.mimetype);
+      const filePath = getSupabasePath("downloadables", req.file.originalname);
+      const url = await uploadFile("downloadables", filePath, req.file.buffer, req.file.mimetype);
       res.json({ url });
     } catch (err: any) {
       console.error("[upload-file] Error:", err);
