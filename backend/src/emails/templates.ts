@@ -18,7 +18,23 @@ const otpBoxStyle = `background:#f4f4f5;border-radius:8px;padding:20px;text-alig
 
 const traqifyLogoHtml = `
   <div style="margin-bottom:32px;">
-    <span style="font-size:22px;font-weight:800;color:#0a0a0a;letter-spacing:-0.5px;">Traq<span style="color:#DE1010;">ify</span></span>
+    <table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;display:inline-table;">
+      <tr>
+        <td style="vertical-align:middle;padding-right:10px;">
+          <div style="width:34px;height:34px;background-color:#DE1010;border-radius:8px;display:inline-block;text-align:center;line-height:34px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:inline-block;vertical-align:middle;margin-top:-1px;">
+              <rect x="3" y="3" width="8" height="8" rx="1.5" fill="white"/>
+              <rect x="13" y="3" width="8" height="8" rx="1.5" fill="white" opacity="0.7"/>
+              <rect x="3" y="13" width="8" height="8" rx="1.5" fill="white" opacity="0.7"/>
+              <rect x="13" y="13" width="8" height="8" rx="1.5" fill="white"/>
+            </svg>
+          </div>
+        </td>
+        <td style="vertical-align:middle;">
+          <span style="font-size:22px;font-weight:800;color:#0a0a0a;letter-spacing:-0.5px;">Traq<span style="color:#DE1010;">ify</span></span>
+        </td>
+      </tr>
+    </table>
   </div>
 `;
 

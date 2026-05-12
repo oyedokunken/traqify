@@ -154,7 +154,7 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
           notes,
           paymentMethod,
           totalAmount,
-          status: "COMPLETED",
+          status: "APPROVED",
           orderItems: { create: orderItems },
         },
         include: {

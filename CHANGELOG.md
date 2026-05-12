@@ -5,6 +5,33 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v1.19.0] - 2026-05-12
+
+### Added
+- **Approval/rejection confirmation modals on Reviews page** -- clicking Approve or Reject now shows a confirmation dialog before the moderation action is applied; modal text and colours adapt (green for approve, red for reject)
+- **Mark-delivered confirmation modal on Logistics page** -- clicking "Mark delivered" now shows a confirmation dialog before updating the order status to COMPLETED
+- **Quick Links card after charts on Overview page** -- the Quick Links grid card now appears below all three charts instead of above them
+
+### Changed
+- **New manual order initial status is now APPROVED** -- orders created from the dashboard (`POST /api/orders`) are set to `APPROVED` instead of `COMPLETED` so they appear in the Logistics queue and can be physically tracked before being marked as delivered
+- **Traqify brand logo in all platform email templates** -- `traqifyLogoHtml` now renders the full brand icon (red square with grid SVG) alongside the "Traqify" wordmark, matching the landing page logo exactly; uses a table layout for email-client compatibility
+
+### Fixed
+- **Report routes audit** -- all nine report types (`revenue`, `products`, `orders`, `customers`, `inventory`, `staff`, `newsletter`, `payments`, `audit-logs`) are correctly served via `GET /:type/pdf` and `POST /:type/email`; all routes protected by `authenticate, requireOrg, isAtLeastAuditor`
+
+---
+
+## [v1.18.0] - 2026-05-12
+
+### Added
+- **Per-chart independent period filters on Overview page** -- each chart (Revenue, Orders, Customers) now has its own 7d / 30d / 60d / 90d pill selector in its card header; changing one chart's period only refetches that chart
+- **Quick Links card on Overview page** -- responsive `grid-cols-2 sm:grid-cols-4` card grid with icon, label, and one-line description linking to Products, Orders, Customers, Inventory, Reports, Storefront, Staff, and Settings
+
+### Fixed
+- **Downloadable file upload 500 error** -- `/api/products/upload-file` now uploads to the `downloadables` Supabase bucket (instead of the image-only `products` bucket), resolving the "mime type application/pdf is not supported" error
+
+---
+
 ## [v1.17.0] - 2026-05-12
 
 ### Added

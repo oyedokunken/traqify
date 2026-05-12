@@ -240,40 +240,6 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
             </motion.div>
           )}
 
-          {/* Quick Links */}
-          <motion.div variants={fadeUp} className="mb-6">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-semibold">Quick Links</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {[
-                    { href: `/dashboard/${params.slug}/products`, icon: Package, label: "Products", desc: "Manage your product catalog", color: "bg-blue-50", iconColor: "text-blue-600" },
-                    { href: `/dashboard/${params.slug}/orders`, icon: ShoppingCart, label: "Orders", desc: "View and process orders", color: "bg-green-50", iconColor: "text-green-600" },
-                    { href: `/dashboard/${params.slug}/customers`, icon: Users, label: "Customers", desc: "Manage customer records", color: "bg-purple-50", iconColor: "text-purple-600" },
-                    { href: `/dashboard/${params.slug}/inventory`, icon: Archive, label: "Inventory", desc: "Track and adjust stock", color: "bg-amber-50", iconColor: "text-amber-600" },
-                    { href: `/dashboard/${params.slug}/reports`, icon: BarChart2, label: "Reports", desc: "Download financial reports", color: "bg-indigo-50", iconColor: "text-indigo-600" },
-                    { href: `/dashboard/${params.slug}/store`, icon: Globe, label: "Storefront", desc: "Configure your public store", color: "bg-red-50", iconColor: "text-[#DE1010]" },
-                    { href: `/dashboard/${params.slug}/staff`, icon: UserCheck, label: "Staff", desc: "Manage team members", color: "bg-teal-50", iconColor: "text-teal-600" },
-                    { href: `/dashboard/${params.slug}/settings`, icon: Cog, label: "Settings", desc: "Account and org settings", color: "bg-gray-100", iconColor: "text-gray-600" },
-                  ].map(({ href, icon: Icon, label, desc, color, iconColor }) => (
-                    <a key={href} href={href}
-                      className="flex items-start gap-3 p-3 rounded-xl border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-all group">
-                      <div className={`w-9 h-9 rounded-lg ${color} flex items-center justify-center flex-shrink-0`}>
-                        <Icon size={17} className={iconColor} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-[#0a0a0a] leading-tight">{label}</p>
-                        <p className="text-xs text-gray-400 mt-0.5 leading-snug">{desc}</p>
-                      </div>
-                    </a>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-
           <motion.div variants={fadeUp}>
             <Card>
               <CardHeader className="pb-2">
@@ -380,6 +346,40 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
                     <Area type="monotone" dataKey="customers" stroke="#10B981" strokeWidth={2} fill="url(#custGrad)" dot={false} activeDot={{ r: 4, strokeWidth: 0, fill: "#10B981" }} />
                   </AreaChart>
                 </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Quick Links */}
+          <motion.div variants={fadeUp} className="mt-6">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-semibold">Quick Links</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    { href: `/dashboard/${params.slug}/products`, icon: Package, label: "Products", desc: "Manage your product catalog", color: "bg-blue-50", iconColor: "text-blue-600" },
+                    { href: `/dashboard/${params.slug}/orders`, icon: ShoppingCart, label: "Orders", desc: "View and process orders", color: "bg-green-50", iconColor: "text-green-600" },
+                    { href: `/dashboard/${params.slug}/customers`, icon: Users, label: "Customers", desc: "Manage customer records", color: "bg-purple-50", iconColor: "text-purple-600" },
+                    { href: `/dashboard/${params.slug}/inventory`, icon: Archive, label: "Inventory", desc: "Track and adjust stock", color: "bg-amber-50", iconColor: "text-amber-600" },
+                    { href: `/dashboard/${params.slug}/reports`, icon: BarChart2, label: "Reports", desc: "Download financial reports", color: "bg-indigo-50", iconColor: "text-indigo-600" },
+                    { href: `/dashboard/${params.slug}/store`, icon: Globe, label: "Storefront", desc: "Configure your public store", color: "bg-red-50", iconColor: "text-[#DE1010]" },
+                    { href: `/dashboard/${params.slug}/staff`, icon: UserCheck, label: "Staff", desc: "Manage team members", color: "bg-teal-50", iconColor: "text-teal-600" },
+                    { href: `/dashboard/${params.slug}/settings`, icon: Cog, label: "Settings", desc: "Account and org settings", color: "bg-gray-100", iconColor: "text-gray-600" },
+                  ].map(({ href, icon: Icon, label, desc, color, iconColor }) => (
+                    <a key={href} href={href}
+                      className="flex items-start gap-3 p-3 rounded-xl border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-all group">
+                      <div className={`w-9 h-9 rounded-lg ${color} flex items-center justify-center flex-shrink-0`}>
+                        <Icon size={17} className={iconColor} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-[#0a0a0a] leading-tight">{label}</p>
+                        <p className="text-xs text-gray-400 mt-0.5 leading-snug">{desc}</p>
+                      </div>
+                    </a>
+                  ))}
+                </div>
               </CardContent>
             </Card>
           </motion.div>

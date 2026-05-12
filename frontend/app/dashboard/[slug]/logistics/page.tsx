@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Truck, Search, MapPin, Phone, CheckCircle, Package, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +33,7 @@ export default function LogisticsPage({ params }: { params: { slug: string } }) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [completing, setCompleting] = useState<string | null>(null);
+  const [deliverConfirm, setDeliverConfirm] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
 
@@ -163,7 +164,7 @@ export default function LogisticsPage({ params }: { params: { slug: string } }) 
                     <p className="text-sm font-bold text-[#0a0a0a]">{formatCurrency(order.totalAmount)}</p>
                   </div>
                   {canManage && (
-                    <Button size="sm" onClick={() => markCompleted(order.id)} disabled={completing === order.id}
+                    <Button size="sm" onClick={() => setDeliverConfirm(order.id)} disabled={completing === order.id}
                       className="gap-1.5 text-xs">
                       <CheckCircle size={13} />
                       {completing === order.id ? "Updating..." : "Mark delivered"}
@@ -184,6 +185,34 @@ export default function LogisticsPage({ params }: { params: { slug: string } }) 
         )}
       </div>
       <ErrorModal isOpen={!!error} onClose={() => setError("")} message={error} />
+
+      <AnimatePresence>
+        {deliverConfirm && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4"
+            onClick={() => setDeliverConfirm(null)}>
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl"
+              onClick={(e) => e.stopPropagation()}>
+              <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-4">
+                <CheckCircle size={24} className="text-green-600" />
+              </div>
+              <h3 className="font-bold text-[#0a0a0a] text-center text-base mb-2">Mark as delivered?</h3>
+              <p className="text-sm text-gray-500 text-center mb-5">This will mark the order as completed and remove it from the logistics queue.</p>
+              <div className="flex gap-3">
+                <button onClick={() => setDeliverConfirm(null)}
+                  className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+                <button
+                  onClick={() => { const id = deliverConfirm!; setDeliverConfirm(null); markCompleted(id); }}
+                  disabled={!!completing}
+                  className="flex-1 py-2.5 bg-[#0a0a0a] text-white rounded-xl text-sm font-semibold hover:bg-black/80 transition-colors disabled:opacity-50">
+                  {completing ? "Updating..." : "Yes, mark delivered"}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
