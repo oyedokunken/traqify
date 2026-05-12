@@ -25,9 +25,9 @@ export const getOverview = async (req: AuthRequest, res: Response): Promise<void
       totalProducts,
       totalCustomers,
     ] = await Promise.all([
-      prisma.order.aggregate({ where: { organizationId: orgId, status: { in: ["COMPLETED", "APPROVED"] } }, _sum: { totalAmount: true } }),
-      prisma.order.aggregate({ where: { organizationId: orgId, status: { in: ["COMPLETED", "APPROVED"] }, createdAt: { gte: startOfMonth } }, _sum: { totalAmount: true } }),
-      prisma.order.aggregate({ where: { organizationId: orgId, status: { in: ["COMPLETED", "APPROVED"] }, createdAt: { gte: startOfLastMonth, lte: endOfLastMonth } }, _sum: { totalAmount: true } }),
+      prisma.payment.aggregate({ where: { organizationId: orgId, status: "COMPLETED" }, _sum: { amount: true } }),
+      prisma.payment.aggregate({ where: { organizationId: orgId, status: "COMPLETED", createdAt: { gte: startOfMonth } }, _sum: { amount: true } }),
+      prisma.payment.aggregate({ where: { organizationId: orgId, status: "COMPLETED", createdAt: { gte: startOfLastMonth, lte: endOfLastMonth } }, _sum: { amount: true } }),
       prisma.order.count({ where: { organizationId: orgId } }),
       prisma.order.count({ where: { organizationId: orgId, createdAt: { gte: startOfMonth } } }),
       prisma.product.count({ where: { organizationId: orgId, isActive: true } }),
@@ -40,12 +40,12 @@ export const getOverview = async (req: AuthRequest, res: Response): Promise<void
     });
     const lowStockCount = allInventory.filter((i) => i.quantity <= i.lowStockAlert).length;
 
-    const monthRev = monthRevenue._sum.totalAmount || 0;
-    const lastMonthRev = lastMonthRevenue._sum.totalAmount || 0;
+    const monthRev = monthRevenue._sum.amount || 0;
+    const lastMonthRev = lastMonthRevenue._sum.amount || 0;
     const revenueGrowth = lastMonthRev > 0 ? ((monthRev - lastMonthRev) / lastMonthRev) * 100 : 0;
 
     res.json({
-      totalRevenue: totalRevenue._sum.totalAmount || 0,
+      totalRevenue: totalRevenue._sum.amount || 0,
       monthRevenue: monthRev,
       revenueGrowth: Math.round(revenueGrowth * 10) / 10,
       totalOrders,
@@ -133,22 +133,38 @@ export const getRevenueChart = async (req: AuthRequest, res: Response): Promise<
     startDate.setUTCDate(startDate.getUTCDate() - (days - 1));
     startDate.setUTCHours(0, 0, 0, 0);
 
-    const raw = await prisma.$queryRaw<{ date: string; revenue: number; orders: bigint }[]>`
-      SELECT
-        DATE(o."createdAt") as date,
-        COALESCE(SUM(o."totalAmount"), 0) as revenue,
-        COUNT(*) as orders
-      FROM orders o
-      WHERE o."organizationId" = ${orgId}
-        AND o.status IN ('COMPLETED', 'APPROVED')
-        AND o."createdAt" >= ${startDate}
-      GROUP BY DATE(o."createdAt")
-      ORDER BY date ASC
-    `;
+    const [rawPayments, rawOrders] = await Promise.all([
+      prisma.$queryRaw<{ date: string; revenue: number }[]>`
+        SELECT
+          DATE(p."createdAt") as date,
+          COALESCE(SUM(p."amount"), 0) as revenue
+        FROM payments p
+        WHERE p."organizationId" = ${orgId}
+          AND p."status" = 'COMPLETED'
+          AND p."createdAt" >= ${startDate}
+        GROUP BY DATE(p."createdAt")
+        ORDER BY date ASC
+      `,
+      prisma.$queryRaw<{ date: string; orders: bigint }[]>`
+        SELECT
+          DATE(o."createdAt") as date,
+          COUNT(*) as orders
+        FROM orders o
+        WHERE o."organizationId" = ${orgId}
+          AND o."createdAt" >= ${startDate}
+        GROUP BY DATE(o."createdAt")
+        ORDER BY date ASC
+      `,
+    ]);
 
     const dataMap = new Map<string, { revenue: number; orders: number }>();
-    for (const d of raw) {
-      dataMap.set(String(d.date).substring(0, 10), { revenue: Number(d.revenue), orders: Number(d.orders) });
+    for (const d of rawPayments) {
+      dataMap.set(String(d.date).substring(0, 10), { revenue: Number(d.revenue), orders: 0 });
+    }
+    for (const d of rawOrders) {
+      const key = String(d.date).substring(0, 10);
+      const existing = dataMap.get(key) || { revenue: 0, orders: 0 };
+      dataMap.set(key, { ...existing, orders: Number(d.orders) });
     }
 
     const result = [];

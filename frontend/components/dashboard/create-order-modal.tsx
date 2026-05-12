@@ -30,7 +30,10 @@ export function CreateOrderModal({ onClose, onSaved }: { onClose: () => void; on
 
   useEffect(() => {
     Promise.all([api.get("/api/products?isActive=true"), api.get("/api/customers")])
-      .then(([p, c]) => { setProducts(p.data); setCustomers(c.data); });
+      .then(([p, c]) => {
+        setProducts(Array.isArray(p.data) ? p.data : p.data.products || []);
+        setCustomers(Array.isArray(c.data) ? c.data : c.data.customers || []);
+      });
   }, []);
 
   const addProduct = (product: Product) => {
