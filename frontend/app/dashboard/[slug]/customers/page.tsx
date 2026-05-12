@@ -87,13 +87,13 @@ export default function CustomersPage({ params }: { params: { slug: string } }) 
   return (
     <div>
       <Topbar title="Customers" slug={params.slug} />
-      <div className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="relative w-64">
+      <div className="p-4 md:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+          <div className="relative w-full sm:w-64">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <Input placeholder="Search customers..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
-          <Button onClick={() => setShowAdd(true)} className="gap-2"><Plus size={16} />Add customer</Button>
+          <Button onClick={() => setShowAdd(true)} className="gap-2 w-full sm:w-auto"><Plus size={16} />Add customer</Button>
         </div>
 
 
@@ -108,7 +108,8 @@ export default function CustomersPage({ params }: { params: { slug: string } }) 
           </div>
         ) : (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <table className="w-full">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[500px]">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
                   <th className="text-left text-xs font-semibold text-gray-500 px-5 py-3">Customer</th>
@@ -164,6 +165,7 @@ export default function CustomersPage({ params }: { params: { slug: string } }) 
                 ))}
               </tbody>
             </table>
+            </div>
           </motion.div>
         )}
 

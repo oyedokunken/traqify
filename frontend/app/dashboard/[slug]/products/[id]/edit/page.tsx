@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { ImagePlus, AlertCircle, Wand2, ArrowLeft, GripVertical, X, Plus, Upload, Link as LinkIcon, Tag, CheckCircle2 } from "lucide-react";
+import { ImagePlus, AlertCircle, Wand2, ArrowLeft, GripVertical, X, Plus, Upload, Link as LinkIcon, Tag, CheckCircle2, Lock } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -19,7 +19,6 @@ const productSchema = z.object({
   description: z.string().min(10, "Description must be at least 10 characters"),
   price: z.string().min(1, "Price is required").refine((v) => !isNaN(Number(v)) && Number(v) > 0, "Price must be a positive number"),
   comparePrice: z.string().optional(),
-  categoryId: z.string().min(1, "Category is required"),
   status: z.enum(["published", "draft"]),
   productType: z.enum(["SIMPLE", "DOWNLOADABLE", "VARIABLE"]),
   downloadUrl: z.string().optional(),
@@ -39,40 +38,73 @@ function generateSKU(name: string): string {
   return `${prefix || "PRD"}-${Math.floor(Math.random() * 900 + 100)}`;
 }
 
-export default function NewProductPage({ params }: { params: { slug: string } }) {
+export default function EditProductPage({ params }: { params: { slug: string; id: string } }) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
+  const [categoryName, setCategoryName] = useState("");
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [imageError, setImageError] = useState("");
   const [uploadProgress, setUploadProgress] = useState(false);
-  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [downloadMode, setDownloadMode] = useState<"url" | "upload">("url");
   const [downloadFile, setDownloadFile] = useState<File | null>(null);
   const [attributes, setAttributes] = useState<{ name: string; values: string; id: number }[]>([]);
   const [resultModal, setResultModal] = useState<{ open: boolean; type: "success" | "error"; title: string; body: string }>({ open: false, type: "error", title: "", body: "" });
+  const [publishConfirm, setPublishConfirm] = useState(false);
+  const [pendingSubmitData, setPendingSubmitData] = useState<any>(null);
   const closeModal = () => setResultModal((m) => ({ ...m, open: false }));
   const showError = (title: string, body: string) => setResultModal({ open: true, type: "error", title, body });
   const showSuccess = (title: string, body: string) => setResultModal({ open: true, type: "success", title, body });
   const fileRef = useRef<HTMLInputElement>(null);
   const downloadFileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    api.get("/api/categories").then((r) => setCategories(r.data)).catch(() => {});
-  }, []);
-
-  const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm<ProductFormData>({
+  const { register, handleSubmit, formState: { errors }, setValue, watch, reset } = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
     defaultValues: {
       name: "", sku: "", description: "", price: "", comparePrice: "",
-      categoryId: "", status: "published", productType: "SIMPLE",
+      status: "draft", productType: "SIMPLE",
       downloadUrl: "", isActive: true, initialStock: 0, lowStockAlert: 10,
     },
   });
 
   const nameValue = watch("name");
   const productType = watch("productType");
+  const priceValue = watch("price");
+
+  useEffect(() => {
+    api.get(`/api/products/${params.id}`)
+      .then((r) => {
+        const p = r.data;
+        reset({
+          name: p.name || "",
+          sku: p.sku || "",
+          description: p.description || "",
+          price: String(p.price || ""),
+          comparePrice: p.comparePrice ? String(p.comparePrice) : "",
+          status: p.status || "draft",
+          productType: p.productType || "SIMPLE",
+          downloadUrl: p.downloadUrl || "",
+          isActive: p.isActive ?? true,
+          initialStock: p.inventory?.quantity ?? 0,
+          lowStockAlert: p.inventory?.lowStockAlert ?? 10,
+        });
+        setCategoryName(p.productCategory?.name || p.category || "");
+        const imgs = p.imageUrls?.length ? p.imageUrls : p.imageUrl ? [p.imageUrl] : [];
+        setImagePreviews(imgs);
+        if (p.variants?.length) {
+          const grouped: Record<string, string[]> = {};
+          for (const v of p.variants) {
+            if (!grouped[v.name]) grouped[v.name] = [];
+            grouped[v.name].push(v.value);
+          }
+          setAttributes(Object.entries(grouped).map(([name, vals], i) => ({ name, values: vals.join(", "), id: i })));
+        }
+      })
+      .catch(() => showError("Failed to load product", "Could not fetch product details."))
+      .finally(() => setFetching(false));
+  }, [params.id]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -113,9 +145,17 @@ export default function NewProductPage({ params }: { params: { slug: string } })
     showError("Please fix the following", msgs.join("\n"));
   };
 
-  const onSubmit = async (data: any) => {
+  const doSave = async (data: any) => {
     setIsLoading(true);
+    setPublishConfirm(false);
     try {
+      const price = parseFloat(data.price);
+      const comparePrice = data.comparePrice ? parseFloat(data.comparePrice) : undefined;
+      if (comparePrice !== undefined && comparePrice >= price) {
+        showError("Invalid sale price", "Sale price must be less than the main price.");
+        setIsLoading(false); return;
+      }
+
       const uploadedUrls: string[] = [];
       if (imageFiles.length > 0) {
         setUploadProgress(true);
@@ -136,7 +176,7 @@ export default function NewProductPage({ params }: { params: { slug: string } })
       let downloadUrl = data.downloadUrl || undefined;
       if (data.productType === "DOWNLOADABLE" && downloadMode === "upload" && downloadFile) {
         if (downloadFile.size > 4 * 1024 * 1024) {
-          showError("File too large", "Downloadable files must be under 4 MB. Please compress your file or host it externally and use a download URL instead.");
+          showError("File too large", "Downloadable files must be under 4 MB.");
           setIsLoading(false); return;
         }
         const fd = new FormData(); fd.append("image", downloadFile);
@@ -144,7 +184,7 @@ export default function NewProductPage({ params }: { params: { slug: string } })
           const r = await api.post("/api/products/upload-image", fd, { headers: { "Content-Type": "multipart/form-data" } });
           downloadUrl = r.data.url;
         } catch (err: any) {
-          showError("Upload failed", err.response?.data?.error || "Failed to upload the downloadable file. Please check your internet connection or try using a URL instead.");
+          showError("Upload failed", err.response?.data?.error || "Failed to upload the downloadable file.");
           setIsLoading(false); return;
         }
       }
@@ -155,71 +195,98 @@ export default function NewProductPage({ params }: { params: { slug: string } })
           )
         : undefined;
 
-      await api.post("/api/products", {
-        ...data,
-        price: parseFloat(data.price),
-        comparePrice: data.comparePrice ? parseFloat(data.comparePrice) : undefined,
+      await api.patch(`/api/products/${params.id}`, {
+        name: data.name,
+        sku: data.sku,
+        description: data.description,
+        price,
+        comparePrice,
+        status: data.status,
+        productType: data.productType,
+        isActive: data.isActive,
         initialStock: parseInt(data.initialStock),
         lowStockAlert: parseInt(data.lowStockAlert),
         imageUrl: allUrls[0] || undefined,
         imageUrls: allUrls,
-        categoryId: data.categoryId || undefined,
-        productType: data.productType || "SIMPLE",
         downloadUrl: data.productType === "DOWNLOADABLE" ? downloadUrl : undefined,
         variants,
       });
-      showSuccess("Product saved", "Your product has been created and is now visible in your catalog.");
-      setTimeout(() => router.push(`/dashboard/${params.slug}/products`), 1800);
-    } catch (err: any) { showError("Failed to save product", err.response?.data?.error || "Something went wrong. Please try again."); }
+      showSuccess("Product updated", "Your changes have been saved successfully.");
+      setImageFiles([]);
+    } catch (err: any) { showError("Failed to update product", err.response?.data?.error || "Something went wrong. Please try again."); }
     finally { setIsLoading(false); }
   };
+
+  const onSubmit = async (data: any) => {
+    const price = parseFloat(data.price);
+    const comparePrice = data.comparePrice ? parseFloat(data.comparePrice) : undefined;
+    if (comparePrice !== undefined && comparePrice >= price) {
+      showError("Invalid sale price", "Sale price must be less than the main price.");
+      return;
+    }
+    if (data.status === "published") {
+      setPendingSubmitData(data);
+      setPublishConfirm(true);
+      return;
+    }
+    await doSave(data);
+  };
+
+  if (fetching) {
+    return (
+      <div>
+        <Topbar title="Products" slug={params.slug} />
+        <div className="flex justify-center py-32">
+          <div className="w-7 h-7 border-2 border-[#DE1010] border-t-transparent rounded-full animate-spin" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
       <Topbar title="Products" slug={params.slug} />
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="p-4 sm:p-6 max-w-5xl">
-        {/* Header */}
         <div className="flex items-center gap-3 mb-6">
           <button onClick={() => router.push(`/dashboard/${params.slug}/products`)}
             className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-[#0a0a0a] transition-colors">
             <ArrowLeft size={15} /> Back to products
           </button>
           <span className="text-gray-300">/</span>
-          <h1 className="text-sm font-semibold text-[#0a0a0a]">Add new product</h1>
+          <h1 className="text-sm font-semibold text-[#0a0a0a]">Edit product</h1>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit, onFormError)}>
-
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left/main column */}
             <div className="lg:col-span-2 space-y-6">
 
               {/* Basic info */}
-              <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+              <div className="bg-white rounded-xl border border-gray-200 p-5 sm:p-6 space-y-4">
                 <h2 className="font-semibold text-[#0a0a0a] text-sm">Product information</h2>
 
                 <div>
                   <Label>Product name <span className="text-[#DE1010]">*</span></Label>
-                  <Input className="mt-1.5" placeholder="e.g. Nike Air Max" {...register("name", { required: "Name is required." })} />
+                  <Input className="mt-1.5" placeholder="e.g. Nike Air Max" {...register("name")} />
                   {errors.name && <p className="text-xs text-[#DE1010] mt-1">{errors.name.message as string}</p>}
                 </div>
 
                 <div>
                   <Label>Description <span className="text-[#DE1010]">*</span></Label>
                   <textarea className="mt-1.5 flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
-                    placeholder="Describe the product in detail - materials, dimensions, usage, etc."
-                    {...register("description", { required: "Description is required." })} />
+                    placeholder="Describe the product in detail..."
+                    {...register("description")} />
                   {errors.description && <p className="text-xs text-[#DE1010] mt-1">{errors.description.message as string}</p>}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <Label>Category <span className="text-[#DE1010]">*</span></Label>
-                    <select className={selectCls} {...register("categoryId", { required: "Category is required." })}>
-                      <option value="">Select a category…</option>
-                      {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                    {errors.categoryId && <p className="text-xs text-[#DE1010] mt-1">{errors.categoryId.message as string}</p>}
+                    <Label>Category</Label>
+                    <div className="mt-1.5 flex h-10 w-full items-center rounded-md border border-gray-200 bg-gray-50 px-3 text-sm text-gray-500 gap-2">
+                      <Lock size={12} className="text-gray-400 flex-shrink-0" />
+                      <span className="truncate">{categoryName || "No category"}</span>
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-1">Category cannot be changed after creation.</p>
                   </div>
 
                   <div>
@@ -230,14 +297,14 @@ export default function NewProductPage({ params }: { params: { slug: string } })
                         <Wand2 size={11} /> Auto-generate
                       </button>
                     </div>
-                    <Input placeholder="e.g. NAM-001" {...register("sku", { required: "SKU is required." })} />
+                    <Input placeholder="e.g. NAM-001" {...register("sku")} />
                     {errors.sku && <p className="text-xs text-[#DE1010] mt-1">{errors.sku.message as string}</p>}
                   </div>
                 </div>
               </div>
 
               {/* Images */}
-              <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <div className="bg-white rounded-xl border border-gray-200 p-5 sm:p-6">
                 <div className="flex items-center justify-between mb-1">
                   <h2 className="font-semibold text-[#0a0a0a] text-sm">Product images</h2>
                   <span className="text-xs text-gray-400">{imagePreviews.length}/{MAX_IMAGES} · drag to reorder</span>
@@ -270,27 +337,30 @@ export default function NewProductPage({ params }: { params: { slug: string } })
               </div>
 
               {/* Pricing */}
-              <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+              <div className="bg-white rounded-xl border border-gray-200 p-5 sm:p-6 space-y-4">
                 <h2 className="font-semibold text-[#0a0a0a] text-sm">Pricing</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label>Price (NGN) <span className="text-[#DE1010]">*</span></Label>
-                    <Input className="mt-1.5" type="number" step="0.01" placeholder="0.00" {...register("price", { required: "Price is required." })} />
+                    <Input className="mt-1.5" type="number" step="0.01" placeholder="0.00" {...register("price")} />
                     {errors.price && <p className="text-xs text-[#DE1010] mt-1">{errors.price.message as string}</p>}
                   </div>
                   <div>
-                    <Label>Sale / compare price (optional)</Label>
+                    <Label>Sale price (optional)</Label>
                     <Input className="mt-1.5" type="number" step="0.01" placeholder="0.00" {...register("comparePrice")} />
+                    {priceValue && watch("comparePrice") && parseFloat(watch("comparePrice") || "0") >= parseFloat(priceValue) && (
+                      <p className="text-xs text-[#DE1010] mt-1">Sale price must be less than the main price.</p>
+                    )}
                   </div>
                 </div>
               </div>
 
               {/* Inventory */}
-              <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+              <div className="bg-white rounded-xl border border-gray-200 p-5 sm:p-6 space-y-4">
                 <h2 className="font-semibold text-[#0a0a0a] text-sm">Inventory</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <Label>Initial stock</Label>
+                    <Label>Stock quantity</Label>
                     <Input className="mt-1.5" type="number" min="0" placeholder="0" {...register("initialStock", { valueAsNumber: true })} />
                   </div>
                   <div>
@@ -320,6 +390,7 @@ export default function NewProductPage({ params }: { params: { slug: string } })
                     <option value="VARIABLE">Variable product</option>
                   </select>
                 </div>
+
                 {productType === "DOWNLOADABLE" && (
                   <div className="space-y-2">
                     <Label>Download file</Label>
@@ -347,7 +418,7 @@ export default function NewProductPage({ params }: { params: { slug: string } })
                         </button>
                         <input ref={downloadFileRef} type="file" className="hidden"
                           onChange={(e) => setDownloadFile(e.target.files?.[0] || null)} />
-                        <p className="text-xs text-gray-400">Max file size is 2MB.</p>
+                        <p className="text-xs text-gray-400">Max file size is 4MB.</p>
                       </>
                     )}
                   </div>
@@ -370,8 +441,7 @@ export default function NewProductPage({ params }: { params: { slug: string } })
                       <div key={attr.id} className="space-y-1.5 bg-gray-50 rounded-lg p-3">
                         <div className="flex items-center gap-2">
                           <Tag size={11} className="text-gray-400 flex-shrink-0" />
-                          <Input placeholder="Attribute (e.g. Size)"
-                            className="h-8 text-xs"
+                          <Input placeholder="Attribute (e.g. Size)" className="h-8 text-xs"
                             value={attr.name}
                             onChange={(e) => setAttributes((a) => a.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} />
                           <button type="button" onClick={() => setAttributes((a) => a.filter((_, j) => j !== i))}
@@ -379,8 +449,7 @@ export default function NewProductPage({ params }: { params: { slug: string } })
                             <X size={12} className="text-gray-500" />
                           </button>
                         </div>
-                        <Input placeholder="Values, comma-separated (e.g. S, M, L, XL)"
-                          className="h-8 text-xs"
+                        <Input placeholder="Values, comma-separated (e.g. S, M, L, XL)" className="h-8 text-xs"
                           value={attr.values}
                           onChange={(e) => setAttributes((a) => a.map((x, j) => j === i ? { ...x, values: e.target.value } : x))} />
                       </div>
@@ -396,7 +465,7 @@ export default function NewProductPage({ params }: { params: { slug: string } })
 
               <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
                 <Button type="submit" className="w-full bg-[#DE1010] hover:bg-red-700 text-white" disabled={isLoading}>
-                  {isLoading ? "Saving…" : "Add product"}
+                  {isLoading ? "Saving…" : "Save changes"}
                 </Button>
                 <Button type="button" variant="outline" className="w-full" onClick={() => router.push(`/dashboard/${params.slug}/products`)}>
                   Cancel
@@ -406,6 +475,35 @@ export default function NewProductPage({ params }: { params: { slug: string } })
           </div>
         </form>
       </motion.div>
+
+      {/* Publish confirmation modal */}
+      <AnimatePresence>
+        {publishConfirm && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4"
+            onClick={() => setPublishConfirm(false)}>
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl"
+              onClick={(e) => e.stopPropagation()}>
+              <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center mb-3">
+                <CheckCircle2 size={20} className="text-green-600" />
+              </div>
+              <h3 className="font-bold text-[#0a0a0a] text-base mb-1">Publish product?</h3>
+              <p className="text-sm text-gray-500 mb-5">This product will be visible in your store and available for purchase.</p>
+              <div className="flex gap-3">
+                <button onClick={() => setPublishConfirm(false)}
+                  className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+                  Cancel
+                </button>
+                <button onClick={() => doSave(pendingSubmitData)}
+                  className="flex-1 px-4 py-2.5 bg-[#0a0a0a] text-white rounded-xl text-sm font-medium hover:bg-black/80 transition-colors">
+                  Yes, publish
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Result modal (success / error) */}
       <AnimatePresence>
@@ -417,26 +515,18 @@ export default function NewProductPage({ params }: { params: { slug: string } })
               className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl"
               onClick={(e) => e.stopPropagation()}>
               <div className="flex items-start justify-between mb-3">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                  resultModal.type === "success" ? "bg-green-100" : "bg-red-50"
-                }`}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${resultModal.type === "success" ? "bg-green-100" : "bg-red-50"}`}>
                   {resultModal.type === "success"
                     ? <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                     : <AlertCircle size={20} className="text-[#DE1010]" />}
                 </div>
-                <button onClick={closeModal} className="p-1 rounded-lg text-gray-400 hover:bg-gray-100 transition-colors">
-                  <X size={16} />
-                </button>
+                <button onClick={closeModal} className="p-1 rounded-lg text-gray-400 hover:bg-gray-100 transition-colors"><X size={16} /></button>
               </div>
               <h3 className="font-bold text-[#0a0a0a] text-base mb-1">{resultModal.title}</h3>
               <p className="text-sm text-gray-500 whitespace-pre-line mb-5">{resultModal.body}</p>
               <button onClick={closeModal}
-                className={`w-full py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                  resultModal.type === "success"
-                    ? "bg-[#0a0a0a] text-white hover:bg-black/80"
-                    : "bg-[#DE1010] text-white hover:bg-red-700"
-                }`}>
-                {resultModal.type === "success" ? "Redirecting..." : "Got it, fix errors"}
+                className={`w-full py-2.5 rounded-xl text-sm font-medium transition-colors ${resultModal.type === "success" ? "bg-[#0a0a0a] text-white hover:bg-black/80" : "bg-[#DE1010] text-white hover:bg-red-700"}`}>
+                {resultModal.type === "success" ? "Done" : "Got it, fix errors"}
               </button>
             </motion.div>
           </motion.div>

@@ -220,7 +220,7 @@ export function Sidebar({ slug, collapsed, onCollapse }: SidebarProps) {
               </div>
 
               {/* Nav */}
-              <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto overflow-x-hidden">
+              <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto overflow-x-hidden no-scrollbar">
                 {allowed.map((item) => {
                   const isActive = pathname.includes(`/dashboard/${slug}/${item.href}`);
                   const isAudit = item.href === "audit-logs";

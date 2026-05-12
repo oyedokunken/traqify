@@ -71,12 +71,12 @@ export default function LogisticsPage({ params }: { params: { slug: string } }) 
   return (
     <div>
       <Topbar title="Logistics" slug={params.slug} />
-      <div className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="relative">
+      <div className="p-4 md:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <div className="relative w-full sm:w-auto">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <Input placeholder="Search by order # or customer..." className="pl-9 w-64" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <Input placeholder="Search by order # or customer..." className="pl-9 w-full sm:w-64" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
             <button onClick={fetchOrders} className="p-2.5 rounded-lg border border-gray-200 bg-white text-gray-500 hover:text-[#0a0a0a] hover:bg-gray-50 transition-colors">
               <RefreshCw size={14} />

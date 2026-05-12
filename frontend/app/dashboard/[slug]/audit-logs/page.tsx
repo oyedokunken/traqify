@@ -155,7 +155,7 @@ export default function AuditLogsPage({ params }: { params: { slug: string } }) 
   return (
     <div>
       <Topbar title="Audit Logs" slug={params.slug} />
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="p-6">
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="p-4 md:p-6">
 
         {/* Header row */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
@@ -275,7 +275,8 @@ export default function AuditLogsPage({ params }: { params: { slug: string } }) 
           </div>
         ) : (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <table className="w-full">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[580px]">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
                   {isManager && (
@@ -340,6 +341,7 @@ export default function AuditLogsPage({ params }: { params: { slug: string } }) 
                 ))}
               </tbody>
             </table>
+            </div>
           </motion.div>
         )}
 
