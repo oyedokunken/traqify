@@ -12,6 +12,11 @@ import {
   DollarSign,
   ExternalLink,
   XCircle,
+  BarChart2,
+  Globe,
+  Archive,
+  UserCheck,
+  Cog,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Topbar } from "@/components/dashboard/topbar";
@@ -55,11 +60,16 @@ const fmtChartDate = (raw: string) => {
 export default function OverviewPage({ params }: { params: { slug: string } }) {
   const { user } = useAuth();
   const [data, setData] = useState<OverviewData | null>(null);
-  const [chart, setChart] = useState<ChartPoint[]>([]);
+  const [revChart, setRevChart] = useState<ChartPoint[]>([]);
+  const [ordChart, setOrdChart] = useState<ChartPoint[]>([]);
   const [customerChart, setCustomerChart] = useState<{ date: string; customers: number }[]>([]);
   const [loading, setLoading] = useState(true);
-  const [chartLoading, setChartLoading] = useState(false);
-  const [period, setPeriod] = useState(30);
+  const [revPeriod, setRevPeriod] = useState(30);
+  const [ordPeriod, setOrdPeriod] = useState(30);
+  const [custPeriod, setCustPeriod] = useState(30);
+  const [revLoading, setRevLoading] = useState(false);
+  const [ordLoading, setOrdLoading] = useState(false);
+  const [custLoading, setCustLoading] = useState(false);
   const [now, setNow] = useState(new Date());
   const [showWelcome, setShowWelcome] = useState(false);
   const [showWelcomeBack, setShowWelcomeBack] = useState(false);
@@ -86,36 +96,35 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
     }
   }, [params.slug, user?.organizationId]);
 
-  const fetchAll = (p: number) => {
-    api.get("/api/reports/overview").then((r) => setData(r.data)).catch(() => {}).finally(() => setLoading(false));
-    api.get(`/api/reports/revenue-chart?period=${p}`).then((r) => setChart(r.data || [])).catch(() => {});
-    api.get(`/api/reports/customer-chart?period=${p}`).then((r) => setCustomerChart(r.data || [])).catch(() => {});
-  };
-
   useEffect(() => {
-    fetchAll(period);
+    api.get("/api/reports/overview").then((r) => setData(r.data)).catch(() => {}).finally(() => setLoading(false));
+    api.get("/api/reports/revenue-chart?period=30").then((r) => { setRevChart(r.data || []); setOrdChart(r.data || []); }).catch(() => {});
+    api.get("/api/reports/customer-chart?period=30").then((r) => setCustomerChart(r.data || [])).catch(() => {});
   }, []);
 
-  // Refresh charts when user returns to the tab (e.g. after adding orders/customers)
+  // Refresh charts when user returns to the tab
   useEffect(() => {
-    const onFocus = () => fetchAll(period);
+    const onFocus = () => {
+      api.get("/api/reports/overview").then((r) => setData(r.data)).catch(() => {});
+      api.get(`/api/reports/revenue-chart?period=${revPeriod}`).then((r) => setRevChart(r.data || [])).catch(() => {});
+      api.get(`/api/reports/revenue-chart?period=${ordPeriod}`).then((r) => setOrdChart(r.data || [])).catch(() => {});
+      api.get(`/api/reports/customer-chart?period=${custPeriod}`).then((r) => setCustomerChart(r.data || [])).catch(() => {});
+    };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [period]);
+  }, [revPeriod, ordPeriod, custPeriod]);
 
-  const changePeriod = async (p: number) => {
-    setPeriod(p);
-    setChartLoading(true);
-    try {
-      const [overviewData, chartData, customerData] = await Promise.all([
-        api.get("/api/reports/overview"),
-        api.get(`/api/reports/revenue-chart?period=${p}`),
-        api.get(`/api/reports/customer-chart?period=${p}`),
-      ]);
-      setData(overviewData.data);
-      setChart(chartData.data || []);
-      setCustomerChart(customerData.data || []);
-    } catch {} finally { setChartLoading(false); }
+  const changeRevPeriod = async (p: number) => {
+    setRevPeriod(p); setRevLoading(true);
+    try { const r = await api.get(`/api/reports/revenue-chart?period=${p}`); setRevChart(r.data || []); } catch {} finally { setRevLoading(false); }
+  };
+  const changeOrdPeriod = async (p: number) => {
+    setOrdPeriod(p); setOrdLoading(true);
+    try { const r = await api.get(`/api/reports/revenue-chart?period=${p}`); setOrdChart(r.data || []); } catch {} finally { setOrdLoading(false); }
+  };
+  const changeCustPeriod = async (p: number) => {
+    setCustPeriod(p); setCustLoading(true);
+    try { const r = await api.get(`/api/reports/customer-chart?period=${p}`); setCustomerChart(r.data || []); } catch {} finally { setCustLoading(false); }
   };
 
   const openStorefront = () => {
@@ -231,28 +240,59 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
             </motion.div>
           )}
 
-          {/* Period filter */}
-          <motion.div variants={fadeUp} className="flex items-center gap-2 mb-4">
-            <span className="text-xs text-gray-500 font-medium">Period:</span>
-            {[{ label: "7 days", value: 7 }, { label: "30 days", value: 30 }, { label: "60 days", value: 60 }, { label: "90 days", value: 90 }].map((opt) => (
-              <button key={opt.value} onClick={() => changePeriod(opt.value)}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                  period === opt.value ? "bg-[#0a0a0a] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                }`}>
-                {opt.label}
-              </button>
-            ))}
-            {chartLoading && <span className="w-4 h-4 border-2 border-[#DE1010] border-t-transparent rounded-full animate-spin" />}
+          {/* Quick Links */}
+          <motion.div variants={fadeUp} className="mb-6">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-semibold">Quick Links</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    { href: `/dashboard/${params.slug}/products`, icon: Package, label: "Products", desc: "Manage your product catalog", color: "bg-blue-50", iconColor: "text-blue-600" },
+                    { href: `/dashboard/${params.slug}/orders`, icon: ShoppingCart, label: "Orders", desc: "View and process orders", color: "bg-green-50", iconColor: "text-green-600" },
+                    { href: `/dashboard/${params.slug}/customers`, icon: Users, label: "Customers", desc: "Manage customer records", color: "bg-purple-50", iconColor: "text-purple-600" },
+                    { href: `/dashboard/${params.slug}/inventory`, icon: Archive, label: "Inventory", desc: "Track and adjust stock", color: "bg-amber-50", iconColor: "text-amber-600" },
+                    { href: `/dashboard/${params.slug}/reports`, icon: BarChart2, label: "Reports", desc: "Download financial reports", color: "bg-indigo-50", iconColor: "text-indigo-600" },
+                    { href: `/dashboard/${params.slug}/store`, icon: Globe, label: "Storefront", desc: "Configure your public store", color: "bg-red-50", iconColor: "text-[#DE1010]" },
+                    { href: `/dashboard/${params.slug}/staff`, icon: UserCheck, label: "Staff", desc: "Manage team members", color: "bg-teal-50", iconColor: "text-teal-600" },
+                    { href: `/dashboard/${params.slug}/settings`, icon: Cog, label: "Settings", desc: "Account and org settings", color: "bg-gray-100", iconColor: "text-gray-600" },
+                  ].map(({ href, icon: Icon, label, desc, color, iconColor }) => (
+                    <a key={href} href={href}
+                      className="flex items-start gap-3 p-3 rounded-xl border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-all group">
+                      <div className={`w-9 h-9 rounded-lg ${color} flex items-center justify-center flex-shrink-0`}>
+                        <Icon size={17} className={iconColor} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-[#0a0a0a] leading-tight">{label}</p>
+                        <p className="text-xs text-gray-400 mt-0.5 leading-snug">{desc}</p>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           </motion.div>
 
           <motion.div variants={fadeUp}>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base font-semibold">Revenue (last {period} days)</CardTitle>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <CardTitle className="text-base font-semibold">Revenue (last {revPeriod} days)</CardTitle>
+                  <div className="flex items-center gap-1.5">
+                    {[7, 30, 60, 90].map((opt) => (
+                      <button key={opt} onClick={() => changeRevPeriod(opt)}
+                        className={`px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors ${revPeriod === opt ? "bg-[#0a0a0a] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
+                        {opt}d
+                      </button>
+                    ))}
+                    {revLoading && <span className="w-3.5 h-3.5 border-2 border-[#DE1010] border-t-transparent rounded-full animate-spin" />}
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={280}>
-                  <AreaChart data={chart} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+                  <AreaChart data={revChart} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
                     <defs>
                       <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#10B981" stopOpacity={0.22} />
@@ -277,11 +317,22 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
           <motion.div variants={fadeUp} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base font-semibold">Order growth (last {period} days)</CardTitle>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <CardTitle className="text-base font-semibold">Order growth (last {ordPeriod} days)</CardTitle>
+                  <div className="flex items-center gap-1.5">
+                    {[7, 30, 60, 90].map((opt) => (
+                      <button key={opt} onClick={() => changeOrdPeriod(opt)}
+                        className={`px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors ${ordPeriod === opt ? "bg-[#0a0a0a] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
+                        {opt}d
+                      </button>
+                    ))}
+                    {ordLoading && <span className="w-3.5 h-3.5 border-2 border-[#DE1010] border-t-transparent rounded-full animate-spin" />}
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={220}>
-                  <AreaChart data={chart} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+                  <AreaChart data={ordChart} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
                     <defs>
                       <linearGradient id="ordGrad" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#10B981" stopOpacity={0.20} />
@@ -300,7 +351,18 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base font-semibold">Customer growth (last {period} days)</CardTitle>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <CardTitle className="text-base font-semibold">Customer growth (last {custPeriod} days)</CardTitle>
+                  <div className="flex items-center gap-1.5">
+                    {[7, 30, 60, 90].map((opt) => (
+                      <button key={opt} onClick={() => changeCustPeriod(opt)}
+                        className={`px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors ${custPeriod === opt ? "bg-[#0a0a0a] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
+                        {opt}d
+                      </button>
+                    ))}
+                    {custLoading && <span className="w-3.5 h-3.5 border-2 border-[#DE1010] border-t-transparent rounded-full animate-spin" />}
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={220}>
