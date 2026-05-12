@@ -27,7 +27,7 @@ import {
 interface OverviewData {
   totalRevenue: number;
   monthRevenue: number;
-  revenueGrowth: number;
+  revenueGrowth: number | null;
   totalOrders: number;
   monthOrders: number;
   totalProducts: number;
@@ -139,9 +139,11 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
     {
       title: "Revenue this month",
       value: formatCurrency(data?.monthRevenue || 0),
-      sub: `${(data?.revenueGrowth ?? 0) >= 0 ? "+" : ""}${data?.revenueGrowth ?? 0}% from last month`,
+      sub: data?.revenueGrowth === null
+        ? "New this month"
+        : `${(data?.revenueGrowth ?? 0) >= 0 ? "+" : ""}${data?.revenueGrowth ?? 0}% from last month`,
       icon: DollarSign,
-      trend: (data?.revenueGrowth || 0) >= 0 ? "up" : "down",
+      trend: (data?.revenueGrowth ?? 0) >= 0 ? "up" : "down",
     },
     {
       title: "Orders this month",
@@ -232,7 +234,7 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
           {/* Period filter */}
           <motion.div variants={fadeUp} className="flex items-center gap-2 mb-4">
             <span className="text-xs text-gray-500 font-medium">Period:</span>
-            {[{ label: "7 days", value: 7 }, { label: "30 days", value: 30 }, { label: "90 days", value: 90 }].map((opt) => (
+            {[{ label: "7 days", value: 7 }, { label: "30 days", value: 30 }, { label: "60 days", value: 60 }, { label: "90 days", value: 90 }].map((opt) => (
               <button key={opt.value} onClick={() => changePeriod(opt.value)}
                 className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
                   period === opt.value ? "bg-[#0a0a0a] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"

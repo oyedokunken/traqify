@@ -90,7 +90,7 @@ export const storeCheckout = async (req: Request, res: Response): Promise<void> 
     });
     if (!customer) {
       customer = await prisma.customer.create({
-        data: { name, email, phone, address, organizationId: org.id },
+        data: { name, email, phone, address, organizationId: org.id, source: "PURCHASE" },
       });
     }
 

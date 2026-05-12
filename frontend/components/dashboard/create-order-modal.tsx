@@ -22,6 +22,7 @@ export function CreateOrderModal({ onClose, onSaved }: { onClose: () => void; on
   const [newCustomerName, setNewCustomerName] = useState("");
   const [newCustomerEmail, setNewCustomerEmail] = useState("");
   const [newCustomerPhone, setNewCustomerPhone] = useState("");
+  const [newCustomerAddress, setNewCustomerAddress] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("CASH");
   const [notes, setNotes] = useState("");
   const [productSearch, setProductSearch] = useState("");
@@ -63,7 +64,11 @@ export function CreateOrderModal({ onClose, onSaved }: { onClose: () => void; on
 
   const handleSubmit = async () => {
     if (items.length === 0) { setError("Add at least one product to create an order."); return; }
-    if (customerMode === "new" && !newCustomerName.trim()) { setError("Customer name is required for new customers."); return; }
+    if (customerMode === "new") {
+      if (!newCustomerName.trim()) { setError("Customer name is required."); return; }
+      if (!newCustomerEmail.trim()) { setError("Customer email is required."); return; }
+      if (!newCustomerPhone.trim()) { setError("Customer phone number is required."); return; }
+    }
     setIsLoading(true);
     setError("");
     try {
@@ -72,8 +77,9 @@ export function CreateOrderModal({ onClose, onSaved }: { onClose: () => void; on
         customerId: customerMode === "existing" ? customerId || undefined : undefined,
         newCustomer: customerMode === "new" ? {
           name: newCustomerName.trim(),
-          email: newCustomerEmail.trim() || undefined,
-          phone: newCustomerPhone.trim() || undefined,
+          email: newCustomerEmail.trim(),
+          phone: newCustomerPhone.trim(),
+          address: newCustomerAddress.trim() || undefined,
         } : undefined,
         paymentMethod,
         notes: notes || undefined,
@@ -208,16 +214,18 @@ export function CreateOrderModal({ onClose, onSaved }: { onClose: () => void; on
                   <Input className="mt-1 h-9 text-sm" placeholder="e.g. John Adeyemi" value={newCustomerName} onChange={(e) => setNewCustomerName(e.target.value)} />
                 </div>
                 <div>
-                  <Label className="text-xs">Email <span className="text-gray-400 font-normal">(optional)</span></Label>
+                  <Label className="text-xs">Email <span className="text-[#DE1010]">*</span></Label>
                   <Input className="mt-1 h-9 text-sm" type="email" placeholder="john@email.com" value={newCustomerEmail} onChange={(e) => setNewCustomerEmail(e.target.value)} />
                 </div>
                 <div>
-                  <Label className="text-xs">Phone <span className="text-gray-400 font-normal">(optional)</span></Label>
+                  <Label className="text-xs">Phone <span className="text-[#DE1010]">*</span></Label>
                   <Input className="mt-1 h-9 text-sm" placeholder="+234 800..." value={newCustomerPhone} onChange={(e) => setNewCustomerPhone(e.target.value)} />
                 </div>
-                {newCustomerEmail && (
-                  <p className="col-span-2 text-xs text-gray-400">A confirmation email will be sent to this address.</p>
-                )}
+                <div className="col-span-2">
+                  <Label className="text-xs">Address <span className="text-gray-400 font-normal">(optional)</span></Label>
+                  <Input className="mt-1 h-9 text-sm" placeholder="Delivery address" value={newCustomerAddress} onChange={(e) => setNewCustomerAddress(e.target.value)} />
+                </div>
+                <p className="col-span-2 text-xs text-gray-400">A confirmation email will be sent to the customer.</p>
               </div>
             )}
           </div>

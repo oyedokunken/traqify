@@ -72,7 +72,7 @@ export function Everything() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-14">
           <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }}
-            className="inline-flex items-center bg-white text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-full border border-gray-200 shadow-sm">
+            className="inline-flex items-center bg-[#0a0a0a] text-white text-xs font-semibold px-3 py-1.5 rounded-full">
             Built for every role
           </motion.div>
           <motion.h2 initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }}
