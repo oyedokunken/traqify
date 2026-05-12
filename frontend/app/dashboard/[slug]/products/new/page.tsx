@@ -52,6 +52,8 @@ export default function NewProductPage({ params }: { params: { slug: string } })
   const [downloadFile, setDownloadFile] = useState<File | null>(null);
   const [attributes, setAttributes] = useState<{ name: string; values: string; id: number }[]>([]);
   const [resultModal, setResultModal] = useState<{ open: boolean; type: "success" | "error"; title: string; body: string }>({ open: false, type: "error", title: "", body: "" });
+  const [publishConfirm, setPublishConfirm] = useState(false);
+  const [pendingSubmitData, setPendingSubmitData] = useState<any>(null);
   const closeModal = () => setResultModal((m) => ({ ...m, open: false }));
   const showError = (title: string, body: string) => setResultModal({ open: true, type: "error", title, body });
   const showSuccess = (title: string, body: string) => setResultModal({ open: true, type: "success", title, body });
@@ -113,7 +115,8 @@ export default function NewProductPage({ params }: { params: { slug: string } })
     showError("Please fix the following", msgs.join("\n"));
   };
 
-  const onSubmit = async (data: any) => {
+  const doCreate = async (data: any) => {
+    setPublishConfirm(false);
     setIsLoading(true);
     try {
       const uploadedUrls: string[] = [];
@@ -139,9 +142,9 @@ export default function NewProductPage({ params }: { params: { slug: string } })
           showError("File too large", "Downloadable files must be under 4 MB. Please compress your file or host it externally and use a download URL instead.");
           setIsLoading(false); return;
         }
-        const fd = new FormData(); fd.append("image", downloadFile);
+        const fd = new FormData(); fd.append("file", downloadFile);
         try {
-          const r = await api.post("/api/products/upload-image", fd, { headers: { "Content-Type": "multipart/form-data" } });
+          const r = await api.post("/api/products/upload-file", fd, { headers: { "Content-Type": "multipart/form-data" } });
           downloadUrl = r.data.url;
         } catch (err: any) {
           showError("Upload failed", err.response?.data?.error || "Failed to upload the downloadable file. Please check your internet connection or try using a URL instead.");
@@ -172,6 +175,15 @@ export default function NewProductPage({ params }: { params: { slug: string } })
       setTimeout(() => router.push(`/dashboard/${params.slug}/products`), 1800);
     } catch (err: any) { showError("Failed to save product", err.response?.data?.error || "Something went wrong. Please try again."); }
     finally { setIsLoading(false); }
+  };
+
+  const onSubmit = async (data: any) => {
+    if (data.status === "published") {
+      setPendingSubmitData(data);
+      setPublishConfirm(true);
+      return;
+    }
+    await doCreate(data);
   };
 
   return (
@@ -406,6 +418,35 @@ export default function NewProductPage({ params }: { params: { slug: string } })
           </div>
         </form>
       </motion.div>
+
+      {/* Publish confirmation modal */}
+      <AnimatePresence>
+        {publishConfirm && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4"
+            onClick={() => setPublishConfirm(false)}>
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl"
+              onClick={(e) => e.stopPropagation()}>
+              <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center mb-3">
+                <CheckCircle2 size={20} className="text-green-600" />
+              </div>
+              <h3 className="font-bold text-[#0a0a0a] text-base mb-1">Publish product?</h3>
+              <p className="text-sm text-gray-500 mb-5">This product will immediately be visible in your store and available for purchase by customers.</p>
+              <div className="flex gap-3">
+                <button onClick={() => setPublishConfirm(false)}
+                  className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+                  Cancel
+                </button>
+                <button onClick={() => doCreate(pendingSubmitData)}
+                  className="flex-1 px-4 py-2.5 bg-[#0a0a0a] text-white rounded-xl text-sm font-medium hover:bg-black/80 transition-colors">
+                  Yes, publish
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Result modal (success / error) */}
       <AnimatePresence>

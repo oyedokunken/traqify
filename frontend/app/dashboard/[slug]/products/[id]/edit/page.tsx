@@ -52,7 +52,7 @@ export default function EditProductPage({ params }: { params: { slug: string; id
   const [downloadFile, setDownloadFile] = useState<File | null>(null);
   const [attributes, setAttributes] = useState<{ name: string; values: string; id: number }[]>([]);
   const [resultModal, setResultModal] = useState<{ open: boolean; type: "success" | "error"; title: string; body: string }>({ open: false, type: "error", title: "", body: "" });
-  const [publishConfirm, setPublishConfirm] = useState(false);
+  const [saveConfirm, setSaveConfirm] = useState(false);
   const [pendingSubmitData, setPendingSubmitData] = useState<any>(null);
   const closeModal = () => setResultModal((m) => ({ ...m, open: false }));
   const showError = (title: string, body: string) => setResultModal({ open: true, type: "error", title, body });
@@ -147,7 +147,7 @@ export default function EditProductPage({ params }: { params: { slug: string; id
 
   const doSave = async (data: any) => {
     setIsLoading(true);
-    setPublishConfirm(false);
+    setSaveConfirm(false);
     try {
       const price = parseFloat(data.price);
       const comparePrice = data.comparePrice ? parseFloat(data.comparePrice) : undefined;
@@ -179,9 +179,9 @@ export default function EditProductPage({ params }: { params: { slug: string; id
           showError("File too large", "Downloadable files must be under 4 MB.");
           setIsLoading(false); return;
         }
-        const fd = new FormData(); fd.append("image", downloadFile);
+        const fd = new FormData(); fd.append("file", downloadFile);
         try {
-          const r = await api.post("/api/products/upload-image", fd, { headers: { "Content-Type": "multipart/form-data" } });
+          const r = await api.post("/api/products/upload-file", fd, { headers: { "Content-Type": "multipart/form-data" } });
           downloadUrl = r.data.url;
         } catch (err: any) {
           showError("Upload failed", err.response?.data?.error || "Failed to upload the downloadable file.");
@@ -224,12 +224,8 @@ export default function EditProductPage({ params }: { params: { slug: string; id
       showError("Invalid sale price", "Sale price must be less than the main price.");
       return;
     }
-    if (data.status === "published") {
-      setPendingSubmitData(data);
-      setPublishConfirm(true);
-      return;
-    }
-    await doSave(data);
+    setPendingSubmitData(data);
+    setSaveConfirm(true);
   };
 
   if (fetching) {
@@ -476,28 +472,34 @@ export default function EditProductPage({ params }: { params: { slug: string; id
         </form>
       </motion.div>
 
-      {/* Publish confirmation modal */}
+      {/* Save confirmation modal */}
       <AnimatePresence>
-        {publishConfirm && (
+        {saveConfirm && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4"
-            onClick={() => setPublishConfirm(false)}>
+            onClick={() => setSaveConfirm(false)}>
             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
               className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl"
               onClick={(e) => e.stopPropagation()}>
-              <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center mb-3">
-                <CheckCircle2 size={20} className="text-green-600" />
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-3 ${pendingSubmitData?.status === "published" ? "bg-green-100" : "bg-blue-50"}`}>
+                <CheckCircle2 size={20} className={pendingSubmitData?.status === "published" ? "text-green-600" : "text-blue-600"} />
               </div>
-              <h3 className="font-bold text-[#0a0a0a] text-base mb-1">Publish product?</h3>
-              <p className="text-sm text-gray-500 mb-5">This product will be visible in your store and available for purchase.</p>
+              <h3 className="font-bold text-[#0a0a0a] text-base mb-1">
+                {pendingSubmitData?.status === "published" ? "Publish product?" : "Save changes?"}
+              </h3>
+              <p className="text-sm text-gray-500 mb-5">
+                {pendingSubmitData?.status === "published"
+                  ? "This product will be visible in your store and available for purchase. Make sure all details are correct."
+                  : "Your changes will be saved immediately. This does not change the product's publish status."}
+              </p>
               <div className="flex gap-3">
-                <button onClick={() => setPublishConfirm(false)}
+                <button onClick={() => setSaveConfirm(false)}
                   className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors">
                   Cancel
                 </button>
                 <button onClick={() => doSave(pendingSubmitData)}
                   className="flex-1 px-4 py-2.5 bg-[#0a0a0a] text-white rounded-xl text-sm font-medium hover:bg-black/80 transition-colors">
-                  Yes, publish
+                  {pendingSubmitData?.status === "published" ? "Yes, publish" : "Yes, save"}
                 </button>
               </div>
             </motion.div>

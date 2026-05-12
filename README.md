@@ -123,7 +123,7 @@ The system is live at **[https://traqify.vercel.app](https://traqify.vercel.app)
 | Security | Helmet, rate-limit | Per-route rate limiting on auth endpoints |
 | Phone input | react-phone-number-input | International flag selector, default NG |
 | PDF generation | PDFKit | Landscape A4 report PDFs |
-| File upload | Multer (memoryStorage) | JPG/PNG/WebP; max 2 MB |
+| File upload | Multer (memoryStorage) | Images: JPG/PNG/WebP max 2 MB; downloadable files: any type max 4 MB |
 | Font | Jost | Google Fonts |
 
 ---
@@ -153,10 +153,14 @@ Four roles with granular middleware enforcement:
 
 ### Products and Inventory
 - Create products with name, SKU, category, price, compare-at price, description
-- **Product types**: SIMPLE, DOWNLOADABLE (with download URL), VARIABLE
-- **Multi-image** support: up to 4 images per product; first image is cover
+- **Product types**: SIMPLE, DOWNLOADABLE (download URL or direct file upload), VARIABLE (attribute builder)
+- **Multi-image** support: up to 4 images per product; first image is cover; drag-to-reorder
 - **Auto-SKU generation** from product name
 - Image upload (JPG / PNG / WebP, max 2 MB) to **Supabase Storage** (`products` bucket)
+- **Downloadable file upload** via dedicated `POST /api/products/upload-file` endpoint (any MIME type, max 4 MB)
+- **Edit page** at `/products/[id]/edit` with full feature parity to Add Product; category is immutable after creation
+- **Publish confirmation modal** on Add Product when status is set to Published
+- **Save confirmation modal** on Edit Product before any save; adapts text for publish vs draft saves
 - Per-product inventory with configurable low-stock alert threshold
 - Inventory adjustment log
 - Low-stock dashboard badge
