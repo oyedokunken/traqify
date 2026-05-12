@@ -255,8 +255,8 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
                   <AreaChart data={chart} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
                     <defs>
                       <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#DE1010" stopOpacity={0.22} />
-                        <stop offset="100%" stopColor="#DE1010" stopOpacity={0} />
+                        <stop offset="0%" stopColor="#10B981" stopOpacity={0.22} />
+                        <stop offset="100%" stopColor="#10B981" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
@@ -267,7 +267,7 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
                       labelFormatter={fmtChartDate}
                       formatter={(v: number) => [formatCurrency(v), "Revenue"]}
                     />
-                    <Area type="monotone" dataKey="revenue" stroke="#DE1010" strokeWidth={2} fill="url(#revGrad)" dot={false} activeDot={{ r: 4, strokeWidth: 0, fill: "#DE1010" }} />
+                    <Area type="monotone" dataKey="revenue" stroke="#10B981" strokeWidth={2} fill="url(#revGrad)" dot={false} activeDot={{ r: 4, strokeWidth: 0, fill: "#10B981" }} />
                   </AreaChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -284,15 +284,15 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
                   <AreaChart data={chart} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
                     <defs>
                       <linearGradient id="ordGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#DE1010" stopOpacity={0.20} />
-                        <stop offset="100%" stopColor="#DE1010" stopOpacity={0} />
+                        <stop offset="0%" stopColor="#10B981" stopOpacity={0.20} />
+                        <stop offset="100%" stopColor="#10B981" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
                     <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} tickFormatter={fmtChartDate} />
                     <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} domain={[0, "auto"]} allowDecimals={false} />
                     <Tooltip contentStyle={{ border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 12 }} labelFormatter={fmtChartDate} formatter={(v: number) => [v, "Orders"]} />
-                    <Area type="monotone" dataKey="orders" stroke="#DE1010" strokeWidth={2} fill="url(#ordGrad)" dot={false} activeDot={{ r: 4, strokeWidth: 0, fill: "#DE1010" }} />
+                    <Area type="monotone" dataKey="orders" stroke="#10B981" strokeWidth={2} fill="url(#ordGrad)" dot={false} activeDot={{ r: 4, strokeWidth: 0, fill: "#10B981" }} />
                   </AreaChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -307,15 +307,15 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
                   <AreaChart data={customerChart} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
                     <defs>
                       <linearGradient id="custGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#0a0a0a" stopOpacity={0.18} />
-                        <stop offset="100%" stopColor="#0a0a0a" stopOpacity={0} />
+                        <stop offset="0%" stopColor="#10B981" stopOpacity={0.18} />
+                        <stop offset="100%" stopColor="#10B981" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
                     <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} tickFormatter={fmtChartDate} />
                     <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} domain={[0, "auto"]} allowDecimals={false} />
                     <Tooltip contentStyle={{ border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 12 }} labelFormatter={fmtChartDate} formatter={(v: number) => [v, "Customers"]} />
-                    <Area type="monotone" dataKey="customers" stroke="#0a0a0a" strokeWidth={2} fill="url(#custGrad)" dot={false} activeDot={{ r: 4, strokeWidth: 0, fill: "#0a0a0a" }} />
+                    <Area type="monotone" dataKey="customers" stroke="#10B981" strokeWidth={2} fill="url(#custGrad)" dot={false} activeDot={{ r: 4, strokeWidth: 0, fill: "#10B981" }} />
                   </AreaChart>
                 </ResponsiveContainer>
               </CardContent>
