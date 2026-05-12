@@ -57,8 +57,8 @@ export function CreateOrderModal({ onClose, onSaved }: { onClose: () => void; on
 
   const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
 
-  const filteredProducts = products.filter((p) =>
-    p.name.toLowerCase().includes(productSearch.toLowerCase()) || p.sku.toLowerCase().includes(productSearch.toLowerCase())
+  const filteredProducts = (Array.isArray(products) ? products : []).filter((p) =>
+    p.name.toLowerCase().includes(productSearch.toLowerCase()) || (p.sku || "").toLowerCase().includes(productSearch.toLowerCase())
   );
 
   const handleSubmit = async () => {
