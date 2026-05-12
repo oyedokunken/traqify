@@ -48,6 +48,7 @@ export default function ReviewsPage({ params }: { params: { slug: string } }) {
   const [total, setTotal] = useState(0);
   const [actionId, setActionId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [moderateConfirm, setModerateConfirm] = useState<{ id: string; action: "approve" | "reject" } | null>(null);
 
   const fetchReviews = async (initial = false) => {
     setLoading(true);
@@ -65,8 +66,11 @@ export default function ReviewsPage({ params }: { params: { slug: string } }) {
 
   useEffect(() => { fetchReviews(statusFilter === "PENDING"); }, [statusFilter]);
 
+  const confirmModerate = (id: string, action: "approve" | "reject") => setModerateConfirm({ id, action });
+
   const moderate = async (id: string, action: "approve" | "reject") => {
     setActionId(id);
+    setModerateConfirm(null);
     try {
       await api.patch(`/api/reviews/${id}/moderate`, { action });
       setReviews((prev) => prev.filter((r) => r.id !== id));
@@ -209,24 +213,24 @@ export default function ReviewsPage({ params }: { params: { slug: string } }) {
                     {r.status === "PENDING" && (
                       <>
                         <Button size="sm" variant="outline" className="gap-1.5 text-green-700 border-green-200 hover:bg-green-50"
-                          disabled={actionId === r.id} onClick={() => moderate(r.id, "approve")}>
+                          disabled={actionId === r.id} onClick={() => confirmModerate(r.id, "approve")}>
                           <CheckCircle size={13} /> Approve
                         </Button>
                         <Button size="sm" variant="outline" className="gap-1.5 text-[#DE1010] border-red-200 hover:bg-red-50"
-                          disabled={actionId === r.id} onClick={() => moderate(r.id, "reject")}>
+                          disabled={actionId === r.id} onClick={() => confirmModerate(r.id, "reject")}>
                           <XCircle size={13} /> Reject
                         </Button>
                       </>
                     )}
                     {r.status === "REJECTED" && (
                       <Button size="sm" variant="outline" className="gap-1.5 text-green-700 border-green-200 hover:bg-green-50"
-                        disabled={actionId === r.id} onClick={() => moderate(r.id, "approve")}>
+                        disabled={actionId === r.id} onClick={() => confirmModerate(r.id, "approve")}>
                         <CheckCircle size={13} /> Approve
                       </Button>
                     )}
                     {r.status === "APPROVED" && (
                       <Button size="sm" variant="outline" className="gap-1.5 text-[#DE1010] border-red-200 hover:bg-red-50"
-                        disabled={actionId === r.id} onClick={() => moderate(r.id, "reject")}>
+                        disabled={actionId === r.id} onClick={() => confirmModerate(r.id, "reject")}>
                         <XCircle size={13} /> Reject
                       </Button>
                     )}
@@ -241,6 +245,44 @@ export default function ReviewsPage({ params }: { params: { slug: string } }) {
           </div>
         )}
       </div>
+
+      <AnimatePresence>
+        {moderateConfirm && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4"
+            onClick={() => setModerateConfirm(null)}>
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl"
+              onClick={(e) => e.stopPropagation()}>
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4 ${moderateConfirm!.action === "approve" ? "bg-green-50" : "bg-red-50"}`}>
+                {moderateConfirm!.action === "approve"
+                  ? <CheckCircle size={24} className="text-green-600" />
+                  : <XCircle size={24} className="text-[#DE1010]" />}
+              </div>
+              <h3 className="font-bold text-[#0a0a0a] text-center text-base mb-2">
+                {moderateConfirm!.action === "approve" ? "Approve this review?" : "Reject this review?"}
+              </h3>
+              <p className="text-sm text-gray-500 text-center mb-5">
+                {moderateConfirm!.action === "approve"
+                  ? "This review will be published and visible to all customers."
+                  : "This review will be hidden from your public store."}
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setModerateConfirm(null)}
+                  className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+                <button
+                  onClick={() => moderate(moderateConfirm!.id, moderateConfirm!.action)}
+                  disabled={!!actionId}
+                  className={`flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-50 ${
+                    moderateConfirm!.action === "approve" ? "bg-green-600 hover:bg-green-700" : "bg-[#DE1010] hover:bg-red-700"
+                  }`}>
+                  {actionId ? "Processing..." : moderateConfirm!.action === "approve" ? "Yes, approve" : "Yes, reject"}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
