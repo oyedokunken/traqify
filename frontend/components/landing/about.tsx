@@ -121,7 +121,7 @@ export function About() {
             transition={{ duration: 0.5 }}
             className="order-last lg:order-first"
           >
-            <span className="text-xs font-semibold text-[#DE1010] uppercase tracking-widest">What is Traqify</span>
+            <span className="inline-flex items-center bg-[#DE1010]/10 text-[#DE1010] text-xs font-semibold px-3 py-1.5 rounded-full border border-[#DE1010]/20">What is Traqify</span>
             <h2 className="text-3xl sm:text-4xl font-bold text-[#0a0a0a] mt-3 mb-5 leading-tight">
               Your store, fully under control
             </h2>

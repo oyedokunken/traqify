@@ -71,14 +71,14 @@ export function Testimonials() {
   return (
     <section id="testimonials" className="bg-gray-50 py-20 overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-12 text-center">
-        <motion.span
+        <motion.div
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          className="text-xs font-semibold text-[#DE1010] uppercase tracking-widest"
+          className="inline-flex items-center bg-white text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-full border border-gray-200 shadow-sm"
         >
           What our users say
-        </motion.span>
+        </motion.div>
         <motion.h2
           initial={{ opacity: 0, y: 16 }}
           whileInView={{ opacity: 1, y: 0 }}

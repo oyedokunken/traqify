@@ -20,8 +20,7 @@ import { useAuth } from "@/lib/auth-context";
 import { formatCurrency } from "@/lib/utils";
 import { AnimatePresence } from "framer-motion";
 import {
-  AreaChart, Area,
-  LineChart, Line,
+  ComposedChart, Area, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 
@@ -251,23 +250,24 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={280}>
-                  <AreaChart data={chart} margin={{ top: 4, right: 0, left: -20, bottom: 0 }}>
+                  <ComposedChart data={chart} margin={{ top: 4, right: 0, left: -20, bottom: 0 }}>
                     <defs>
                       <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#DE1010" stopOpacity={0.15} />
+                        <stop offset="5%" stopColor="#DE1010" stopOpacity={0.12} />
                         <stop offset="95%" stopColor="#DE1010" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
                     <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} tickFormatter={fmtChartDate} />
-                    <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} domain={[0, "auto"]} tickFormatter={(v) => `₦${(v / 1000).toFixed(0)}k`} />
+                    <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} domain={[0, "auto"]} tickFormatter={(v) => `\u20a6${(v / 1000).toFixed(0)}k`} />
                     <Tooltip
                       contentStyle={{ border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 12 }}
                       labelFormatter={fmtChartDate}
                       formatter={(v: number) => [formatCurrency(v), "Revenue"]}
                     />
-                    <Area type="monotone" dataKey="revenue" stroke="#DE1010" strokeWidth={2} fill="url(#revGrad)" />
-                  </AreaChart>
+                    <Area type="monotone" dataKey="revenue" stroke="none" fill="url(#revGrad)" />
+                    <Bar dataKey="revenue" fill="#DE1010" opacity={0.85} radius={[3, 3, 0, 0]} maxBarSize={16} />
+                  </ComposedChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
@@ -280,19 +280,20 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={220}>
-                  <AreaChart data={chart} margin={{ top: 4, right: 0, left: -20, bottom: 0 }}>
+                  <ComposedChart data={chart} margin={{ top: 4, right: 0, left: -20, bottom: 0 }}>
                     <defs>
                       <linearGradient id="ordGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#DE1010" stopOpacity={0.12} />
+                        <stop offset="5%" stopColor="#DE1010" stopOpacity={0.10} />
                         <stop offset="95%" stopColor="#DE1010" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
                     <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} tickFormatter={fmtChartDate} />
-                    <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} domain={[0, "auto"]} />
+                    <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} domain={[0, "auto"]} allowDecimals={false} />
                     <Tooltip contentStyle={{ border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 12 }} labelFormatter={fmtChartDate} formatter={(v: number) => [v, "Orders"]} />
-                    <Area type="monotone" dataKey="orders" stroke="#DE1010" strokeWidth={2} fill="url(#ordGrad)" name="Orders" dot={false} />
-                  </AreaChart>
+                    <Area type="monotone" dataKey="orders" stroke="none" fill="url(#ordGrad)" />
+                    <Bar dataKey="orders" fill="#DE1010" opacity={0.85} radius={[3, 3, 0, 0]} maxBarSize={16} name="Orders" />
+                  </ComposedChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
@@ -303,13 +304,20 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={220}>
-                  <LineChart data={customerChart} margin={{ top: 4, right: 0, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <ComposedChart data={customerChart} margin={{ top: 4, right: 0, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="custGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#0a0a0a" stopOpacity={0.10} />
+                        <stop offset="95%" stopColor="#0a0a0a" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
                     <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} tickFormatter={fmtChartDate} />
-                    <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} domain={[0, "auto"]} />
-                    <Tooltip contentStyle={{ border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 12 }} labelFormatter={fmtChartDate} />
-                    <Line type="monotone" dataKey="customers" stroke="#0a0a0a" strokeWidth={2} dot={false} name="Customers" />
-                  </LineChart>
+                    <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} domain={[0, "auto"]} allowDecimals={false} />
+                    <Tooltip contentStyle={{ border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 12 }} labelFormatter={fmtChartDate} formatter={(v: number) => [v, "Customers"]} />
+                    <Area type="monotone" dataKey="customers" stroke="none" fill="url(#custGrad)" />
+                    <Bar dataKey="customers" fill="#0a0a0a" opacity={0.80} radius={[3, 3, 0, 0]} maxBarSize={16} name="Customers" />
+                  </ComposedChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>

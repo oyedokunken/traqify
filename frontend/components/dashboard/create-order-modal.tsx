@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Plus, Minus, Trash2 } from "lucide-react";
+import { X, Plus, Minus, Trash2, UserPlus, Users } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,11 @@ export function CreateOrderModal({ onClose, onSaved }: { onClose: () => void; on
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [items, setItems] = useState<OrderItem[]>([]);
+  const [customerMode, setCustomerMode] = useState<"existing" | "new" | "walkin">("walkin");
   const [customerId, setCustomerId] = useState("");
+  const [newCustomerName, setNewCustomerName] = useState("");
+  const [newCustomerEmail, setNewCustomerEmail] = useState("");
+  const [newCustomerPhone, setNewCustomerPhone] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("CASH");
   const [notes, setNotes] = useState("");
   const [productSearch, setProductSearch] = useState("");
@@ -56,12 +60,18 @@ export function CreateOrderModal({ onClose, onSaved }: { onClose: () => void; on
 
   const handleSubmit = async () => {
     if (items.length === 0) { setError("Add at least one product to create an order."); return; }
+    if (customerMode === "new" && !newCustomerName.trim()) { setError("Customer name is required for new customers."); return; }
     setIsLoading(true);
     setError("");
     try {
       await api.post("/api/orders", {
         items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
-        customerId: customerId || undefined,
+        customerId: customerMode === "existing" ? customerId || undefined : undefined,
+        newCustomer: customerMode === "new" ? {
+          name: newCustomerName.trim(),
+          email: newCustomerEmail.trim() || undefined,
+          phone: newCustomerPhone.trim() || undefined,
+        } : undefined,
         paymentMethod,
         notes: notes || undefined,
       });
@@ -154,14 +164,62 @@ export function CreateOrderModal({ onClose, onSaved }: { onClose: () => void; on
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Customer (optional)</Label>
-              <select className="mt-1.5 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
-                <option value="">Walk-in customer</option>
-                {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+          <div>
+            <Label>Customer</Label>
+            <div className="flex gap-2 mt-1.5">
+              {(["walkin", "existing", "new"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setCustomerMode(mode)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                    customerMode === mode
+                      ? "bg-[#0a0a0a] text-white border-[#0a0a0a]"
+                      : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                  }`}
+                >
+                  {mode === "walkin" && "Walk-in"}
+                  {mode === "existing" && <><Users size={12} /> Existing</>}
+                  {mode === "new" && <><UserPlus size={12} /> New customer</>}
+                </button>
+              ))}
             </div>
+
+            {customerMode === "existing" && (
+              <select
+                className="mt-2 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                value={customerId}
+                onChange={(e) => setCustomerId(e.target.value)}
+              >
+                <option value="">Select a customer...</option>
+                {customers.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}{c.email ? ` (${c.email})` : ""}</option>
+                ))}
+              </select>
+            )}
+
+            {customerMode === "new" && (
+              <div className="mt-2 grid grid-cols-2 gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                <div className="col-span-2">
+                  <Label className="text-xs">Full name <span className="text-[#DE1010]">*</span></Label>
+                  <Input className="mt-1 h-9 text-sm" placeholder="e.g. John Adeyemi" value={newCustomerName} onChange={(e) => setNewCustomerName(e.target.value)} />
+                </div>
+                <div>
+                  <Label className="text-xs">Email <span className="text-gray-400 font-normal">(optional)</span></Label>
+                  <Input className="mt-1 h-9 text-sm" type="email" placeholder="john@email.com" value={newCustomerEmail} onChange={(e) => setNewCustomerEmail(e.target.value)} />
+                </div>
+                <div>
+                  <Label className="text-xs">Phone <span className="text-gray-400 font-normal">(optional)</span></Label>
+                  <Input className="mt-1 h-9 text-sm" placeholder="+234 800..." value={newCustomerPhone} onChange={(e) => setNewCustomerPhone(e.target.value)} />
+                </div>
+                {newCustomerEmail && (
+                  <p className="col-span-2 text-xs text-gray-400">A confirmation email will be sent to this address.</p>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Payment method</Label>
               <select className="mt-1.5 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
@@ -171,7 +229,7 @@ export function CreateOrderModal({ onClose, onSaved }: { onClose: () => void; on
                 <option value="POS">POS</option>
               </select>
             </div>
-            <div className="col-span-2">
+            <div>
               <Label>Notes (optional)</Label>
               <Input className="mt-1.5" placeholder="Any notes about this order..." value={notes} onChange={(e) => setNotes(e.target.value)} />
             </div>

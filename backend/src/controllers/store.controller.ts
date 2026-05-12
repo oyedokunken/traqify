@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import { OrderStatus } from "@prisma/client";
 import prisma from "../config/database";
 import { sendEmail } from "../config/email";
-import { wishlistReminderTemplate, newOrderEmailTemplate } from "../emails/templates";
+import { wishlistReminderTemplate, newOrderEmailTemplate, storeOrderConfirmationEmailTemplate } from "../emails/templates";
 import { createAuditLog } from "../utils/audit";
 import https from "https";
 
@@ -26,7 +26,7 @@ export const getStoreProducts = async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    const products = await prisma.product.findMany({
+    const rawProducts = await prisma.product.findMany({
       where: {
         organizationId: org.id,
         isActive: true,
@@ -39,6 +39,7 @@ export const getStoreProducts = async (req: Request, res: Response): Promise<voi
         inventory: { select: { quantity: true, lowStockAlert: true } },
         productCategory: { select: { id: true, name: true, slug: true } },
         _count: { select: { reviews: { where: { status: "APPROVED" } } } },
+        reviews: { where: { status: "APPROVED" }, select: { rating: true } },
       },
       orderBy:
         sort === "price_asc" ? { price: "asc" }
@@ -46,6 +47,14 @@ export const getStoreProducts = async (req: Request, res: Response): Promise<voi
         : sort === "name" ? { name: "asc" }
         : sort === "oldest" ? { createdAt: "asc" }
         : { createdAt: "desc" },
+    });
+
+    const products = rawProducts.map((p: any) => {
+      const { reviews: reviewArr, ...rest } = p;
+      const averageRating = reviewArr.length > 0
+        ? Math.round((reviewArr.reduce((s: number, r: any) => s + r.rating, 0) / reviewArr.length) * 10) / 10
+        : null;
+      return { ...rest, averageRating };
     });
 
     const cats = await prisma.productCategory.findMany({
@@ -209,58 +218,25 @@ export const storeCheckout = async (req: Request, res: Response): Promise<void> 
       newOrderEmailTemplate(org.name, order.id, name, totalAmount, emailItems, `${process.env.FRONTEND_URL || "http://localhost:3000"}/dashboard/${org.slug}/orders`)
     ).catch((e) => console.error("[Email] Store order notification failed:", e.message));
 
-    const itemsHtml = order.orderItems
-      .map((i: { product: { name: string }; quantity: number; subtotal?: number; unitPrice: number }) => `<tr><td style="padding:8px 0;border-bottom:1px solid #f0f0f0">${i.product.name} × ${i.quantity}</td><td style="padding:8px 0;border-bottom:1px solid #f0f0f0;text-align:right;font-weight:600">₦${(i.subtotal || i.unitPrice * i.quantity).toLocaleString()}</td></tr>`)
-      .join("");
-
-    const orgFull = await prisma.organization.findUnique({
+    const orgContact = await prisma.organization.findUnique({
       where: { id: org.id },
-      select: { email: true, phone: true, address: true, website: true },
+      select: { email: true, phone: true, address: true, logoUrl: true },
     });
-    const contactLines = [
-      orgFull?.email ? `Email: ${orgFull.email}` : null,
-      orgFull?.phone ? `Phone: ${orgFull.phone}` : null,
-      orgFull?.address ? `Address: ${orgFull.address}` : null,
-      orgFull?.website ? `Website: ${orgFull.website}` : null,
-    ].filter(Boolean).map((l) => `<p style="margin:2px 0;color:#9ca3af;font-size:12px;text-align:center">${l}</p>`).join("");
 
-    try { await sendEmail(
+    sendEmail(
       email,
       `Order ${orderNumber} confirmed - ${org.name}`,
-      `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff">
-        <div style="text-align:center;margin-bottom:28px;padding-bottom:20px;border-bottom:1px solid #f0f0f0">
-          ${org.logoUrl ? `<img src="${org.logoUrl}" alt="${org.name}" style="max-height:60px;max-width:200px;object-fit:contain">` : `<div style="display:inline-flex;width:56px;height:56px;background:#DE1010;border-radius:12px;align-items:center;justify-content:center;color:white;font-weight:700;font-size:24px">${org.name[0]}</div>`}
-        </div>
-        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px;margin-bottom:20px;display:flex;align-items:center;gap:12px">
-          <span style="font-size:24px">&#10003;</span>
-          <div>
-            <p style="margin:0;font-weight:700;color:#166534;font-size:15px">Order confirmed!</p>
-            <p style="margin:4px 0 0;color:#166534;font-size:13px">Hi ${name}, we have received your order.</p>
-          </div>
-        </div>
-        <div style="background:#f9fafb;border-radius:8px;padding:16px;margin-bottom:20px">
-          <p style="font-size:11px;color:#9ca3af;margin:0 0 4px;text-transform:uppercase;letter-spacing:.5px">Order number</p>
-          <p style="font-size:20px;font-weight:700;color:#0a0a0a;margin:0">${orderNumber}</p>
-        </div>
-        <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:16px">
-          <tr style="border-bottom:2px solid #f0f0f0">
-            <th style="text-align:left;padding:8px 0;font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase">Item</th>
-            <th style="text-align:right;padding:8px 0;font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase">Amount</th>
-          </tr>
-          ${itemsHtml}
-          <tr><td style="padding:12px 0;font-weight:700;border-top:2px solid #f0f0f0">Total</td><td style="padding:12px 0;font-weight:700;text-align:right;color:#DE1010;border-top:2px solid #f0f0f0">&#8358;${totalAmount.toLocaleString()}</td></tr>
-        </table>
-        <div style="background:#fef9f0;border:1px solid #fde68a;border-radius:8px;padding:14px;margin-bottom:16px">
-          <p style="margin:0;font-size:13px;color:#92400e"><strong>Payment:</strong> ${paymentMethod || "Bank Transfer"}. Our team will reach out with payment details shortly.</p>
-          ${notes ? `<p style="margin:8px 0 0;font-size:13px;color:#92400e"><strong>Your notes:</strong> ${notes}</p>` : ""}
-        </div>
-        <hr style="border:none;border-top:1px solid #f0f0f0;margin:24px 0">
-        <div style="text-align:center">
-          ${contactLines}
-          <p style="color:#c4c4c4;font-size:10px;margin:10px 0 0">Powered by <strong style="color:#DE1010">Traqify</strong></p>
-        </div>
-      </div>`
-    ); } catch (emailErr) { console.error("Order confirmation email failed:", emailErr); }
+      storeOrderConfirmationEmailTemplate(
+        name,
+        orderNumber,
+        org.name,
+        totalAmount,
+        emailItems,
+        { email: orgContact?.email || null, phone: orgContact?.phone || null, address: orgContact?.address || null },
+        orgContact?.logoUrl || null,
+        paymentMethod || "Bank Transfer"
+      )
+    ).catch((emailErr) => console.error("Order confirmation email failed:", emailErr));
 
     res.status(201).json({
       id: order.id,

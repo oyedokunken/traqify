@@ -26,6 +26,7 @@ interface Product {
   productCategory?: { id: string; name: string };
   inventory?: { quantity: number };
   _count?: { reviews: number };
+  averageRating?: number | null;
 }
 
 interface CartItem extends Product { qty: number; }
@@ -103,10 +104,10 @@ function ProductCard({ product, images, inStock, inWishlist, slug, onAddToCart, 
             <p className="font-bold text-[#0a0a0a] text-sm">{formatCurrency(product.price)}</p>
             {product.comparePrice && product.comparePrice > product.price && <p className="text-[10px] text-gray-400 line-through">{formatCurrency(product.comparePrice)}</p>}
           </div>
-          {(product._count?.reviews ?? 0) > 0 && (
+          {(product.averageRating ?? 0) > 0 && (
             <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full font-medium">
               <Star size={9} className="fill-amber-400 text-amber-400" />
-              {product._count!.reviews}
+              {product.averageRating!.toFixed(1)}/5.0
             </span>
           )}
         </div>

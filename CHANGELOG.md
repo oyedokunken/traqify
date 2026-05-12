@@ -5,6 +5,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v1.15.0] - 2025-05-27
+
+### Added
+- **Manual order: inline customer creation** -- the Create Order modal now has a 3-mode customer picker: Walk-in, Existing customer (searchable dropdown), or New customer (name required; email + phone optional). Selecting "New customer" creates the customer record, creates a MANUAL-source audit log, and wires up the customer to the order in one step
+- **Manual order: customer confirmation email** -- if a new customer provides an email address, a store-branded order confirmation email is sent automatically after the order is created
+- **storeOrderConfirmationEmailTemplate** -- new shared store-email template used by both the manual order flow and the store checkout flow; accepts org contact details and logo; uses the white-mode `wrapStoreEmail` wrapper
+- **Product average rating** -- `GET /api/products` and the store `getStoreProducts` endpoint now compute `averageRating` (rounded to 1 d.p.) from approved reviews and include it in each product object; replaces the raw review count everywhere
+- **Rating display** -- dashboard Products page and store product cards now show the average rating as "4.8/5.0" instead of a raw count; store product detail page shows an average summary pill above the review grid
+
+### Changed
+- **All email templates standardized to white mode** -- removed all dark-background sections and emojis from every template; added `recipientEmail` optional parameter (defaults to `""`) to all Traqify platform templates so the footer reads "This email was sent to [email] from Traqify"
+- **Store-facing emails moved to `wrapStoreEmail`** -- `orderApprovedEmailTemplate`, `orderCompletedEmailTemplate`, and `wishlistReminderTemplate` now use the store wrapper (org logo, contact line, "sent to [email] from [store] through Traqify" footer) and accept `contact` + `customerEmail` parameters
+- **Store checkout email refactored** -- `storeCheckout` controller now calls `storeOrderConfirmationEmailTemplate` instead of embedding inline HTML; `orgContact.website` removed from footer per design spec
+- **`updateOrderStatus` passes org contact to email templates** -- APPROVED and COMPLETED status emails now include the org's email, phone, and address in the footer
+- **Overview charts: candlestick-style bars** -- all three charts (Revenue, Order growth, Customer growth) converted from `AreaChart` to `ComposedChart` with `Bar` (rounded tops, max 16 px wide) + semi-transparent `Area` gradient fill; grid verticals hidden for a cleaner look
+- **Order/Customer chart Y-axis**: `allowDecimals={false}` added so integer-only axes render cleanly
+
+### Fixed
+- **Product star rating showing count instead of average** -- all star badges now show the computed average (e.g. "4.8/5.0") instead of the total approved review count
+- **Store product detail review list** -- individual review items now show "X.X/5.0" format; a summary pill ("4.8/5.0 - 3 reviews") is displayed above the grid
+
+---
+
 ## [v1.14.0] - 2025-05-11
 
 ### Added
