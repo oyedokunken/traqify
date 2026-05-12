@@ -96,12 +96,28 @@ Role hierarchy scores used by backend middleware: OWNER=4, MANAGER=3, AUDITOR=2,
 ## Products and Inventory
 
 ### Adding Products
-- Navigate to **Products** -> Click **Add product** (full-page form)
+- Navigate to **Products** -> Click **Add product** (full-page form at `/products/new`)
 - Fill in: name, SKU, category, price, compare price, description
 - Upload up to 4 images (JPG/PNG/WebP, max 2 MB); first image is the cover; drag to reorder
-- Choose **product type**: SIMPLE, DOWNLOADABLE (with download URL or file upload), VARIABLE (with attribute builder)
+- Choose **product type**: SIMPLE, DOWNLOADABLE (with download URL or file upload via `POST /api/products/upload-file`), VARIABLE (with attribute builder)
 - Set initial stock and low-stock alert threshold
 - Toggle published/draft status and visibility
+- Setting status to **Published** shows a confirmation modal before the product goes live
+
+### Editing Products
+- Click the edit icon on any product card -> navigates to `/products/[id]/edit`
+- Full-feature parity with the Add Product page (images, variants, download file/URL, pricing)
+- **Category is immutable** after creation -- shown as a read-only field with a lock icon
+- Clicking **Save changes** always shows a pre-save confirmation modal
+  - If status is set to Published: modal reads "Publish product?" with a note that it will go live
+  - Otherwise: modal reads "Save changes?" confirming edits will be applied immediately
+- After saving: success or error result modal displayed
+
+### Downloadable File Upload
+- Image uploads use `POST /api/products/upload-image` (JPG/PNG/WebP only, 5 MB limit)
+- Downloadable product files use `POST /api/products/upload-file` (any MIME type, 4 MB limit)
+  - Field name: `file` (multipart/form-data)
+  - This endpoint has no MIME-type restriction so PDFs, ZIPs, and other formats are accepted
 
 ### Filtering Products
 The products list supports four filters simultaneously:

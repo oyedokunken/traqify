@@ -5,6 +5,45 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v1.17.0] - 2026-05-12
+
+### Added
+- **Publish confirmation modal on Add Product page** -- submitting the new product form with status set to "Published" now shows a confirmation modal before the product is created and made live
+- **Save confirmation modal on Edit Product page** -- clicking "Save changes" always shows a pre-save confirmation modal; modal text adapts ("Publish product?" vs "Save changes?") based on the current status field value
+- **Dedicated downloadable file upload endpoint** -- new `POST /api/products/upload-file` backend endpoint accepts any file type (no MIME restriction) with a 4 MB limit, used exclusively for downloadable product files; fixes 400 errors that occurred when uploading non-image downloadable files through the image-only `/upload-image` endpoint
+- **Unified product edit page** -- `/dashboard/[slug]/products/[id]/edit` is a full-featured edit page mirroring the Add Product page; supports image upload with drag-to-reorder, downloadable file or URL mode, variant attributes, immutable category display, sale price validation, publish confirm, and save result feedback modals
+- **Product category immutability** -- the category field on the Edit Product page is read-only with a lock icon and an explanatory note; prevents accidental category changes after creation
+
+### Changed
+- **Products list page** -- the Edit button now navigates directly to `/products/[id]/edit` instead of opening an inline modal; the old `ProductModal` component is no longer used
+- **Downloadable file upload** -- both New Product and Edit Product pages now use `POST /api/products/upload-file` (field name `file`) for downloadable file uploads instead of the image-only `/upload-image` endpoint
+- **Mobile-first responsive layout across all dashboard pages** -- padding changed from `p-6` to `p-4 md:p-6` on every dashboard page; all data tables wrapped in `overflow-x-auto` with `min-w-*` to prevent horizontal overflow on small screens; search inputs widened to `w-full sm:w-auto`; filter toolbars use `flex-wrap gap-3` to stack cleanly on mobile
+- **Mobile sidebar** -- added `no-scrollbar` CSS class to the mobile navigation container to remove the vertical scrollbar on small screens
+
+### Fixed
+- **Upload 400 on downloadable file** -- using the image MIME filter on `/upload-image` rejected PDFs, ZIPs, and other non-image downloadable file types with HTTP 400; resolved by routing downloadable uploads to the new `/upload-file` endpoint
+
+---
+
+## [v1.16.0] - 2026-05-12
+
+### Added
+- **60-day chart period** -- Overview page now supports 7, 30, 60, and 90 day periods for all charts and KPI cards
+- **Revenue growth "New this month" indicator** -- when there was no revenue in the prior month but there is revenue this month, the growth indicator shows "New this month" instead of "0%" to avoid a misleading zero
+
+### Changed
+- **`getRevenueChart` migrated from `$queryRaw` to `findMany`** -- eliminates Postgres enum cast errors in serverless environments; revenue and orders are aggregated in TypeScript grouped by ISO date string
+- **`getCustomerChart` baseline seeding** -- cumulative customer chart now seeds the y-axis with the count of all customers created before the period start, so the line never drops to zero when existing customers predate the selected window
+- **`createOrder` payment is inside the transaction** -- the COMPLETED Payment record for manually created orders is now created inside the Prisma `$transaction` block, guaranteeing it can never be skipped if the order succeeds
+- **Overview period change re-fetches KPI cards** -- switching the period now refreshes both charts and the four summary stat cards
+
+### Fixed
+- **Customer source on store checkout** -- `storeCheckout` was creating customers without `source: "PURCHASE"` causing all store customers to appear as MANUAL; source is now explicitly set
+- **Revenue chart missing store-checkout revenue** -- store orders now always have a linked Payment record from checkout, so they are included in chart aggregation
+- **`getCustomerChart` Y-axis starting at 0** -- pre-period customers now seed the cumulative baseline so the chart starts from the correct value
+
+---
+
 ## [v1.15.0] - 2025-05-27
 
 ### Added

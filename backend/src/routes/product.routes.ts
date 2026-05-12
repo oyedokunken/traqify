@@ -43,6 +43,38 @@ router.post(
   }
 );
 
+const uploadAny = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 4 * 1024 * 1024 },
+});
+
+router.post(
+  "/upload-file",
+  isOwnerOrManager,
+  (req: Request, res: Response, next: NextFunction) => {
+    uploadAny.single("file")(req, res, (err: any) => {
+      if (err instanceof multer.MulterError) {
+        res.status(400).json({ error: err.message }); return;
+      }
+      if (err) {
+        res.status(400).json({ error: err.message || "Upload failed." }); return;
+      }
+      next();
+    });
+  },
+  async (req: Request, res: Response) => {
+    try {
+      if (!req.file) { res.status(400).json({ error: "No file provided." }); return; }
+      const filePath = getSupabasePath("products", req.file.originalname);
+      const url = await uploadFile("products", filePath, req.file.buffer, req.file.mimetype);
+      res.json({ url });
+    } catch (err: any) {
+      console.error("[upload-file] Error:", err);
+      res.status(500).json({ error: err?.message || "Upload failed." });
+    }
+  }
+);
+
 router.get("/", getProducts);
 router.get("/:id", getProduct);
 router.post("/", isOwnerOrManager, createProduct);
