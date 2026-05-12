@@ -72,7 +72,7 @@ export default function OrdersPage({ params }: { params: { slug: string } }) {
     const p = new URLSearchParams({ page: String(page), limit: "20" });
     if (statusFilter) p.set("status", statusFilter);
     api.get(`/api/orders?${p}`)
-      .then((r) => { setOrders(r.data.orders); setTotal(r.data.total); })
+      .then((r) => { setOrders(r.data.orders || []); setTotal(r.data.total || 0); })
       .catch(() => setError("Failed to load orders."))
       .finally(() => setLoading(false));
   };
