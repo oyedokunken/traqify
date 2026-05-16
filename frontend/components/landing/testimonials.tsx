@@ -70,7 +70,7 @@ function ScrollingRow({ items, direction }: { items: typeof testimonials; direct
 export function Testimonials() {
   return (
     <section id="testimonials" className="bg-gray-50 py-20 overflow-hidden">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-12 text-center">
+      <div className="max-w-7xl mx-auto px-5 sm:px-6 lg:px-8 mb-12 text-center">
         <motion.div
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}

@@ -87,7 +87,7 @@ export default function ProductsPage({ params }: { params: { slug: string } }) {
   return (
     <div>
       <Topbar title="Products" slug={params.slug} />
-      <div className="p-4 md:p-6">
+      <div className="p-5 md:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <div className="relative w-full sm:w-auto">

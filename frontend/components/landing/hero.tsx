@@ -12,7 +12,7 @@ const fadeRight = { hidden: { opacity: 0, x: 40 }, visible: { opacity: 1, x: 0 }
 export function Hero() {
   return (
     <section className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-red-50/30 pt-24 pb-16 flex items-center">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+      <div className="max-w-7xl mx-auto px-5 sm:px-6 lg:px-8 w-full">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-stretch">
           <motion.div
             initial="hidden"

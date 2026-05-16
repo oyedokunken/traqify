@@ -83,7 +83,7 @@ export default function InventoryPage({ params }: { params: { slug: string } }) 
   return (
     <div>
       <Topbar title="Inventory" slug={params.slug} />
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="p-4 md:p-6">
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="p-5 md:p-6">
         <div className="flex flex-wrap items-center gap-2 mb-6">
           <div className="relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />

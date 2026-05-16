@@ -89,8 +89,13 @@ function ProductCard({ product, images, inStock, inWishlist, slug, onAddToCart, 
             {images.map((_, i) => <span key={i} className={`w-1.5 h-1.5 rounded-full transition-colors ${i === imgIdx ? "bg-white" : "bg-white/50"}`} />)}
           </div>
         )}
+        {product.productCategory && (
+          <div className="absolute top-2 left-2 bg-white text-[#0a0a0a] text-[9px] font-semibold px-2 py-0.5 rounded-full shadow-sm leading-tight">
+            {product.productCategory.name}
+          </div>
+        )}
         {product.comparePrice && product.comparePrice > product.price && (
-          <div className="absolute top-2 left-2 bg-[#DE1010] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md">
+          <div className="absolute top-2 right-2 bg-[#DE1010] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md">
             -{Math.round((1 - product.price / product.comparePrice) * 100)}%
           </div>
         )}
@@ -107,7 +112,7 @@ function ProductCard({ product, images, inStock, inWishlist, slug, onAddToCart, 
           {(product.averageRating ?? 0) > 0 && (
             <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full font-medium">
               <Star size={9} className="fill-amber-400 text-amber-400" />
-              {product.averageRating!.toFixed(1)}/5.0
+              {product.averageRating!.toFixed(1)} ({product._count?.reviews ?? 0})
             </span>
           )}
         </div>
@@ -270,7 +275,7 @@ export default function PublicStorePage({ params }: { params: { slug: string } }
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-5 sm:px-6 h-16 flex items-center justify-between gap-4">
           {/* Logo / Store name */}
           <div className="flex items-center flex-shrink-0">
             {org?.website ? (
@@ -370,7 +375,7 @@ export default function PublicStorePage({ params }: { params: { slug: string } }
         )}
       </AnimatePresence>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      <main className="max-w-7xl mx-auto px-5 sm:px-6 py-8">
         <div className="flex gap-6">
 
           {/* Left filter sidebar - desktop only */}
@@ -517,7 +522,7 @@ export default function PublicStorePage({ params }: { params: { slug: string } }
         {/* Store info section */}
         <section id="store-info" className="mt-16 scroll-mt-20">
           <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-            <div className="bg-[#0a0a0a] px-6 py-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="bg-[#0a0a0a] px-5 sm:px-6 py-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
               <div className="flex items-center gap-4">
                 {org?.logoUrl ? (
                   <img src={org.logoUrl} alt={org.name} className="h-14 w-auto max-w-[160px] object-contain bg-white rounded-xl p-1" />

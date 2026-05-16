@@ -5,6 +5,7 @@ import { createAuditLog } from "../utils/audit";
 import { AuthRequest } from "../middleware/auth.middleware";
 import { sendEmail } from "../config/email";
 import { orderApprovedEmailTemplate, orderCompletedEmailTemplate, newOrderEmailTemplate, storeOrderConfirmationEmailTemplate } from "../emails/templates";
+import https from "https";
 
 const generateOrderNumber = (): string => {
   const timestamp = Date.now().toString(36).toUpperCase();
@@ -247,7 +248,7 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
       data: { status },
       include: {
         customer: true,
-        orderItems: { include: { product: { select: { name: true } } } },
+        orderItems: { include: { product: { select: { name: true, productType: true, downloadUrl: true } } } },
         organization: { select: { name: true, logoUrl: true, email: true, phone: true, address: true } },
       },
     }) as any;
@@ -272,10 +273,35 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
           orderApprovedEmailTemplate(updated.customer.name, updated.orderNumber, updated.organization?.name || "", updated.totalAmount, items, updated.organization?.logoUrl || null, orgContact, updated.customer.email)
         ).catch((e) => console.error("[Email] Order approved email failed:", e.message));
       } else if (status === "COMPLETED") {
+        const downloadableItems = updated.orderItems
+          .filter((i: any) => i.product?.productType === "DOWNLOADABLE" && i.product?.downloadUrl)
+          .map((i: any) => ({ name: i.product.name, downloadUrl: i.product.downloadUrl }));
+
+        const attachments: any[] = [];
+        for (const item of downloadableItems) {
+          if (item.downloadUrl.includes("supabase.co")) {
+            try {
+              const fileBuffer = await new Promise<Buffer>((resolve, reject) => {
+                https.get(item.downloadUrl, (res: any) => {
+                  const chunks: Buffer[] = [];
+                  res.on("data", (chunk: Buffer) => chunks.push(chunk));
+                  res.on("end", () => resolve(Buffer.concat(chunks)));
+                  res.on("error", reject);
+                });
+              });
+              const filename = item.downloadUrl.split("/").pop() || "download.pdf";
+              attachments.push({ filename, content: fileBuffer });
+            } catch (err) {
+              console.error("[Email] Failed to fetch downloadable file:", err);
+            }
+          }
+        }
+
         sendEmail(
           updated.customer.email,
           `Order ${updated.orderNumber} delivered: ${updated.organization?.name}`,
-          orderCompletedEmailTemplate(updated.customer.name, updated.orderNumber, updated.organization?.name || "", updated.totalAmount, updated.organization?.logoUrl || null, orgContact, updated.customer.email)
+          orderCompletedEmailTemplate(updated.customer.name, updated.orderNumber, updated.organization?.name || "", updated.totalAmount, updated.organization?.logoUrl || null, orgContact, updated.customer.email, downloadableItems),
+          attachments.length > 0 ? attachments : undefined
         ).catch((e) => console.error("[Email] Order completed email failed:", e.message));
       }
     }
