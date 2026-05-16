@@ -118,7 +118,7 @@ export default function PaymentsPage({ params }: { params: { slug: string } }) {
   return (
     <div>
       <Topbar title="Payments" slug={params.slug} />
-      <div className="p-4 md:p-6">
+      <div className="p-5 md:p-6">
 
         {/* Summary cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">

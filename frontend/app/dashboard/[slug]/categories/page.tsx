@@ -58,7 +58,7 @@ export default function CategoriesPage({ params }: { params: { slug: string } })
   return (
     <div>
       <Topbar title="Product Categories" slug={params.slug} />
-      <div className="p-4 md:p-6">
+      <div className="p-5 md:p-6">
         {error && <p className="text-sm text-[#DE1010] bg-red-50 px-3 py-2 rounded-lg mb-4">{error}</p>}
 
         <div className="flex flex-wrap items-center justify-between mb-6 gap-3">

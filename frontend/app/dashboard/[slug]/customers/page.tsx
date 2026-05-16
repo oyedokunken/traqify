@@ -87,7 +87,7 @@ export default function CustomersPage({ params }: { params: { slug: string } }) 
   return (
     <div>
       <Topbar title="Customers" slug={params.slug} />
-      <div className="p-4 md:p-6">
+      <div className="p-5 md:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <div className="relative w-full sm:w-64">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />

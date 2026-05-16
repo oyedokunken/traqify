@@ -49,6 +49,7 @@ export default function ReviewsPage({ params }: { params: { slug: string } }) {
   const [actionId, setActionId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [moderateConfirm, setModerateConfirm] = useState<{ id: string; action: "approve" | "reject" } | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   const fetchReviews = async (initial = false) => {
     setLoading(true);
@@ -68,6 +69,8 @@ export default function ReviewsPage({ params }: { params: { slug: string } }) {
 
   const confirmModerate = (id: string, action: "approve" | "reject") => setModerateConfirm({ id, action });
 
+  const confirmDelete = (id: string) => setDeleteConfirm(id);
+
   const moderate = async (id: string, action: "approve" | "reject") => {
     setActionId(id);
     setModerateConfirm(null);
@@ -80,6 +83,7 @@ export default function ReviewsPage({ params }: { params: { slug: string } }) {
 
   const remove = async (id: string) => {
     setActionId(id);
+    setDeleteConfirm(null);
     try {
       await api.delete(`/api/reviews/${id}`);
       setReviews((prev) => prev.filter((r) => r.id !== id));
@@ -105,7 +109,7 @@ export default function ReviewsPage({ params }: { params: { slug: string } }) {
   return (
     <div>
       <Topbar title="Reviews" slug={params.slug} />
-      <div className="p-4 md:p-6">
+      <div className="p-5 md:p-6">
         <AnimatePresence>
           {error && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -235,7 +239,7 @@ export default function ReviewsPage({ params }: { params: { slug: string } }) {
                       </Button>
                     )}
                     <Button size="sm" variant="ghost" className="text-gray-400 hover:text-[#DE1010]"
-                      disabled={actionId === r.id} onClick={() => remove(r.id)}>
+                      disabled={actionId === r.id} onClick={() => confirmDelete(r.id)}>
                       <Trash2 size={14} />
                     </Button>
                   </div>
@@ -277,6 +281,38 @@ export default function ReviewsPage({ params }: { params: { slug: string } }) {
                     moderateConfirm!.action === "approve" ? "bg-green-600 hover:bg-green-700" : "bg-[#DE1010] hover:bg-red-700"
                   }`}>
                   {actionId ? "Processing..." : moderateConfirm!.action === "approve" ? "Yes, approve" : "Yes, reject"}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {deleteConfirm && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4"
+            onClick={() => setDeleteConfirm(null)}>
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl"
+              onClick={(e) => e.stopPropagation()}>
+              <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+                <Trash2 size={24} className="text-[#DE1010]" />
+              </div>
+              <h3 className="font-bold text-[#0a0a0a] text-center text-base mb-2">
+                Delete this review?
+              </h3>
+              <p className="text-sm text-gray-500 text-center mb-5">
+                This review will be permanently deleted and cannot be recovered.
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setDeleteConfirm(null)}
+                  className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+                <button
+                  onClick={() => remove(deleteConfirm!)}
+                  disabled={!!actionId}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-[#DE1010] hover:bg-red-700 text-white transition-colors disabled:opacity-50">
+                  {actionId ? "Deleting..." : "Yes, delete"}
                 </button>
               </div>
             </motion.div>

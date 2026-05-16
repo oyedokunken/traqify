@@ -90,7 +90,7 @@ export default function NewsletterPage({ params }: { params: { slug: string } })
     <>
     <div>
       <Topbar title="Newsletter" slug={params.slug} />
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="p-4 md:p-6">
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="p-5 md:p-6">
 
         {/* Stats row */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">

@@ -371,11 +371,23 @@ export const orderCompletedEmailTemplate = (
   totalAmount: number,
   orgLogoUrl: string | null = null,
   contact: { email: string | null; phone: string | null; address: string | null } = { email: null, phone: null, address: null },
-  customerEmail = ""
+  customerEmail = "",
+  downloadableItems: { name: string; downloadUrl: string }[] = []
 ): string =>
   wrapStoreEmail(`
     <h2 style="font-size:20px;font-weight:700;color:#0a0a0a;margin:0 0 12px 0;">Your order has been delivered</h2>
     <p style="font-size:15px;color:#52525b;line-height:1.7;margin:0 0 20px 0;">Hi ${customerName}, your order <strong>${orderNumber}</strong> (&#8358;${totalAmount.toLocaleString()}) has been marked as delivered. Thank you for shopping with <strong>${orgName}</strong>.</p>
+    ${downloadableItems.length > 0 ? `
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px;margin:20px 0;">
+      <p style="margin:0 0 12px;font-weight:700;color:#166534;font-size:15px;">Your downloads</p>
+      ${downloadableItems.map((item) => `
+      <div style="margin-bottom:12px;">
+        <p style="margin:0 0 6px;font-size:14px;color:#0a0a0a;font-weight:600;">${item.name}</p>
+        <a href="${item.downloadUrl}" style="display:inline-block;background:#16a34a;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-size:13px;font-weight:600;">Download</a>
+      </div>
+      `).join("")}
+    </div>
+    ` : ""}
     <p style="font-size:15px;color:#52525b;line-height:1.7;margin:0 0 16px 0;">If you have any questions or concerns about your order, please reach out to us directly.</p>
     <p style="font-size:15px;color:#52525b;margin:0;">We hope to see you again soon.</p>
   `, orgName, orgLogoUrl, contact, customerEmail);

@@ -160,7 +160,7 @@ export default function ProductPage({ params }: { params: { slug: string; id: st
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      <main className="max-w-7xl mx-auto px-5 sm:px-6 py-8">
         {/* Back link */}
         <Link href={`/store/${params.slug}`}
           className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-6 transition-colors">
@@ -216,11 +216,17 @@ export default function ProductPage({ params }: { params: { slug: string; id: st
             )}
             <h1 className="text-2xl font-bold text-[#0a0a0a] leading-tight">{product.name}</h1>
 
-            {/* Stars (decorative) */}
-            <div className="flex items-center gap-1">
-              {[1,2,3,4,5].map((s) => <Star key={s} size={14} className="fill-amber-400 text-amber-400" />)}
-              <span className="text-xs text-gray-400 ml-1">5.0</span>
-            </div>
+            {reviews.length > 0 && (() => {
+              const avg = reviews.reduce((s, r) => s + r.rating, 0) / reviews.length;
+              return (
+                <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-0.5">
+                    {[1,2,3,4,5].map((s) => <Star key={s} size={14} className={s <= Math.round(avg) ? "fill-amber-400 text-amber-400" : "fill-gray-200 text-gray-200"} />)}
+                  </div>
+                  <span className="text-xs text-gray-500 font-medium">{avg.toFixed(1)} ({reviews.length} review{reviews.length !== 1 ? "s" : ""})</span>
+                </div>
+              );
+            })()}
 
             {/* Price */}
             <div className="flex items-baseline gap-3">
