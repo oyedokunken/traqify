@@ -47,7 +47,8 @@ const traqifyFooter = (recipientEmail: string) => `
       <a href="https://github.com/oyedokunken/traqify" style="color:#a1a1aa;text-decoration:none;margin:0 6px;">GitHub</a>
     </p>
     <p style="margin:8px 0 0 0;">This email was sent to <strong>${recipientEmail}</strong> from Traqify. If you did not request this, you can safely ignore it.</p>
-    <p style="margin:4px 0 0 0;font-size:11px;color:#c4c4c4;">
+    <hr style="margin:16px 0 8px 0;border:none;border-top:1px solid #e4e4e7;">
+    <p style="margin:8px 0 0 0;">
     Traqify is a production-deployed, multi-tenant enterprise store management platform built for retail businesses that need structure, auditability, and role-based control across their operations.
 </p>
   </div>
@@ -115,7 +116,8 @@ const wrapStoreEmail = (
     <div style="background:#f9fafb;padding:20px 40px;border-top:1px solid #f0f0f0;text-align:center;">
       ${contactLine ? `<p style="margin:0 0 6px;font-size:12px;color:#9ca3af;">${contactLine}</p>` : ""}
       <p style="margin:0;font-size:11px;color:#c4c4c4;">This email was sent to <strong style="color:#9ca3af;">${recipientEmail}</strong> from <strong style="color:#9ca3af;">${orgName}</strong> through <strong style="color:#DE1010;">Traqify</strong>. If you did not place an order, you can safely ignore this email.</p>
-      <p>
+      <hr style="margin:16px 0 8px 0;border:none;border-top:1px solid #e5e7eb;">
+      <p style="margin:8px 0 0 0;font-size:11px;color:#c4c4c4;">
       Traqify is a production-deployed, multi-tenant enterprise store management platform built for retail businesses that need structure, auditability, and role-based control across their operations.
       </p>
     </div>
