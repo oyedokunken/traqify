@@ -34,6 +34,15 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Block registration for users with pending or accepted staff invites
+    const existingInvite = await prisma.staffInvite.findFirst({
+      where: { email, status: { in: ["PENDING", "ACCEPTED"] } },
+    });
+    if (existingInvite) {
+      res.status(409).json({ error: "This email has been invited to join an organization. You can only belong to one organization at a time. Please use the invitation link sent to your email, or sign in if you already accepted it.", isInvited: true });
+      return;
+    }
+
     const hashedPassword = await bcrypt.hash(password, 12);
 
     const user = await prisma.user.create({
@@ -86,7 +95,17 @@ export const checkEmail = async (req: Request, res: Response): Promise<void> => 
       where: { email },
       include: { organization: { select: { slug: true } } },
     });
+
+    // Check if this email has a pending or accepted staff invite
+    const invite = await prisma.staffInvite.findFirst({
+      where: { email, status: { in: ["PENDING", "ACCEPTED"] } },
+    });
+
     if (!user) {
+      if (invite) {
+        res.json({ exists: false, isInvited: true });
+        return;
+      }
       res.json({ exists: false });
       return;
     }
@@ -95,6 +114,7 @@ export const checkEmail = async (req: Request, res: Response): Promise<void> => 
       signInMethod: user.signInMethod || "EMAIL",
       hasOrg: !!user.organizationId,
       orgSlug: user.organization?.slug || null,
+      isInvited: !!invite,
     });
   } catch {
     res.status(500).json({ error: "Failed to check email." });
@@ -193,7 +213,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
     if (!user.password) {
-      res.status(401).json({ error: "This account uses Google Sign-In. Please use the Continue with Google button to sign in.", isGoogleAccount: true });
+      res.status(401).json({ error: "This account uses Google Sign-In. Please use the Continue with Google button to sign in, or reset your password to set one up.", isGoogleAccount: true });
       return;
     }
 
@@ -302,6 +322,15 @@ export const googleCallback = async (req: Request, res: Response): Promise<void>
     });
 
     if (!user) {
+      // Block Google sign-up for invited users
+      const pendingInvite = await prisma.staffInvite.findFirst({
+        where: { email: googleUser.email, status: { in: ["PENDING", "ACCEPTED"] } },
+      });
+      if (pendingInvite) {
+        res.redirect(`${frontendUrl}/login?error=invited_user`);
+        return;
+      }
+
       user = await prisma.user.create({
         data: {
           email: googleUser.email,
@@ -312,9 +341,6 @@ export const googleCallback = async (req: Request, res: Response): Promise<void>
         },
         include: { organization: { select: { id: true, name: true, slug: true, logoUrl: true } } },
       }) as any;
-    } else if (user.password && user.signInMethod !== "GOOGLE") {
-      res.redirect(`${frontendUrl}/login?error=email_account`);
-      return;
     } else {
       user = await prisma.user.update({
         where: { id: user.id },

@@ -285,7 +285,8 @@ Branded HTML templates for:
 2. **bcrypt password hashing** — cost factor 12; no plain-text passwords stored anywhere
 3. **JWT access token** — 7-day default lifetime; signed with `JWT_SECRET`; carries `userId`, `email`, `organizationId`, `role`
 4. **JWT refresh token** — separate secret (`JWT_REFRESH_SECRET`); used by Axios interceptor to silently re-issue access tokens on 401
-5. **Google OAuth 2.0** — redirect-based flow (server-side code exchange); Google accounts cannot log in with password and vice versa
+5. **Google OAuth 2.0** — redirect-based flow (server-side code exchange); email/password and Google OAuth are not mutually exclusive
+6. **Invited user registration block** — users with a pending staff invitation cannot create new accounts via registration or Google OAuth; they must use their invitation link or sign in
 
 ### Authorization layers
 

@@ -47,6 +47,11 @@ Traqify is a full-stack multi-tenant SaaS application.
 4. Backend exchanges code for user info, upserts user, returns tokens
 5. Frontend `/auth-callback` page reads tokens from URL params and stores them
 
+**Note:** Email/password and Google OAuth are not mutually exclusive. A user who registered with email can also sign in with Google, and vice versa. Users who only have a Google account (no password set) are prompted to reset their password if they want to use email/password login.
+
+### Invited User Registration Block
+Users who have a pending or accepted staff invitation cannot create a new account via the registration page or Google OAuth sign-up. They are shown an error modal informing them they can only belong to one organization at a time and should use their invitation link or sign in.
+
 ### Forgot Password
 1. `POST /api/auth/forgot-password` with email
 2. Reset link emailed (valid 1 hour)
@@ -177,7 +182,7 @@ When a new order is created (from the dashboard or the public store), the org OW
 ### Inviting Staff
 1. Go to **Staff** -> Click **Invite staff**
 2. Enter email and select role (MANAGER, CASHIER, or AUDITOR)
-3. An invitation email is sent with a secure link valid for 48 hours
+3. An invitation email is sent with a secure link valid for 3 days (72 hours)
 4. Invited member clicks the link, sets their name and password, and joins the org
 5. After accepting, they are redirected to their dashboard automatically
 

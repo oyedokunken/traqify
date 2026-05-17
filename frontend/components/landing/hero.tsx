@@ -57,7 +57,7 @@ export function Hero() {
             animate="visible"
             variants={fadeRight}
             transition={{ duration: 0.6, delay: 0.2 }}
-            className="relative order-first lg:order-last"
+            className="relative order-first lg:order-last mx-3 sm:mx-0"
           >
             <div className="absolute -inset-4 bg-gradient-to-br from-[#DE1010]/10 to-transparent rounded-3xl" />
             <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-gray-100 h-full min-h-[360px]">

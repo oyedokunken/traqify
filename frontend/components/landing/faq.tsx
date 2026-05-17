@@ -7,35 +7,35 @@ import { Plus, Minus } from "lucide-react";
 const faqs = [
   {
     q: "Is Traqify free to use?",
-    a: "You can sign up and start using Traqify right away at no cost. Create your organization, add products, and start managing orders immediately.",
+    a: "Yes. You can sign up and start using Traqify right away at no cost. Create your organization, add products, and start managing orders immediately. No credit card required.",
   },
   {
     q: "How many staff members can I invite?",
-    a: "You can invite as many staff members as you need. Each gets a role � Manager, Cashier, or Auditor � with access scoped to what they actually need.",
+    a: "There is no limit. You can invite as many staff members as your business needs. Each person gets assigned a specific role with access limited to exactly what they need to do their job.",
   },
   {
     q: "Can I manage multiple store locations?",
-    a: "Yes. You can create separate organizations for different branches, each fully isolated with their own products, orders, staff, and reports.",
+    a: "Yes. You can create a separate organization for each branch or location. Each one is fully isolated with its own products, orders, staff, and reports.",
   },
   {
     q: "How does the public store page work?",
-    a: "Every organization gets a public catalog at traqify.com/store/your-slug. Customers browse and place orders without creating an account, and get a confirmation email.",
+    a: "Every organization gets its own public storefront. Customers can browse your products, add items to their cart, and place orders without needing to create an account. They receive a confirmation email automatically.",
   },
   {
     q: "Is my data secure?",
-    a: "All data travels over TLS and is stored on Supabase infrastructure (hosted on AWS). Passwords are hashed with bcrypt. We do not sell your data to anyone.",
+    a: "Absolutely. All data is encrypted in transit and at rest. Passwords are securely hashed and never stored in plain text. We follow industry-standard security practices and we will never sell or share your data with anyone.",
   },
   {
     q: "Can I export reports?",
-    a: "Yes. Reports can be printed as PDF directly from the browser, complete with your organization name and branding.",
+    a: "Yes. You can generate and download PDF reports directly from your dashboard. Reports include your organization name and branding, and cover areas like revenue, orders, inventory, customers, and more.",
   },
   {
     q: "What payment methods are supported?",
-    a: "Customers can select Bank Transfer, Cash on Delivery, or Card. Order confirmation emails go out automatically with the relevant payment details.",
+    a: "Customers can pay via Bank Transfer, Cash on Delivery, or Card. Order confirmation emails are sent out automatically with the relevant payment details included.",
   },
   {
     q: "Does Traqify work on mobile?",
-    a: "The dashboard is fully responsive and works well on phones and tablets. A dedicated mobile app is on the roadmap.",
+    a: "Yes. The entire dashboard is fully responsive and works well on phones and tablets. You can manage your store from any device, anywhere.",
   },
 ];
 
