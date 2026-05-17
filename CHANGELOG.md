@@ -5,6 +5,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v1.20.0] - 2026-05-17
+
+### Added
+- **Delete confirmation modal on Reviews page** -- clicking Delete now shows a confirmation dialog before the review is permanently removed
+- **Category pill on store product cards** -- each product card now displays its category name in a white pill badge at the top-left corner of the image container
+- **Total review count on store product cards** -- product cards now show the number of approved reviews alongside the average star rating
+- **Downloadable product email attachments** -- when an order containing downloadable products is marked as completed, the order completion email now includes download buttons (for URL-based downloads) or file attachments (for uploaded files)
+- **Invited user registration block** -- users who have been invited to join an organization can no longer create a new account via the registration page; an error modal informs them they can only belong to one organization at a time and should use their invitation link or sign in instead; this applies to both email registration and Google OAuth sign-up
+
+### Changed
+- **Google OAuth and email/password login are no longer mutually exclusive** -- removed the restriction that blocked Google OAuth users from signing in with email/password and vice versa; users who originally registered with email can now also use Google OAuth, and Google users are prompted to reset their password if they want to use email/password login
+- **Mobile padding on all landing page sections** -- updated horizontal padding from `px-4` to `px-5` on all landing page sections (Hero, About, Features, Stats, How It Works, Why Traqify, Testimonials, Everything, FAQ, CTA) excluding the header and footer
+- **Mobile padding on all dashboard pages** -- updated padding from `p-4` to `p-5` on mobile for all dashboard pages (Overview, Products, Orders, Reviews, Logistics, Customers, Inventory, Payments, Staff, Categories, Newsletter, Settings)
+- **Mobile padding on store pages** -- updated horizontal padding to `px-5` on the store listing and product detail pages
+- **Hero image column mobile padding** -- added `px-4` padding on mobile to the hero image column so the image is not flush against the screen edges
+- **FAQ answers rewritten** -- removed all mentions of tech stack and technical implementation details from FAQ answers; security answer now provides assurance without referencing specific technologies; no em dashes or emojis
+- **Footer mobile layout** -- the "Stay updated" column now spans full width on mobile and tablet (2-column grid), creating a cleaner 2x2 layout; desktop remains unchanged as a single row
+- **Email footer formatting** -- the "Traqify is a production-deployed..." text in both platform and store email footers now uses the same font styling as the "This email was sent to..." text, with a horizontal rule separator above it
+
+### Fixed
+- **5.0 default rating bug** -- product detail page was displaying hardcoded decorative 5.0 stars regardless of actual reviews; now shows the computed average rating only when reviews exist
+
+---
+
 ## [v1.19.0] - 2026-05-12
 
 ### Added

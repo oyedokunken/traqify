@@ -48,7 +48,8 @@ prisma/dev.db-journal
 next-env.d.ts
 
 # Local notes (may contain sensitive info)
-prompts.txt
+system-ideation.txt
+email.txt
 
 # Deployment docs (contain env details)
 DEPLOY.md

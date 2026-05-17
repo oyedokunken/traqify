@@ -42,7 +42,7 @@ function LoginForm() {
     const hint = searchParams.get("hint");
     const emailParam = searchParams.get("email");
     if (e === "oauth_failed") setError("Google sign-in failed. Please try again.");
-    if (e === "email_account") setError("This email is registered with a password. Please sign in with your email and password instead.");
+    if (e === "invited_user") setError("This email has been invited to join an organization. You can only belong to one organization at a time. Please use the invitation link sent to your email to get started.");
     if (hint === "exists") setError("You already have an account with this email. Please sign in.");
     if (emailParam) setValue("email", emailParam);
   }, [searchParams, setValue]);

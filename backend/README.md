@@ -9,7 +9,7 @@ Express + TypeScript API server for the Traqify multi-tenant store management pl
 - **ORM**: Prisma 5 (PostgreSQL / Supabase)
 - **Language**: TypeScript
 - **Email**: Nodemailer
-- **Auth**: JWT (access + refresh tokens), bcrypt
+- **Auth**: JWT (access + refresh tokens), bcrypt, Google OAuth 2.0
 - **PDF**: PDFKit
 - **Payments**: Paystack webhook verification
 

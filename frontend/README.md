@@ -10,6 +10,7 @@ Next.js 14 app router frontend for the Traqify multi-tenant store management pla
 - **Animations**: Framer Motion
 - **Forms**: react-hook-form + Zod
 - **HTTP**: Axios with JWT interceptor (auto token-refresh on 401)
+- **Auth**: Email/password + Google OAuth (not mutually exclusive), staff invite flow
 - **Icons**: Lucide React
 - **Charts**: Recharts
 
