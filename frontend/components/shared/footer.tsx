@@ -49,7 +49,7 @@ export function Footer() {
     <>
     <footer className="bg-[#111111] text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-10">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-10 mb-12">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-10 mb-12">
           <div className="col-span-2 lg:col-span-1">
             <div className="mb-4">
               <Logo size="md" className="[&_span:last-child]:text-white" />
@@ -100,7 +100,7 @@ export function Footer() {
               </ul>
             </div>
 
-          <div className="lg:col-span-2">
+          <div>
               <h4 className="text-sm font-semibold mb-5 text-gray-200">Platform</h4>
               <ul className="space-y-3">
                 {[

@@ -2,11 +2,22 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/shared/logo";
 import { cn } from "@/lib/utils";
+
+const WHITE_BG_PATHS = [
+  "/system",
+  "/changelog",
+  "/security",
+  "/license",
+  "/contributing",
+  "/privacy",
+  "/terms",
+];
 
 const navLinks = [
   { href: "#features", label: "Features" },
@@ -18,6 +29,8 @@ const navLinks = [
 ];
 
 export function Navbar() {
+  const pathname = usePathname();
+  const alwaysWhite = WHITE_BG_PATHS.includes(pathname);
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("");
@@ -52,7 +65,7 @@ export function Navbar() {
         transition={{ duration: 0.4 }}
         className={cn(
           "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
-          scrolled ? "bg-white/95 backdrop-blur-sm border-b border-gray-100 shadow-sm" : "bg-transparent"
+          (alwaysWhite || scrolled) ? "bg-white/95 backdrop-blur-sm border-b border-gray-100 shadow-sm" : "bg-transparent"
         )}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
