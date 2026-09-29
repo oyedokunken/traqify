@@ -50,7 +50,7 @@ export function Footer() {
     <footer className="bg-[#111111] text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-10">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-10 mb-12">
-          <div>
+          <div className="col-span-2 lg:col-span-1">
             <div className="mb-4">
               <Logo size="md" className="[&_span:last-child]:text-white" />
             </div>
@@ -100,6 +100,23 @@ export function Footer() {
               </ul>
             </div>
 
+          <div className="lg:col-span-2">
+              <h4 className="text-sm font-semibold mb-5 text-gray-200">Platform</h4>
+              <ul className="space-y-3">
+                {[
+                  { label: "The System", href: "/system" },
+                  { label: "Security", href: "/security" },
+                  { label: "License", href: "/license" },
+                  { label: "Contributing", href: "/contributing" },
+                  { label: "Changelog", href: "/changelog" },
+                ].map((link) => (
+                  <li key={link.href}>
+                    <Link href={link.href} className="text-sm text-gray-400 hover:text-white transition-colors">{link.label}</Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
           <div>
             <h4 className="text-sm font-semibold mb-5 text-gray-200">Stay updated</h4>
             <p className="text-gray-400 text-xs mb-4 leading-relaxed">Get product updates and tips delivered to your inbox.</p>
@@ -136,6 +153,7 @@ export function Footer() {
               </div>
             </form>
           </div>
+
         </div>
 
         <div className="border-t border-white/5 pt-8">
