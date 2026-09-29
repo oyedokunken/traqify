@@ -34,70 +34,463 @@ The system is live at **[https://traqify.vercel.app](https://traqify.vercel.app)
 ## Table of Contents
 
 1. [Architecture](#architecture)
-2. [Tech Stack](#tech-stack)
-3. [Features](#features)
-4. [Database Schema](#database-schema)
-5. [API Reference](#api-reference)
-6. [Folder Structure](#folder-structure)
-7. [Running Locally](#running-locally)
-8. [Environment Variables](#environment-variables)
-9. [Google OAuth Setup](#google-oauth-setup)
-10. [Deployment](#deployment)
-11. [License](#license)
+2. [Sequence Diagrams](#sequence-diagrams)
+3. [Component Diagram](#component-diagram)
+4. [Use Case Diagram](#use-case-diagram)
+5. [State Diagrams](#state-diagrams)
+6. [Deployment Architecture](#deployment-architecture)
+7. [Tech Stack](#tech-stack)
+8. [Features](#features)
+9. [Database Schema](#database-schema)
+10. [API Reference](#api-reference)
+11. [Folder Structure](#folder-structure)
+12. [Running Locally](#running-locally)
+13. [Environment Variables](#environment-variables)
+14. [Google OAuth Setup](#google-oauth-setup)
+15. [Deployment](#deployment)
+16. [License](#license)
 
 ---
 
 ## Architecture
 
+```mermaid
+graph TB
+    subgraph Client["Client (Browser)"]
+        FE["Next.js 14 App Router<br/>TypeScript + Tailwind CSS<br/>Framer Motion + Recharts<br/>Axios with JWT interceptor"]
+    end
+
+    subgraph Server["API Server (Express.js)"]
+        MW["Helmet + Rate Limit<br/>JWT authenticate<br/>requireOrg + RBAC guards"]
+        CTRL["Controllers<br/>auth, org, products, inventory<br/>orders, customers, staff<br/>reports, audit, store<br/>payments, reviews, newsletter"]
+        MW --> CTRL
+    end
+
+    PG[("PostgreSQL<br/>Supabase")]
+    S3[("Supabase Storage<br/>products + avatars buckets")]
+    MAIL["Nodemailer<br/>Gmail SMTP<br/>Branded HTML templates"]
+    GOAUTH["Google OAuth 2.0"]
+    PAY["Paystack"]
+
+    FE -->|"REST JSON / Bearer JWT"| MW
+    CTRL -->|"Prisma ORM"| PG
+    CTRL --> S3
+    CTRL --> MAIL
+    FE -->|"OAuth redirect"| GOAUTH
+    GOAUTH -->|"code callback"| MW
+    FE -->|"Paystack.js inline"| PAY
+    PAY -->|"server-side verify"| CTRL
 ```
-                              CLIENT
-              +--------------------------------------+
-              |    Next.js 14 (App Router)  :3000    |
-              |  TypeScript + Tailwind + Framer      |
-              |  Axios client (JWT + auto-refresh)   |
-              +------------------+-------------------+
-                                 |
-                    HTTP/HTTPS   |   REST JSON API
-                                 |
-              +------------------v-------------------+
-              |    Express.js API Server  :5000       |
-              |  TypeScript + Prisma ORM              |
-              |  JWT middleware + RBAC middleware      |
-              +------+----------+--------------------+
-                     |          |
-         +-----------+          +-----------+
-         |                                  |
-+--------v-----------+          +-----------v-----------+
-|  PostgreSQL (via   |          |  Supabase Storage      |
-|  Supabase)         |          |  (product images,      |
-|                    |          |   avatars)             |
-|  Prisma ORM        |          +-----------------------+
-+--------------------+
-         |
-+--------v-----------+
-|  Nodemailer        |
-|  Gmail SMTP        |
-|  HTML email        |
-|  templates         |
-+--------------------+
 
-  AUTHENTICATION FLOWS
-  ----------------------
-  Email/Password (OTP-first flow):
-    1. POST /send-otp -> OTP email (works before user exists)
-    2. POST /verify-email -> validate code -> redirect /register?verifiedEmail=...
-    3. POST /register -> create user (emailVerified:true) -> JWT (React state only)
-    4. POST /organizations -> create org -> POST /login -> fresh JWT with orgId
-       -> redirect /dashboard/[slug]/overview
+### Authentication Flows
 
-  Google OAuth 2.0:
-    GET /google-redirect -> accounts.google.com
-    -> GET /google-callback?code= -> exchange code -> userinfo
-    -> upsert user -> JWT + redirect to /auth-callback
+**Email + OTP registration:**
+1. `POST /api/auth/send-otp` - generates a 6-digit OTP, stores it with a 10-minute TTL, and emails it (works before the user record exists)
+2. `POST /api/auth/verify-email` - validates the code, marks the email verified, redirects to `/register?verifiedEmail=...`
+3. `POST /api/auth/register` - creates the user with `emailVerified: true`, returns access and refresh tokens
+4. `POST /api/organizations` - creates the organization and links the owner
+5. `POST /api/auth/login` - issues a fresh JWT that carries `organizationId`
 
-  Token Refresh:
-    Axios 401 interceptor -> POST /auth/refresh -> new access token
-    Automatic, transparent to all callers
+**Google OAuth 2.0:**
+1. `GET /api/auth/google-redirect` - redirects the browser to the Google consent screen
+2. `GET /api/auth/google-callback?code=` - exchanges the code, fetches the user profile, upserts the user record, issues a JWT
+
+**Token refresh:**
+The Axios client intercepts every 401 response, silently calls `POST /api/auth/refresh` with the stored refresh token, saves the new access token, and retries the original request. This is transparent to all callers.
+
+See [Sequence Diagrams](#sequence-diagrams) below for step-by-step visual flows.
+
+---
+
+## Sequence Diagrams
+
+### Email Registration and OTP Verification
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant FE as Next.js Frontend
+    participant API as Express API
+    participant DB as PostgreSQL
+    participant MAIL as Gmail SMTP
+
+    User->>FE: Enter email on register page
+    FE->>API: POST /api/auth/send-otp
+    API->>DB: INSERT OTPVerification (6-digit, 10 min TTL)
+    API->>MAIL: Send OTP email
+    MAIL-->>User: OTP code in inbox
+    User->>FE: Submit OTP code
+    FE->>API: POST /api/auth/verify-email
+    API->>DB: Mark OTP used, flag emailVerified
+    API-->>FE: Redirect to /register?verifiedEmail=...
+    User->>FE: Fill name and password
+    FE->>API: POST /api/auth/register
+    API->>DB: INSERT User (emailVerified true)
+    API-->>FE: access token + refresh token
+    User->>FE: Fill organization details
+    FE->>API: POST /api/organizations
+    API->>DB: INSERT Organization, link ownerId
+    FE->>API: POST /api/auth/login
+    API-->>FE: New JWT with organizationId
+    FE-->>User: Redirect to /dashboard/slug/overview
+```
+
+### Google OAuth 2.0
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant FE as Next.js Frontend
+    participant API as Express API
+    participant GOOGLE as Google OAuth 2.0
+    participant DB as PostgreSQL
+
+    User->>FE: Click Continue with Google
+    FE->>API: GET /api/auth/google-redirect
+    API-->>FE: 302 redirect to Google consent screen
+    FE->>GOOGLE: Browser follows redirect
+    User->>GOOGLE: Grant consent
+    GOOGLE->>API: GET /api/auth/google-callback?code=...
+    API->>GOOGLE: Exchange code for tokens
+    GOOGLE-->>API: Access token and user profile
+    API->>DB: Upsert User (create or update)
+    API-->>FE: 302 redirect to /auth-callback?token=...
+    FE-->>User: Dashboard or create-organization page
+```
+
+### POS Order Creation
+
+```mermaid
+sequenceDiagram
+    actor Staff
+    participant FE as Next.js Frontend
+    participant API as Express API
+    participant DB as PostgreSQL
+    participant MAIL as Gmail SMTP
+
+    Staff->>FE: Search products, add to cart
+    Staff->>FE: Attach customer (optional)
+    Staff->>FE: Click Create Order
+    FE->>API: POST /api/orders (CASHIER+ role)
+    API->>DB: INSERT Order + OrderItems
+    API->>DB: DECREMENT inventory quantities
+    API->>DB: INSERT AuditLog
+    opt Customer email is present
+        API->>MAIL: Send order confirmation to customer
+    end
+    API->>MAIL: Send admin notification to org owner
+    API-->>FE: 201 Created (status PENDING)
+    FE-->>Staff: Success toast, order listed
+```
+
+### Public Store Checkout via Paystack
+
+```mermaid
+sequenceDiagram
+    actor Customer
+    participant FE as Store Frontend
+    participant PAY as Paystack
+    participant API as Express API
+    participant DB as PostgreSQL
+    participant MAIL as Gmail SMTP
+
+    Customer->>FE: Add to cart, proceed to checkout
+    Customer->>FE: Fill details and solve arithmetic CAPTCHA
+    FE->>PAY: Initialize Paystack inline popup
+    PAY-->>Customer: Payment form
+    Customer->>PAY: Submit card details
+    PAY-->>FE: onSuccess callback with reference
+    FE->>API: POST /api/store/slug/checkout with reference
+    API->>PAY: Verify transaction server-side
+    PAY-->>API: status SUCCESSFUL
+    API->>DB: INSERT Order (status APPROVED)
+    API->>DB: UPSERT Customer (source PURCHASE)
+    API->>DB: DECREMENT inventory
+    API->>DB: INSERT AuditLog
+    API->>MAIL: Send order confirmation email
+    API-->>FE: 201 Created
+    FE-->>Customer: Order success screen
+```
+
+### Silent JWT Token Refresh
+
+```mermaid
+sequenceDiagram
+    participant FE as Next.js Frontend
+    participant AXIOS as Axios Interceptor
+    participant API as Express API
+
+    FE->>API: Protected request with expired access token
+    API-->>AXIOS: 401 Unauthorized
+    AXIOS->>API: POST /api/auth/refresh (refresh token)
+    API-->>AXIOS: 200 new access token
+    AXIOS->>FE: Store new access token
+    AXIOS->>API: Retry original request with new token
+    API-->>FE: 200 OK with data
+```
+
+### Staff Invitation Flow
+
+```mermaid
+sequenceDiagram
+    actor Manager
+    actor NewStaff
+    participant FE as Next.js Frontend
+    participant API as Express API
+    participant DB as PostgreSQL
+    participant MAIL as Gmail SMTP
+
+    Manager->>FE: Enter email and role
+    FE->>API: POST /api/staff/invite (MANAGER+)
+    API->>DB: Check for existing PENDING invite
+    alt Already pending
+        API-->>FE: 409 Conflict
+    else No conflict
+        API->>DB: INSERT StaffInvite (64-char token, 72 h expiry)
+        API->>DB: INSERT AuditLog
+        API->>MAIL: Send invitation email
+        API-->>FE: 201 Created
+    end
+    MAIL-->>NewStaff: Invitation email with token link
+    NewStaff->>FE: Open /invite/token
+    FE->>API: GET /api/staff/invite/token
+    API->>DB: Validate token (not expired, not accepted)
+    API-->>FE: Invite details (org name, role)
+    NewStaff->>FE: Set password and submit
+    FE->>API: POST /api/auth/register (with invite token)
+    API->>DB: INSERT User, SET invite status ACCEPTED
+    API->>MAIL: Send welcome email
+    API-->>FE: access token + refresh token
+    FE-->>NewStaff: Dashboard with role-specific welcome modal
+```
+
+---
+
+## Component Diagram
+
+Frontend component architecture: pages, shared library, and component dependencies.
+
+```mermaid
+graph TB
+    subgraph AppDir["app/"]
+        ROOT["layout.tsx<br/>AuthProvider + Toaster"]
+
+        subgraph AuthGroup["(auth)/"]
+            LOGIN_P["login"]
+            REG_P["register"]
+            VERIFY_P["verify-email"]
+            FORGOT_P["forgot-password"]
+            RESET_P["reset-password"]
+            CALLBACK_P["auth-callback"]
+        end
+
+        CREATEORG_P["create-organization"]
+        INVITE_P["invite/[token]"]
+
+        subgraph StoreGroup["store/[slug]/"]
+            STORE_P["page (catalog + cart)"]
+            CHECKOUT_P["checkout"]
+            PROD_PAGE["products/[id]"]
+        end
+
+        subgraph DashGroup["dashboard/[slug]/"]
+            DASH_LAYOUT["layout<br/>(auth guard + sidebar)"]
+            OVERVIEW_P["overview"]
+            PRODUCTS_P["products"]
+            ORDERS_P["orders"]
+            CUSTOMERS_P["customers"]
+            STAFF_P["staff"]
+            REPORTS_P["reports"]
+            PAYMENTS_P["payments"]
+            AUDIT_P["audit-logs"]
+            SETTINGS_P["settings"]
+        end
+    end
+
+    subgraph LibDir["lib/"]
+        API_LIB["api.ts<br/>Axios instance + JWT interceptor"]
+        AUTH_CTX["auth-context.tsx<br/>useAuth hook"]
+        SB_LIB["supabase.ts"]
+    end
+
+    subgraph Comps["components/"]
+        SIDEBAR_C["sidebar.tsx"]
+        TOPBAR_C["topbar.tsx"]
+        PROD_MODAL["product-modal.tsx"]
+        ORDER_MODAL["create-order-modal.tsx"]
+    end
+
+    ROOT --> AUTH_CTX
+    DASH_LAYOUT --> AUTH_CTX
+    DASH_LAYOUT --> SIDEBAR_C
+    DASH_LAYOUT --> TOPBAR_C
+    PRODUCTS_P --> PROD_MODAL
+    ORDERS_P --> ORDER_MODAL
+    PROD_MODAL --> SB_LIB
+    AuthGroup --> API_LIB
+    DashGroup --> API_LIB
+    StoreGroup --> API_LIB
+    INVITE_P --> API_LIB
+    CREATEORG_P --> API_LIB
+    API_LIB --> AUTH_CTX
+```
+
+---
+
+## Use Case Diagram
+
+Role-based access: what each actor can do in the system.
+
+```mermaid
+flowchart LR
+    OWNER(["Owner"])
+    MANAGER(["Manager"])
+    CASHIER(["Cashier"])
+    AUDITOR(["Auditor"])
+    PUBLIC(["Customer (Public)"])
+
+    subgraph Auth["Authentication"]
+        UC_AUTH["Register / Login<br/>OTP Verification<br/>Password Reset<br/>Google OAuth"]
+    end
+
+    subgraph OwnerOnly["Owner Only"]
+        UC_ORG["Manage Org Settings and Logo"]
+        UC_PUB["Publish / Unpublish Store"]
+        UC_ROLE["Change Staff Roles"]
+        UC_REMOVE["Remove Staff Members"]
+        UC_DEL_ORD["Delete Orders"]
+    end
+
+    subgraph ManagerPlus["Manager and Above"]
+        UC_PRODUCTS["Create and Edit Products<br/>and Categories"]
+        UC_INV["Adjust Inventory"]
+        UC_APPROVE["Approve and Cancel Orders"]
+        UC_CUST["Manage Customers"]
+        UC_PAY["Record Payments"]
+        UC_STAFF_INV["Invite and Restrict Staff"]
+        UC_REPORTS["Download and Email Reports"]
+    end
+
+    subgraph CashierPlus["Cashier and Above"]
+        UC_POS["Create POS Orders"]
+        UC_ADD_CUST["Add Customers"]
+        UC_DASH["View Dashboard"]
+    end
+
+    subgraph AuditorOwner["Auditor and Owner"]
+        UC_AUDIT["View Audit Logs"]
+        UC_VIEW_PAY["View All Payments"]
+    end
+
+    subgraph PublicStore["Public Store"]
+        UC_BROWSE["Browse Product Catalog"]
+        UC_CHECKOUT["Paystack Checkout"]
+        UC_WISHLIST["Wishlist and Reminder Emails"]
+        UC_REVIEW["Submit Product Review"]
+    end
+
+    OWNER --> Auth & OwnerOnly & ManagerPlus & CashierPlus & AuditorOwner
+    MANAGER --> Auth & ManagerPlus & CashierPlus
+    CASHIER --> Auth & CashierPlus
+    AUDITOR --> Auth & AuditorOwner & CashierPlus
+    PUBLIC --> PublicStore
+```
+
+---
+
+## State Diagrams
+
+### Order Status
+
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING : Order created (POS or store checkout)
+    PENDING --> APPROVED : Manager approves
+    PENDING --> CANCELLED : Manager cancels
+    APPROVED --> COMPLETED : Logistics marks delivered
+    APPROVED --> CANCELLED : Manager cancels
+    COMPLETED --> [*]
+    CANCELLED --> [*]
+```
+
+### Payment Status
+
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING : Payment recorded
+    PENDING --> COMPLETED : Payment confirmed
+    PENDING --> FAILED : Transaction fails
+    COMPLETED --> REFUNDED : Refund issued
+    COMPLETED --> [*]
+    FAILED --> [*]
+    REFUNDED --> [*]
+```
+
+### Staff Invite Lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING : Manager sends invite
+    PENDING --> ACCEPTED : Staff accepts within 72 h
+    PENDING --> EXPIRED : 72 hours elapse (lazy check on read)
+    PENDING --> [*] : Manager cancels (hard delete)
+    ACCEPTED --> [*]
+    EXPIRED --> [*]
+```
+
+### Product Status
+
+```mermaid
+stateDiagram-v2
+    [*] --> draft : Product created
+    draft --> published : Manager publishes
+    published --> draft : Manager unpublishes
+    published --> inactive : Soft deleted (isActive false)
+    draft --> inactive : Soft deleted (isActive false)
+    inactive --> [*]
+```
+
+---
+
+## Deployment Architecture
+
+```mermaid
+graph TB
+    subgraph Internet["Internet"]
+        USER["Staff / Admin Browser"]
+        CUST["Store Customer Browser"]
+    end
+
+    subgraph Vercel["Vercel Edge Network"]
+        subgraph FE_DEPLOY["traqify.vercel.app"]
+            NEXT_SRV["Next.js 14<br/>Serverless Functions<br/>+ CDN Static Assets"]
+        end
+        subgraph BE_DEPLOY["traqify-api.vercel.app"]
+            EXPRESS_SRV["Express.js<br/>Serverless Function<br/>Node.js 18 runtime"]
+        end
+    end
+
+    subgraph SupabaseCloud["Supabase Cloud"]
+        PG["PostgreSQL 15<br/>Primary database<br/>(connection pooler)"]
+        SB_STORE["Object Storage<br/>products/ bucket<br/>avatars/ bucket"]
+    end
+
+    subgraph External["Third-Party Services"]
+        GMAIL["Gmail SMTP<br/>smtp.gmail.com:587"]
+        GOOGLE_ID["Google Identity<br/>accounts.google.com"]
+        PAYSTACK_API["Paystack API<br/>api.paystack.co"]
+    end
+
+    USER -->|HTTPS| NEXT_SRV
+    CUST -->|HTTPS| NEXT_SRV
+    NEXT_SRV -->|HTTPS REST| EXPRESS_SRV
+    EXPRESS_SRV -->|Prisma / PG wire protocol| PG
+    EXPRESS_SRV -->|Supabase SDK| SB_STORE
+    EXPRESS_SRV -->|SMTP TLS| GMAIL
+    NEXT_SRV -->|OAuth redirect| GOOGLE_ID
+    GOOGLE_ID -->|callback| EXPRESS_SRV
+    NEXT_SRV -->|Paystack.js CDN| PAYSTACK_API
+    PAYSTACK_API -->|verify call| EXPRESS_SRV
 ```
 
 ---
@@ -327,6 +720,160 @@ Auth endpoints (`/api/auth/*`) are rate-limited via `express-rate-limit`:
 ---
 
 ## Database Schema
+
+```mermaid
+erDiagram
+    Organization {
+        string id PK
+        string name
+        string slug UK
+        boolean storePublished
+    }
+    User {
+        string id PK
+        string email UK
+        string role
+        boolean isActive
+        string organizationId FK
+        string invitedById FK
+    }
+    ProductCategory {
+        string id PK
+        string name
+        string slug
+        string organizationId FK
+    }
+    Product {
+        string id PK
+        string name
+        string sku
+        float price
+        string productType
+        string status
+        string organizationId FK
+        string categoryId FK
+    }
+    ProductVariant {
+        string id PK
+        string name
+        string value
+        float price
+        string productId FK
+    }
+    Inventory {
+        string id PK
+        int quantity
+        int lowStockAlert
+        int reorderPoint
+        string productId FK
+    }
+    Customer {
+        string id PK
+        string name
+        string email
+        string source
+        string organizationId FK
+    }
+    Order {
+        string id PK
+        string orderNumber UK
+        string status
+        float totalAmount
+        string organizationId FK
+        string customerId FK
+        string createdById FK
+    }
+    OrderItem {
+        string id PK
+        int quantity
+        float unitPrice
+        float subtotal
+        string orderId FK
+        string productId FK
+    }
+    Payment {
+        string id PK
+        float amount
+        string currency
+        string status
+        string method
+        string organizationId FK
+        string orderId FK
+    }
+    StaffInvite {
+        string id PK
+        string email
+        string role
+        string token UK
+        string status
+        datetime expiresAt
+        string organizationId FK
+    }
+    AuditLog {
+        string id PK
+        string action
+        string entity
+        string entityId
+        boolean isRead
+        string userId FK
+        string organizationId FK
+    }
+    Review {
+        string id PK
+        int rating
+        string status
+        string productId FK
+        string orderId FK
+        string organizationId FK
+    }
+    Wishlist {
+        string id PK
+        string sessionId
+        string email
+        string organizationId FK
+    }
+    OTPVerification {
+        string id PK
+        string email
+        string otp
+        datetime expiresAt
+        boolean used
+    }
+    PasswordResetToken {
+        string id PK
+        string email
+        string token UK
+        datetime expiresAt
+        boolean used
+    }
+    NewsletterSubscriber {
+        string id PK
+        string email UK
+    }
+
+    Organization ||--o{ User : "employs"
+    Organization ||--o{ Product : "owns"
+    Organization ||--o{ Order : "processes"
+    Organization ||--o{ Customer : "tracks"
+    Organization ||--o{ StaffInvite : "sends"
+    Organization ||--o{ AuditLog : "generates"
+    Organization ||--o{ Payment : "records"
+    Organization ||--o{ Wishlist : "receives"
+    Organization ||--o{ ProductCategory : "manages"
+    Organization ||--o{ Review : "receives"
+    User ||--o{ Order : "creates"
+    User ||--o{ AuditLog : "authors"
+    User }o--o| User : "invited by"
+    ProductCategory ||--o{ Product : "groups"
+    Product ||--|| Inventory : "tracked by"
+    Product ||--o{ ProductVariant : "has variants"
+    Product ||--o{ OrderItem : "appears in"
+    Product ||--o{ Review : "receives"
+    Order ||--o{ OrderItem : "contains"
+    Order ||--o{ Payment : "has"
+    Order ||--o{ Review : "generates"
+    Customer ||--o{ Order : "places"
+```
 
 ```
 User
