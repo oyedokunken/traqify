@@ -24,6 +24,7 @@ import { processWishlistEmails } from "./controllers/store.controller";
 import categoryRoutes from "./routes/category.routes";
 import reviewRoutes from "./routes/review.routes";
 import paymentRoutes from "./routes/payment.routes";
+import cronRoutes from "./routes/cron.routes";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -87,6 +88,7 @@ app.use("/api/newsletter", newsletterRoutes);
 app.use("/api/store", storeRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/cron", cronRoutes);
 
 app.use(errorHandler);
 
