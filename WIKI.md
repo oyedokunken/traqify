@@ -44,8 +44,8 @@ Traqify is a full-stack multi-tenant SaaS application.
 1. Click "Continue with Google"  -  redirects to `GET /api/auth/google-redirect`
 2. Backend redirects to Google consent screen
 3. Google redirects to `GET /api/auth/google-callback?code=...`
-4. Backend exchanges code for user info, upserts user, returns tokens
-5. Frontend `/auth-callback` page reads tokens from URL params and stores them
+4. Backend exchanges the Google code for user info, upserts the user record, stores access and refresh tokens in a short-lived `OAuthSession` record (2-minute TTL), and redirects to `/auth-callback?code=<opaque>`
+5. Frontend `/auth-callback` page calls `GET /api/auth/oauth-exchange/:code`; the server returns the tokens and deletes the OAuthSession record immediately; tokens are never placed in the URL
 
 **Note:** Email/password and Google OAuth are not mutually exclusive. A user who registered with email can also sign in with Google, and vice versa. Users who only have a Google account (no password set) are prompted to reset their password if they want to use email/password login.
 
@@ -75,7 +75,7 @@ Role hierarchy scores used by backend middleware: OWNER=4, MANAGER=3, AUDITOR=2,
 | Manage customers            |  Yes  |   Yes   |   Yes   |         |
 | Invite staff                |  Yes  |   Yes   |         |         |
 | Restrict/remove staff       |  Yes  |   Yes   |         |         |
-| View staff list             |  Yes  |   Yes   |         |         |
+| View staff list             |  Yes  |   Yes   |         |   Yes   |
 | View newsletter subscribers |  Yes  |   Yes   |         |         |
 | Moderate reviews            |  Yes  |   Yes   |         |         |
 | View financial reports      |  Yes  |   Yes   |         |   Yes   |
@@ -267,6 +267,9 @@ Located at `/dashboard/[slug]/newsletter` (OWNER/MANAGER only).
 - **Export CSV** button to download all subscribers as a CSV file; CSV includes Name, Email, Subscribed On, and **Status** columns
 - **Delete subscriber**: trash icon on each row; confirm modal before deletion; audit log entry created
 
+### Subscriber Scoping
+Subscribers are linked to the organization that received their subscription. `GET /api/newsletter/subscribers` returns only the subscribers belonging to the requesting user's organization. Deleting a subscriber is also org-scoped; an OWNER or MANAGER from a different organization cannot see or delete another org's subscribers.
+
 ### Subscription Form
 The public newsletter subscription form on the landing page posts to `POST /api/newsletter/subscribe`.
 Validated with `react-hook-form` and `zod` -- no HTML `required` attribute; inline error messages appear below each field.
@@ -381,10 +384,11 @@ All emails use branded HTML templates defined in `backend/src/emails/templates.t
 | POST | /api/auth/send-otp | Resend OTP |
 | POST | /api/auth/login | Login |
 | POST | /api/auth/refresh | Refresh token |
-| POST | /api/auth/logout | Logout |
+| POST | /api/auth/logout | Increment tokenVersion; invalidates all outstanding tokens |
 | GET  | /api/auth/google-redirect | Start Google OAuth |
-| GET  | /api/auth/google-callback | Google OAuth callback |
-| POST | /api/auth/forgot-password | Send reset link |
+| GET  | /api/auth/google-callback | Google OAuth callback; redirects with one-time opaque code |
+| GET  | /api/auth/oauth-exchange/:code | Exchange one-time code for tokens |
+| POST | /api/auth/forgot-password | Send reset link (same response whether account exists or not) |
 | POST | /api/auth/reset-password | Reset password |
 | PATCH | /api/auth/me | Update name / avatar |
 | POST | /api/auth/change-password | Change password |
@@ -443,7 +447,7 @@ All emails use branded HTML templates defined in `backend/src/emails/templates.t
 ### Staff
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | /api/staff | List staff members |
+| GET | /api/staff | List staff members (AUDITOR+) |
 | POST | /api/staff/invite | Send invitation |
 | PATCH | /api/staff/:userId/role | Update role |
 | PATCH | /api/staff/:userId/access | Toggle access |

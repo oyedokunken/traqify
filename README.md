@@ -93,7 +93,8 @@ graph TB
 
 **Google OAuth 2.0:**
 1. `GET /api/auth/google-redirect` - redirects the browser to the Google consent screen
-2. `GET /api/auth/google-callback?code=` - exchanges the code, fetches the user profile, upserts the user record, issues a JWT
+2. `GET /api/auth/google-callback?code=` - exchanges the code, fetches the user profile, upserts the user record, stores tokens in a short-lived `OAuthSession` record, and redirects the browser to `/auth-callback?code=<opaque>`
+3. `GET /api/auth/oauth-exchange/:code` - frontend calls this once with the opaque code; server returns the access token, refresh token, and user; the code is deleted immediately after use
 
 **Token refresh:**
 The Axios client intercepts every 401 response, silently calls `POST /api/auth/refresh` with the stored refresh token, saves the new access token, and retries the original request. This is transparent to all callers.
@@ -154,7 +155,11 @@ sequenceDiagram
     API->>GOOGLE: Exchange code for tokens
     GOOGLE-->>API: Access token and user profile
     API->>DB: Upsert User (create or update)
-    API-->>FE: 302 redirect to /auth-callback?token=...
+    API->>DB: INSERT OAuthSession (code, tokens, 2 min TTL)
+    API-->>FE: 302 redirect to /auth-callback?code=<opaque>
+    FE->>API: GET /api/auth/oauth-exchange/:code
+    API->>DB: Read OAuthSession, delete record
+    API-->>FE: access token + refresh token + user
     FE-->>User: Dashboard or create-organization page
 ```
 
@@ -674,12 +679,14 @@ Branded HTML templates for:
 
 ### Authentication layers
 
-1. **OTP email verification** — every new account must verify their email before gaining access; the OTP is a 6-digit code with a 10-minute expiry and single-use enforcement
+1. **OTP email verification** — every new account must verify their email before gaining access; OTPs are 6-digit codes generated with `crypto.randomInt`, SHA-256 hashed before storage, expire after 10 minutes, and are invalidated after 5 failed attempts
 2. **bcrypt password hashing** — cost factor 12; no plain-text passwords stored anywhere
-3. **JWT access token** — 7-day default lifetime; signed with `JWT_SECRET`; carries `userId`, `email`, `organizationId`, `role`
-4. **JWT refresh token** — separate secret (`JWT_REFRESH_SECRET`); used by Axios interceptor to silently re-issue access tokens on 401
-5. **Google OAuth 2.0** — redirect-based flow (server-side code exchange); email/password and Google OAuth are not mutually exclusive
-6. **Invited user registration block** — users with a pending staff invitation cannot create new accounts via registration or Google OAuth; they must use their invitation link or sign in
+3. **JWT access token** — 7-day default lifetime; signed with `JWT_SECRET`; carries `userId`, `email`, `organizationId`, `role`, and `tokenVersion`
+4. **JWT refresh token** — separate secret (`JWT_REFRESH_SECRET`); used by Axios interceptor to silently re-issue access tokens on 401; both token types are validated against `User.tokenVersion` on every use
+5. **Token version invalidation** — `tokenVersion` is incremented in the database on logout and on password change; all outstanding tokens for a user become invalid immediately, regardless of their remaining TTL
+6. **Google OAuth 2.0** — redirect-based flow; after the callback the backend stores tokens in a short-lived `OAuthSession` record and redirects with only an opaque one-time code; tokens are never in the URL
+7. **Invited user registration block** — users with a pending staff invitation cannot create new accounts via registration or Google OAuth; they must use their invitation link or sign in
+8. **Startup validation** — the API process throws before accepting any traffic if any of the five required environment variables (`JWT_SECRET`, `JWT_REFRESH_SECRET`, `DATABASE_URL`, `PAYSTACK_SECRET_KEY`, `FRONTEND_URL`) are missing
 
 ### Authorization layers
 
@@ -690,8 +697,9 @@ Branded HTML templates for:
 
 ### Rate limiting
 
-Auth endpoints (`/api/auth/*`) are rate-limited via `express-rate-limit`:
-- 10 requests per 15 minutes per IP on sensitive routes (login, register, OTP send)
+Two tiers applied via `express-rate-limit`:
+- **Global**: 200 requests per 15 minutes per IP across all routes
+- **Auth**: 20 requests per 15 minutes per IP on all `/api/auth/*` routes
 
 ### HTTP security headers
 
@@ -734,6 +742,8 @@ erDiagram
         string email UK
         string role
         boolean isActive
+        int tokenVersion
+        datetime passwordChangedAt
         string organizationId FK
         string invitedById FK
     }
@@ -835,9 +845,10 @@ erDiagram
     OTPVerification {
         string id PK
         string email
-        string otp
+        string otp_hash
         datetime expiresAt
         boolean used
+        int attempts
     }
     PasswordResetToken {
         string id PK
@@ -846,9 +857,18 @@ erDiagram
         datetime expiresAt
         boolean used
     }
+    OAuthSession {
+        string id PK
+        string code UK
+        string token
+        string refreshToken
+        string userData
+        datetime expiresAt
+    }
     NewsletterSubscriber {
         string id PK
-        string email UK
+        string email
+        string organizationId FK
     }
 
     Organization ||--o{ User : "employs"
@@ -861,6 +881,7 @@ erDiagram
     Organization ||--o{ Wishlist : "receives"
     Organization ||--o{ ProductCategory : "manages"
     Organization ||--o{ Review : "receives"
+    Organization ||--o{ NewsletterSubscriber : "collects (optional)"
     User ||--o{ Order : "creates"
     User ||--o{ AuditLog : "authors"
     User }o--o| User : "invited by"
@@ -980,14 +1001,15 @@ All protected endpoints require `Authorization: Bearer <token>`.
 | POST | `/send-otp` | Public | Resend OTP |
 | POST | `/login` | Public | Email + password login |
 | POST | `/refresh` | Public | Refresh access token |
-| POST | `/logout` | Auth | Invalidate refresh token |
-| POST | `/forgot-password` | Public | Send reset link |
+| POST | `/logout` | Auth | Increment tokenVersion; invalidates all outstanding tokens |
+| POST | `/forgot-password` | Public | Send reset link (same response whether account exists or not) |
 | POST | `/reset-password` | Public | Set new password via token |
 | GET  | `/google-redirect` | Public | Redirect to Google consent screen |
-| GET  | `/google-callback` | Public | Handle OAuth callback, issue JWT |
+| GET  | `/google-callback` | Public | Handle OAuth callback; stores tokens in OAuthSession; redirects with one-time code |
+| GET  | `/oauth-exchange/:code` | Public | Exchange one-time code for access token, refresh token, and user |
 | GET  | `/me` | Auth | Get current user profile |
 | PATCH | `/me` | Auth | Update name / avatarUrl |
-| POST | `/change-password` | Auth | Change password (requires current password) |
+| POST | `/change-password` | Auth | Change password; increments tokenVersion |
 | POST | `/upload-avatar` | Auth | Upload avatar to Supabase (`avatars` bucket) |
 
 ### Organizations (`/api/org` or `/api/organizations`)
@@ -1027,7 +1049,8 @@ All protected endpoints require `Authorization: Bearer <token>`.
 | POST | `/` | MANAGER+ | Create product |
 | PATCH | `/:id` | MANAGER+ | Update product |
 | DELETE | `/:id` | MANAGER+ | Soft-delete product |
-| POST | `/upload-image` | MANAGER+ | Upload product image to Supabase |
+| POST | `/upload-image` | MANAGER+ | Upload product image to Supabase (JPEG/PNG/WebP, max 5 MB) |
+| POST | `/upload-file` | MANAGER+ | Upload downloadable product file (PDF, ZIP, etc., max 4 MB) |
 
 ### Inventory (`/api/inventory`)
 | Method | Path | Auth | Description |
@@ -1055,7 +1078,7 @@ All protected endpoints require `Authorization: Bearer <token>`.
 ### Staff (`/api/staff`)
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/` | Auth + OrgMember | List staff members |
+| GET | `/` | AUDITOR+ | List staff members |
 | GET | `/invites` | MANAGER+ | List all pending/expired invites |
 | POST | `/invite` | MANAGER+ | Send staff invitation (3-day token) |
 | DELETE | `/invites/:inviteId` | MANAGER+ | Cancel a pending invite |
@@ -1112,7 +1135,13 @@ All protected endpoints require `Authorization: Bearer <token>`.
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | POST | `/subscribe` | Public | Subscribe to newsletter |
-| GET | `/subscribers` | OWNER/MANAGER | List all newsletter subscribers |
+| GET | `/subscribers` | OWNER/MANAGER | List newsletter subscribers scoped to the requesting org |
+| DELETE | `/:id` | OWNER/MANAGER | Remove a subscriber (org-scoped) |
+
+### Cron (`/api/cron`)
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/ping` | CRON_SECRET bearer | Keep-alive ping to prevent Supabase database pausing |
 
 ---
 
@@ -1388,6 +1417,7 @@ The app will be available at **http://localhost:3000** (local) or **https://traq
 | `GOOGLE_CLIENT_SECRET` | Yes | OAuth 2.0 client secret |
 | `PAYSTACK_SECRET_KEY` | Yes | Paystack secret key (verify payments server-side) |
 | `PAYSTACK_PUBLIC_KEY` | No | Paystack public key (also set in frontend env) |
+| `CRON_SECRET` | Yes (production) | Secret Vercel injects as `Authorization: Bearer` on cron invocations; must not contain whitespace |
 
 ### `frontend/.env.local`
 
@@ -1462,7 +1492,7 @@ Traqify is purpose-built with enterprise patterns. Here is an honest assessment 
 |------|--------------|-------------------------|
 | **Password history** | Not enforced (current vs new password checked, but no history log) | Add `PasswordHistory` model; hash-compare last N passwords |
 | **MFA / 2FA** | Not implemented | TOTP (Google Authenticator) or SMS via Twilio |
-| **Session management** | Stateless JWT; no server-side session store | Add Redis for token blocklisting on logout/restriction |
+| **Session management** | `tokenVersion` in every JWT invalidates all tokens simultaneously on logout or password change; selective per-device revocation is not supported | Add a per-session token store (Redis) if selective revocation is needed |
 | **Background jobs** | Wishlist reminders use a simulated delay model; invite expiry is lazy (on-read) | Proper cron/queue (BullMQ + Redis) for scheduled tasks |
 | **Horizontal scaling** | Single Express instance per Vercel function | Stateless architecture already; add Redis for shared state |
 | **Webhook events** | No outbound webhooks | Add a `WebhookEndpoint` model + `POST` delivery queue |
