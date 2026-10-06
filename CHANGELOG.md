@@ -5,6 +5,50 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v1.23.0] - 2026-05-20
+
+### Added
+- **Folder-level README files** -- `backend/README.md` and `frontend/README.md` expanded into full reference documents with Mermaid architecture diagrams, middleware pipeline flowcharts, RBAC role hierarchy diagrams, complete API reference tables, database model diagrams, email template references, file upload specs, and environment variable tables
+- **SECURITY.md rewritten** -- root `SECURITY.md` now documents all active security controls: transport security, OTP SHA-256 hashing, tokenVersion session invalidation, Google OAuth one-time code exchange, Paystack amount verification, file upload allowlists, rate limiting tiers, cron job protection, startup environment validation, and known limitations
+
+---
+
+## [v1.22.0] - 2026-05-20
+
+### Added
+- **17 security vulnerabilities fixed** across backend and frontend:
+  - **OAuth token exposure** -- tokens are no longer placed in redirect URL query parameters; backend now stores them in a short-lived `OAuthSession` record and issues an opaque one-time exchange code; frontend `/auth-callback` exchanges the code via `GET /api/auth/oauth-exchange/:code`
+  - **Token version invalidation** -- `tokenVersion` field added to `User`; all JWTs carry the version; middleware rejects tokens whose version does not match; `POST /api/auth/logout` and password change both increment the version, invalidating all outstanding tokens immediately
+  - **OTP SHA-256 hashing** -- OTPs are hashed with `crypto.createHash('sha256')` before storage; only the hash is persisted; verification hashes the submitted value before comparison
+  - **OTP brute-force protection** -- `OTPVerification.attempts` counter invalidates the record after 5 failed guesses
+  - **Paystack amount verification** -- `verifiedAmount` from Paystack is now compared against the server-calculated `totalAmount`; a mismatch returns 402 before any order or inventory change
+  - **Newsletter org-scoping** -- `NewsletterSubscriber` now has an `organizationId` FK; subscriber queries are filtered to the requesting user's organization; cross-org subscriber access is structurally prevented
+  - **Blind forgotPassword response** -- endpoint returns the same message whether the email exists or not, removing account enumeration
+  - **SSRF guard on downloadable files** -- hostname is validated with `new URL().hostname.endsWith('.supabase.co')` before any server-side file fetch
+  - **Password complexity enforced on changePassword** -- uses the same 4-rule policy (uppercase, lowercase, digit, special character) as registration
+  - **Special character required on acceptInvite** -- `acceptInviteSchema` Zod validator now requires a special character in the password field
+  - **MIME allowlist on upload-file** -- downloadable product uploads now reject files outside an explicit type allowlist (PDF, ZIP, Office documents, common image and media formats)
+  - **`notFound` middleware registered** -- unmatched routes now return a structured 404 instead of the Express HTML default
+  - **Startup environment validation** -- five required environment variables checked at process start; server throws before accepting traffic if any are absent
+  - **`withCredentials` removed from Axios** -- redundant with Bearer token authentication; reduces CSRF attack surface
+  - **Morgan `short` in production** -- access logs no longer include full query strings in production
+  - **Staff listing restricted to AUDITOR+** -- `GET /api/staff` now requires `isAtLeastAuditor`; CASHIER can no longer list staff names, emails, and roles
+  - **Unauthenticated `POST /api/auth/google` deleted** -- endpoint previously issued valid JWTs for any supplied email with no Google token verification
+
+---
+
+## [v1.21.0] - 2026-05-19
+
+### Added
+- **Daily Vercel Cron job** -- `GET /api/cron/ping` runs at `0 6 * * *` UTC (once per day, the maximum allowed on Vercel Hobby Plan) to keep the Supabase Free-tier database from being paused after 7 days of inactivity; Vercel injects `Authorization: Bearer <CRON_SECRET>` on every invocation; the endpoint validates the header before executing any database operation
+- **`CRON_SECRET` environment variable** -- new required production variable documented in `backend/.env.example`; must be set in the Vercel project environment settings without leading or trailing whitespace
+
+### Fixed
+- **White navbar on public documentation pages** -- `/system`, `/changelog`, `/security`, `/license`, `/contributing`, `/privacy`, and `/terms` now display a white navbar immediately on page load without requiring a scroll event; controlled by `WHITE_BG_PATHS` in `components/shared/navbar.tsx`
+- **Footer 5-column desktop layout** -- footer switched from `lg:grid-cols-4` to `lg:grid-cols-5`; all five sections (brand, Product, Account, Platform, Stay updated) now appear in a single horizontal row on desktop; 2-column mobile layout unchanged
+
+---
+
 ## [v1.20.0] - 2026-05-17
 
 ### Added
