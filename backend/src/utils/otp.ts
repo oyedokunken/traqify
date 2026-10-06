@@ -5,6 +5,11 @@ export const generateOTP = (): string => {
   return crypto.randomInt(100000, 999999).toString();
 };
 
+const hashOTP = (otp: string): string =>
+  crypto.createHash("sha256").update(otp).digest("hex");
+
+const MAX_OTP_ATTEMPTS = 5;
+
 export const createOTP = async (email: string): Promise<string> => {
   await prisma.oTPVerification.deleteMany({ where: { email } });
 
@@ -12,23 +17,39 @@ export const createOTP = async (email: string): Promise<string> => {
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
   await prisma.oTPVerification.create({
-    data: { email, otp, expiresAt },
+    data: { email, otp: hashOTP(otp), expiresAt },
   });
 
-  return otp;
+  return otp; // Return the plain OTP for delivery — only the hash is stored
 };
 
 export const verifyOTP = async (email: string, otp: string): Promise<boolean> => {
   const record = await prisma.oTPVerification.findFirst({
     where: {
       email,
-      otp,
       used: false,
       expiresAt: { gt: new Date() },
     },
   });
 
   if (!record) return false;
+
+  // Per-email brute-force protection
+  if (record.attempts >= MAX_OTP_ATTEMPTS) {
+    await prisma.oTPVerification.update({
+      where: { id: record.id },
+      data: { used: true },
+    });
+    return false;
+  }
+
+  if (record.otp !== hashOTP(otp)) {
+    await prisma.oTPVerification.update({
+      where: { id: record.id },
+      data: { attempts: { increment: 1 } },
+    });
+    return false;
+  }
 
   await prisma.oTPVerification.update({
     where: { id: record.id },

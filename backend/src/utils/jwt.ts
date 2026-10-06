@@ -5,6 +5,7 @@ export interface JWTPayload {
   email: string;
   organizationId?: string;
   role?: string;
+  tokenVersion?: number;
 }
 
 export const signToken = (payload: JWTPayload): string => {

@@ -37,6 +37,7 @@ export const authenticate = async (
         role: true,
         organizationId: true,
         isActive: true,
+        tokenVersion: true,
       },
     });
 
@@ -47,6 +48,12 @@ export const authenticate = async (
 
     if (!user.isActive) {
       res.status(403).json({ error: "Your account has been deactivated. Please contact your administrator." });
+      return;
+    }
+
+    // Reject tokens issued before a password change or explicit logout
+    if (payload.tokenVersion !== undefined && payload.tokenVersion !== user.tokenVersion) {
+      res.status(401).json({ error: "Session expired. Please log in again." });
       return;
     }
 

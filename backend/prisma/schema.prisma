@@ -68,6 +68,8 @@ model User {
   signInMethod   SignInMethod  @default(EMAIL)
   isActive       Boolean      @default(true)
   lastLoginAt    DateTime?
+  tokenVersion   Int          @default(0)
+  passwordChangedAt DateTime?
 
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
@@ -110,6 +112,7 @@ model Organization {
   wishlists   Wishlist[]
   reviews     Review[]
   payments    Payment[]
+  newsletters NewsletterSubscriber[]
 
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
@@ -123,6 +126,7 @@ model OTPVerification {
   otp       String
   expiresAt DateTime
   used      Boolean  @default(false)
+  attempts  Int      @default(0)
 
   createdAt DateTime @default(now())
 
@@ -326,12 +330,28 @@ model Wishlist {
 }
 
 model NewsletterSubscriber {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
+  id             String        @id @default(cuid())
+  email          String
+  name           String?
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime      @default(now())
 
+  @@unique([email, organizationId])
   @@map("newsletter_subscribers")
+}
+
+model OAuthSession {
+  id           String   @id @default(cuid())
+  code         String   @unique
+  token        String
+  refreshToken String
+  userData     String
+  expiresAt    DateTime
+
+  createdAt    DateTime @default(now())
+
+  @@map("oauth_sessions")
 }
 
 model Review {
