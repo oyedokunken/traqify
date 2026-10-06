@@ -1515,5 +1515,5 @@ MIT. See [LICENSE](LICENSE).
 Software Engineer
 
 - Email: [oyedokunken@gmail.com](mailto:oyedokunken@gmail.com)
-- WhatsApp: [+2348028134942](https://wa.link/nv875h)
+- Portfolio: [oyedokun.dev](https://www.oyedokun.dev/)
 - GitHub: [@oyedokunken](https://github.com/oyedokunken)

@@ -11,7 +11,7 @@ export default function LicensePage() {
     <div className="min-h-screen bg-white">
       <Navbar />
       
-      <div className="bg-[#DE1010] py-16">
+      <div className="bg-[#DE1010] pt-24 pb-16">
         <div className="max-w-5xl mx-auto px-5 sm:px-6 lg:px-8 text-center">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
             <nav className="flex items-center justify-center gap-2 text-sm text-white/80 mb-6">
