@@ -11,7 +11,7 @@ export default function SystemPage() {
     <div className="min-h-screen bg-white">
       <Navbar />
       
-      <div className="bg-[#DE1010] py-16">
+      <div className="bg-[#DE1010] pt-24 pb-16">
         <div className="max-w-5xl mx-auto px-5 sm:px-6 lg:px-8 text-center">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
             <nav className="flex items-center justify-center gap-2 text-sm text-white/80 mb-6">
@@ -92,10 +92,13 @@ export default function SystemPage() {
   Google OAuth 2.0:
     GET /google-redirect -> accounts.google.com
     -> GET /google-callback?code= -> exchange code -> userinfo
-    -> upsert user -> JWT + redirect to /auth-callback
+    -> upsert user -> store tokens in OAuthSession (2 min TTL)
+    -> redirect /auth-callback?code=<opaque>
+    -> GET /oauth-exchange/:code -> tokens returned, code deleted
 
   Token Refresh:
     Axios 401 interceptor -> POST /auth/refresh -> new access token
+    Tokens carry tokenVersion; incremented on logout/password change
     Automatic, transparent to all callers`}
             </pre>
           </div>
@@ -287,12 +290,14 @@ export default function SystemPage() {
             <div>
               <h3 className="text-lg font-semibold text-[#0a0a0a] mb-3">Authentication layers</h3>
               <ul className="space-y-2 text-gray-600">
-                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>OTP email verification — every new account must verify their email before gaining access; the OTP is a 6-digit code with a 10-minute expiry and single-use enforcement</span></li>
+                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>OTP email verification — 6-digit code generated with crypto.randomInt, SHA-256 hashed before storage, expires after 10 minutes, invalidated after 5 failed attempts</span></li>
                 <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>bcrypt password hashing — cost factor 12; no plain-text passwords stored anywhere</span></li>
-                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>JWT access token — 7-day default lifetime; signed with JWT_SECRET; carries userId, email, organizationId, role</span></li>
-                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>JWT refresh token — separate secret (JWT_REFRESH_SECRET); used by Axios interceptor to silently re-issue access tokens on 401</span></li>
-                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>Google OAuth 2.0 — redirect-based flow (server-side code exchange); email/password and Google OAuth are not mutually exclusive</span></li>
-                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>Invited user registration block — users with a pending staff invitation cannot create new accounts via registration or Google OAuth; they must use their invitation link or sign in</span></li>
+                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>JWT access token — 7-day default lifetime; carries userId, email, organizationId, role, and tokenVersion</span></li>
+                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>Token version invalidation — tokenVersion incremented on logout and password change; all outstanding tokens for a user are rejected immediately regardless of their remaining TTL</span></li>
+                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>JWT refresh token — separate secret; used by Axios interceptor to silently re-issue access tokens on 401</span></li>
+                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>Google OAuth 2.0 — tokens stored in a short-lived OAuthSession; browser receives only an opaque one-time code; tokens are never placed in the URL</span></li>
+                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>Startup validation — server throws before accepting traffic if JWT_SECRET, JWT_REFRESH_SECRET, DATABASE_URL, PAYSTACK_SECRET_KEY, or FRONTEND_URL are missing</span></li>
+                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>Invited user registration block — users with a pending staff invitation cannot create new accounts; they must use their invitation link or sign in</span></li>
               </ul>
             </div>
             <div>
@@ -306,18 +311,28 @@ export default function SystemPage() {
             </div>
             <div>
               <h3 className="text-lg font-semibold text-[#0a0a0a] mb-3">Rate limiting</h3>
-              <p className="text-gray-600">Auth endpoints (/api/auth/*) are rate-limited via express-rate-limit: 10 requests per 15 minutes per IP on sensitive routes (login, register, OTP send).</p>
+              <ul className="space-y-2 text-gray-600">
+                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>Global: 200 requests per 15 minutes per IP across all routes</span></li>
+                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>Auth: 20 requests per 15 minutes per IP on all /api/auth/* routes</span></li>
+              </ul>
             </div>
             <div>
               <h3 className="text-lg font-semibold text-[#0a0a0a] mb-3">HTTP security headers</h3>
-              <p className="text-gray-600">helmet is applied globally: sets X-Content-Type-Options, X-Frame-Options, Strict-Transport-Security, X-XSS-Protection, and Content Security Policy headers.</p>
+              <p className="text-gray-600">Helmet applied globally: X-Content-Type-Options, X-Frame-Options, Strict-Transport-Security, X-XSS-Protection, Content Security Policy.</p>
             </div>
             <div>
               <h3 className="text-lg font-semibold text-[#0a0a0a] mb-3">File upload security</h3>
               <ul className="space-y-2 text-gray-600">
-                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>Only image/jpeg, image/png, image/webp MIME types accepted (validated server-side)</span></li>
-                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>Max file size: 5 MB (enforced by Multer before the handler runs)</span></li>
-                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>Files stored in Supabase Storage (not the server filesystem); server never persists files to disk</span></li>
+                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>Product images and avatars: JPEG/PNG/WebP only, max 5 MB</span></li>
+                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>Downloadable product files: explicit MIME allowlist (PDF, ZIP, Office, images, audio, video), max 4 MB</span></li>
+                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>Files stored in Supabase Storage via multer memoryStorage; server never writes files to disk</span></li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-[#0a0a0a] mb-3">Payment security</h3>
+              <ul className="space-y-2 text-gray-600">
+                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>Paystack transaction verified server-side before any order is created</span></li>
+                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>Server recalculates order total independently; verified amount must match or the checkout is rejected</span></li>
               </ul>
             </div>
           </div>
@@ -335,6 +350,8 @@ export default function SystemPage() {
   emailVerified, signInMethod (EMAIL | GOOGLE)
   role (OWNER | MANAGER | CASHIER | AUDITOR)
   isActive Boolean                         -- account restriction flag
+  tokenVersion Int                         -- incremented on logout / password change
+  passwordChangedAt DateTime?
   organizationId (FK -> Organization)?
   invitedById (FK -> User)?                -- set when joined via invite
   lastLoginAt, createdAt
@@ -396,15 +413,20 @@ ProductCategory
   id, name, slug, description?
   organizationId
 
-OTPCode
-  id, email, code, expiresAt, used Boolean
+OTPVerification
+  id, email, otp_hash (SHA-256), expiresAt, used Boolean
+  attempts Int                             -- invalidated after 5 failures
+
+OAuthSession
+  id, code (unique), token, refreshToken
+  userData, expiresAt                      -- 2 minute TTL; deleted on exchange
 
 PasswordResetToken
   id, email, token, expiresAt, used Boolean
 
 AuditLog
   id, userId, organizationId
-  action (CREATE | UPDATE | DELETE | LOGIN)
+  action (CREATE | UPDATE | DELETE | LOGIN | EXPORT)
   entity String, entityId String, details String
   ipAddress?, userAgent?
   isRead Boolean (default false)
@@ -417,7 +439,8 @@ Wishlist
   createdAt
 
 NewsletterSubscriber
-  id, email, subscribedAt`}
+  id, email, organizationId (FK -> Organization)?
+  subscribedAt`}
             </pre>
           </div>
         </motion.section>

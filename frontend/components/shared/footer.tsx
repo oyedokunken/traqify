@@ -161,7 +161,7 @@ export function Footer() {
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-3 gap-y-1 text-xs text-gray-600">
               <span className="text-gray-600">&copy; {new Date().getFullYear()} Traqify. All rights reserved. Built with{" "}
                 <span className="text-white">&#10084;&#65039;</span>{" "}by{" "}
-                <a href="https://wa.link/nv875h" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">@oyedokunken</a>
+                <a href="https://www.oyedokun.dev/" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">@oyedokunken</a>
               </span>
               <span className="text-white/20 hidden sm:inline">|</span>
               <Link href="/privacy" className="text-gray-500 hover:text-white transition-colors">Privacy Policy</Link>

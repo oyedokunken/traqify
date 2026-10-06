@@ -11,7 +11,7 @@ export default function SecurityPage() {
     <div className="min-h-screen bg-white">
       <Navbar />
       
-      <div className="bg-[#DE1010] py-16">
+      <div className="bg-[#DE1010] pt-24 pb-16">
         <div className="max-w-5xl mx-auto px-5 sm:px-6 lg:px-8 text-center">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
             <nav className="flex items-center justify-center gap-2 text-sm text-white/80 mb-6">
@@ -46,19 +46,19 @@ export default function SecurityPage() {
                 </thead>
                 <tbody>
                   <tr className="border-b border-gray-100">
-                    <td className="px-4 py-3 text-sm text-gray-600">1.20.x</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">1.23.x</td>
                     <td className="px-4 py-3 text-sm"><CheckCircle2 className="w-4 h-4 text-green-600 inline" /></td>
                   </tr>
                   <tr className="border-b border-gray-100">
-                    <td className="px-4 py-3 text-sm text-gray-600">1.19.x</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">1.22.x</td>
                     <td className="px-4 py-3 text-sm"><CheckCircle2 className="w-4 h-4 text-green-600 inline" /></td>
                   </tr>
                   <tr className="border-b border-gray-100">
-                    <td className="px-4 py-3 text-sm text-gray-600">1.18.x</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">1.21.x</td>
                     <td className="px-4 py-3 text-sm"><CheckCircle2 className="w-4 h-4 text-green-600 inline" /></td>
                   </tr>
                   <tr>
-                    <td className="px-4 py-3 text-sm text-gray-600">&lt; 1.18</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">&lt; 1.21</td>
                     <td className="px-4 py-3 text-sm text-gray-400">No</td>
                   </tr>
                 </tbody>
@@ -99,11 +99,11 @@ export default function SecurityPage() {
           </h2>
           <div className="grid md:grid-cols-2 gap-4">
             {[
-              { icon: Lock, title: "JWT Access Tokens", desc: "Short-lived (15 min), signed with JWT_SECRET, stored in localStorage" },
-              { icon: Key, title: "Refresh Tokens", desc: "Long-lived (7 days), stored alongside access tokens" },
-              { icon: Globe, title: "Google OAuth 2.0", desc: "Handled server-side via redirect flow" },
-              { icon: Mail, title: "OTP Email Verification", desc: "Required before account activation; expires after 10 minutes" },
-              { icon: Shield, title: "Password Hashing", desc: "All passwords hashed with bcrypt (cost factor 12)" },
+              { icon: Lock, title: "JWT Access Tokens", desc: "7-day default lifetime; signed with JWT_SECRET; carry tokenVersion — incremented on logout and password change to invalidate all outstanding tokens immediately" },
+              { icon: Key, title: "Refresh Tokens", desc: "30-day lifetime; signed with JWT_REFRESH_SECRET; validated against tokenVersion on every use" },
+              { icon: Globe, title: "Google OAuth 2.0", desc: "Server-side code exchange; tokens stored in OAuthSession (2 min TTL); browser only receives an opaque one-time code — tokens never appear in the URL" },
+              { icon: Mail, title: "OTP Email Verification", desc: "SHA-256 hashed before storage; expires after 10 minutes; invalidated after 5 failed attempts" },
+              { icon: Shield, title: "Password Hashing", desc: "bcrypt cost factor 12; changePassword requires current password and enforces full complexity rules (uppercase, lowercase, digit, special character)" },
             ].map((item, index) => (
               <motion.div key={index} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.4 + index * 0.05 }} className="bg-gray-50 p-5 rounded-xl border border-gray-200">
                 <div className="flex items-start gap-3">
@@ -127,14 +127,15 @@ export default function SecurityPage() {
           </h2>
           <div className="bg-gray-50 p-6 rounded-xl border border-gray-200">
             <p className="text-gray-600 leading-relaxed mb-4">
-              Four roles with descending privilege: OWNER &gt; MANAGER &gt; CASHIER &gt; AUDITOR
+              Four roles with descending privilege: OWNER &gt; MANAGER &gt; AUDITOR &gt; CASHIER
             </p>
             <ul className="space-y-2">
               {[
-                "Route-level enforcement via authenticate and RBAC Express middleware",
-                "All authenticated routes require a valid JWT; expired tokens are rejected with 401",
-                "Organization scope is enforced on every query",
-                "OWNER protection: the OWNER account cannot be restricted, removed, or have their password reset",
+                "Route-level enforcement: authenticate middleware, requireOrg middleware, and four RBAC guards (isOwnerOnly, isOwnerOrManager, isAtLeastAuditor, isAtLeastCashier) applied per route",
+                "All authenticated routes require a valid JWT; expired tokens and tokens with a stale tokenVersion are rejected with 401",
+                "Organization scope enforced on every Prisma query; no query trusts the frontend to scope data",
+                "Staff listing (GET /api/staff) requires AUDITOR or above; CASHIER cannot enumerate org members",
+                "OWNER protection: the OWNER account cannot be restricted, removed, or have their password reset via staff tools",
                 "Invite role cap: OWNER role can never be assigned via invitation",
               ].map((item, index) => (
                 <li key={index} className="flex items-start gap-3">
@@ -153,11 +154,14 @@ export default function SecurityPage() {
           </h2>
           <div className="grid md:grid-cols-2 gap-4">
             {[
-              { icon: Globe, title: "CORS", desc: "Configured with explicit FRONTEND_URL allowlist" },
-              { icon: Upload, title: "File Uploads", desc: "Multer memoryStorage, type restrictions, size limits" },
-              { icon: FileText, title: "Input Validation", desc: "Zod schemas on all backend requests" },
-              { icon: Eye, title: "Audit Logging", desc: "Every create/update/delete action logged" },
-              { icon: Database, title: "Environment Variables", desc: "Sensitive values never committed to repository" },
+              { icon: Globe, title: "CORS", desc: "Explicit FRONTEND_URL allowlist; credentials: true for cookie support without wildcard origin" },
+              { icon: Upload, title: "File Uploads", desc: "Product images: JPEG/PNG/WebP max 5 MB. Downloadable files: explicit MIME allowlist max 4 MB. Multer memoryStorage — no disk writes" },
+              { icon: FileText, title: "Input Validation", desc: "Zod schemas on every request body; all auth routes have full password complexity rules (uppercase, lowercase, digit, special character)" },
+              { icon: Eye, title: "Audit Logging", desc: "Every create/update/delete/login/export event logged with actor, entity, IP, user agent, and timestamp; append-only" },
+              { icon: Database, title: "Startup Validation", desc: "Server throws before accepting any traffic if JWT_SECRET, JWT_REFRESH_SECRET, DATABASE_URL, PAYSTACK_SECRET_KEY, or FRONTEND_URL are absent" },
+              { icon: Shield, title: "Paystack Verification", desc: "Transaction verified server-side via Paystack API before any order is created; verified amount must match server-calculated total" },
+              { icon: Lock, title: "SSRF Protection", desc: "Downloadable product file URLs are validated with URL.hostname.endsWith('.supabase.co') before any server-side fetch" },
+              { icon: Key, title: "Cron Job Security", desc: "GET /api/cron/ping requires Authorization: Bearer <CRON_SECRET>; Vercel injects the header automatically; the endpoint is not publicly exploitable" },
             ].map((item, index) => (
               <motion.div key={index} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.9 + index * 0.05 }} className="bg-gray-50 p-5 rounded-xl border border-gray-200">
                 <div className="flex items-start gap-3">
