@@ -11,7 +11,7 @@ import {
   getInviteDetails,
 } from "../controllers/staff.controller";
 import { authenticate, requireOrg } from "../middleware/auth.middleware";
-import { isOwnerOrManager, isOwnerOnly } from "../middleware/rbac.middleware";
+import { isOwnerOrManager, isOwnerOnly, isAtLeastAuditor } from "../middleware/rbac.middleware";
 
 const router = Router();
 
@@ -19,7 +19,7 @@ router.get("/invite/:token", getInviteDetails);
 
 router.use(authenticate, requireOrg);
 
-router.get("/", getStaff);
+router.get("/", isAtLeastAuditor, getStaff);
 router.get("/invites", isOwnerOrManager, getInvites);
 router.delete("/invites/:inviteId", isOwnerOrManager, cancelInvite);
 router.post("/invite", isOwnerOrManager, inviteStaff);

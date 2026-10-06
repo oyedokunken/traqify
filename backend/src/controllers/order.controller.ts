@@ -279,21 +279,26 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
 
         const attachments: any[] = [];
         for (const item of downloadableItems) {
-          if (item.downloadUrl.includes("supabase.co")) {
-            try {
-              const fileBuffer = await new Promise<Buffer>((resolve, reject) => {
-                https.get(item.downloadUrl, (res: any) => {
-                  const chunks: Buffer[] = [];
-                  res.on("data", (chunk: Buffer) => chunks.push(chunk));
-                  res.on("end", () => resolve(Buffer.concat(chunks)));
-                  res.on("error", reject);
+          let isAllowedHost = false;
+          try {
+            const parsed = new URL(item.downloadUrl);
+            isAllowedHost = parsed.hostname.endsWith(".supabase.co") || parsed.hostname.endsWith(".supabase.in");
+          } catch { /* malformed URL - skip */ }
+          if (isAllowedHost) {
+              try {
+                const fileBuffer = await new Promise<Buffer>((resolve, reject) => {
+                  https.get(item.downloadUrl, (res: any) => {
+                    const chunks: Buffer[] = [];
+                    res.on("data", (chunk: Buffer) => chunks.push(chunk));
+                    res.on("end", () => resolve(Buffer.concat(chunks)));
+                    res.on("error", reject);
+                  });
                 });
-              });
-              const filename = item.downloadUrl.split("/").pop() || "download.pdf";
-              attachments.push({ filename, content: fileBuffer });
-            } catch (err) {
-              console.error("[Email] Failed to fetch downloadable file:", err);
-            }
+                const filename = item.downloadUrl.split("/").pop() || "download.pdf";
+                attachments.push({ filename, content: fileBuffer });
+              } catch (err) {
+                console.error("[Email] Failed to fetch downloadable file:", err);
+              }
           }
         }
 

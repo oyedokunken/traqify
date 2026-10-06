@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import prisma from "../config/database";
 import { signToken, signRefreshToken, verifyRefreshToken } from "../utils/jwt";
 import { createOTP, verifyOTP, generatePasswordResetToken, verifyPasswordResetToken, markPasswordResetTokenUsed } from "../utils/otp";
@@ -13,6 +14,7 @@ import {
   resetPasswordSchema,
   acceptInviteSchema,
   updateUserSchema,
+  changePasswordSchema,
 } from "../utils/validators";
 import { createAuditLog } from "../utils/audit";
 import { generateUniqueSlug } from "../utils/slug";
@@ -60,8 +62,9 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       email: user.email,
       organizationId: user.organizationId || undefined,
       role: user.role,
+      tokenVersion: user.tokenVersion,
     });
-    const refresh = signRefreshToken({ userId: user.id, email: user.email });
+    const refresh = signRefreshToken({ userId: user.id, email: user.email, tokenVersion: user.tokenVersion });
 
     res.status(201).json({
       message: "Account created successfully.",
@@ -250,8 +253,9 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       email: user.email,
       organizationId: user.organizationId || undefined,
       role: user.role,
+      tokenVersion: user.tokenVersion,
     });
-    const refresh = signRefreshToken({ userId: user.id, email: user.email });
+    const refresh = signRefreshToken({ userId: user.id, email: user.email, tokenVersion: user.tokenVersion });
 
     res.json({
       token,
@@ -354,8 +358,9 @@ export const googleCallback = async (req: Request, res: Response): Promise<void>
       email: user!.email,
       organizationId: user!.organizationId || undefined,
       role: user!.role,
+      tokenVersion: (user as any).tokenVersion ?? 0,
     });
-    const refresh = signRefreshToken({ userId: user!.id, email: user!.email });
+    const refresh = signRefreshToken({ userId: user!.id, email: user!.email, tokenVersion: (user as any).tokenVersion ?? 0 });
 
     const userData = {
       id: user!.id,
@@ -367,13 +372,14 @@ export const googleCallback = async (req: Request, res: Response): Promise<void>
       organization: (user as any).organization || null,
     };
 
-    const params = new URLSearchParams({
-      token,
-      refreshToken: refresh,
-      user: encodeURIComponent(JSON.stringify(userData)),
+    // H-1: Store tokens server-side; redirect with a short-lived one-time code only
+    const oauthCode = crypto.randomBytes(24).toString("hex");
+    const expiresAt = new Date(Date.now() + 2 * 60 * 1000); // 2 minutes
+    await prisma.oAuthSession.create({
+      data: { code: oauthCode, token, refreshToken: refresh, userData: JSON.stringify(userData), expiresAt },
     });
 
-    res.redirect(`${frontendUrl}/auth-callback?${params.toString()}`);
+    res.redirect(`${frontendUrl}/auth-callback?code=${oauthCode}`);
   } catch {
     res.redirect(`${frontendUrl}/login?error=oauth_failed`);
   }
@@ -388,6 +394,11 @@ export const changePassword = async (req: Request, res: Response): Promise<void>
       res.status(400).json({ error: "Current and new password are required." });
       return;
     }
+    const parsed = changePasswordSchema.safeParse({ newPassword });
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.errors[0].message });
+      return;
+    }
     const user = await prisma.user.findUnique({ where: { id: authReq.user.id } });
     if (!user || !user.password) {
       res.status(400).json({ error: "Password change not available for this account." });
@@ -395,9 +406,9 @@ export const changePassword = async (req: Request, res: Response): Promise<void>
     }
     const valid = await bcrypt.compare(currentPassword, user.password);
     if (!valid) { res.status(400).json({ error: "Current password is incorrect." }); return; }
-    if (newPassword.length < 8) { res.status(400).json({ error: "New password must be at least 8 characters." }); return; }
     const hash = await bcrypt.hash(newPassword, 12);
-    await prisma.user.update({ where: { id: user.id }, data: { password: hash } });
+    // Increment tokenVersion to invalidate all existing sessions
+    await prisma.user.update({ where: { id: user.id }, data: { password: hash, passwordChangedAt: new Date(), tokenVersion: { increment: 1 } } });
     await createAuditLog(user.id, user.organizationId || "", "UPDATE", "USER", user.id, "Changed account password");
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
     await sendEmail(user.email, "Your Traqify password was changed", passwordChangedEmailTemplate(user.name || "there", `${frontendUrl}/login`)).catch(() => {});
@@ -407,55 +418,17 @@ export const changePassword = async (req: Request, res: Response): Promise<void>
   }
 };
 
-export const googleAuth = async (req: Request, res: Response): Promise<void> => {
+export const logout = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { email, name, avatarUrl, googleId } = req.body;
-    if (!email) {
-      res.status(400).json({ error: "Email is required." });
-      return;
-    }
-
-    let user = await prisma.user.findUnique({ where: { email } });
-
-    if (!user) {
-      user = await prisma.user.create({
-        data: {
-          email,
-          name,
-          avatarUrl,
-          emailVerified: true,
-          signInMethod: "GOOGLE",
-        },
-      });
-    } else {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { lastLoginAt: new Date(), avatarUrl: avatarUrl || user.avatarUrl },
-      });
-    }
-
-    const token = signToken({
-      userId: user.id,
-      email: user.email,
-      organizationId: user.organizationId || undefined,
-      role: user.role,
+    if (!req.user) { res.status(401).json({ error: "Authentication required." }); return; }
+    // Increment tokenVersion so all existing access and refresh tokens are invalidated
+    await prisma.user.update({
+      where: { id: req.user.id },
+      data: { tokenVersion: { increment: 1 } },
     });
-    const refresh = signRefreshToken({ userId: user.id, email: user.email });
-
-    res.json({
-      token,
-      refreshToken: refresh,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        organizationId: user.organizationId,
-        avatarUrl: user.avatarUrl,
-      },
-    });
+    res.json({ message: "Logged out successfully." });
   } catch {
-    res.status(500).json({ error: "Google authentication failed." });
+    res.status(500).json({ error: "Logout failed." });
   }
 };
 
@@ -470,16 +443,14 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
     const { email } = parsed.data;
     const user = await prisma.user.findUnique({ where: { email } });
 
-    if (!user) {
-      res.status(404).json({ error: "No account found with that email address." });
-      return;
+    // Always return the same response to prevent account enumeration
+    if (user) {
+      const token = await generatePasswordResetToken(email);
+      const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+      await sendEmail(email, "Reset your Traqify password", passwordResetEmailTemplate(user.name || "there", resetUrl));
     }
 
-    const token = await generatePasswordResetToken(email);
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
-    await sendEmail(email, "Reset your Traqify password", passwordResetEmailTemplate(user.name || "there", resetUrl));
-
-    res.json({ message: "Password reset link sent. Check your inbox." });
+    res.json({ message: "If an account exists for that email, a reset link has been sent." });
   } catch {
     res.status(500).json({ error: "Failed to process password reset request." });
   }
@@ -502,7 +473,10 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
-    await prisma.user.update({ where: { email }, data: { password: hashedPassword } });
+    await prisma.user.update({
+      where: { email },
+      data: { password: hashedPassword, passwordChangedAt: new Date(), tokenVersion: { increment: 1 } },
+    });
     await markPasswordResetTokenUsed(token);
 
     res.json({ message: "Your password has been reset successfully." });
@@ -527,11 +501,18 @@ export const refreshToken = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
+    // Reject refresh tokens that predate a logout or password change
+    if (payload.tokenVersion !== undefined && payload.tokenVersion !== user.tokenVersion) {
+      res.status(401).json({ error: "Session has been revoked. Please log in again." });
+      return;
+    }
+
     const newToken = signToken({
       userId: user.id,
       email: user.email,
       organizationId: user.organizationId || undefined,
       role: user.role,
+      tokenVersion: user.tokenVersion,
     });
 
     res.json({ token: newToken });
@@ -659,8 +640,9 @@ export const acceptInvite = async (req: Request, res: Response): Promise<void> =
       email: user.email,
       organizationId: user.organizationId || undefined,
       role: user.role,
+      tokenVersion: user.tokenVersion,
     });
-    const refresh = signRefreshToken({ userId: user.id, email: user.email });
+    const refresh = signRefreshToken({ userId: user.id, email: user.email, tokenVersion: user.tokenVersion });
 
     res.status(201).json({
       message: "Invitation accepted. Welcome to the team.",
@@ -677,5 +659,29 @@ export const acceptInvite = async (req: Request, res: Response): Promise<void> =
     });
   } catch {
     res.status(500).json({ error: "Failed to accept invitation." });
+  }
+};
+
+export const exchangeOAuthCode = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { code } = req.params;
+    if (!code) { res.status(400).json({ error: "Code is required." }); return; }
+
+    const session = await prisma.oAuthSession.findUnique({ where: { code } });
+    if (!session || session.expiresAt < new Date()) {
+      res.status(400).json({ error: "OAuth code is invalid or has expired." });
+      return;
+    }
+
+    // Delete immediately — one-time use
+    await prisma.oAuthSession.delete({ where: { code } });
+
+    res.json({
+      token: session.token,
+      refreshToken: session.refreshToken,
+      user: JSON.parse(session.userData),
+    });
+  } catch {
+    res.status(500).json({ error: "OAuth code exchange failed." });
   }
 };

@@ -12,13 +12,16 @@ export const subscribe = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const existing = await prisma.newsletterSubscriber.findUnique({ where: { email } });
+    // Platform newsletter (no org context): organizationId is null
+    const existing = await prisma.newsletterSubscriber.findFirst({
+      where: { email, organizationId: null },
+    });
     if (existing) {
       res.status(409).json({ error: "This email is already subscribed." });
       return;
     }
 
-    await prisma.newsletterSubscriber.create({ data: { email, name } });
+    await prisma.newsletterSubscriber.create({ data: { email, name, organizationId: null } });
 
     const greeting = name ? ", " + name : "";
     const html = "<div style='font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px 24px'>"
@@ -38,15 +41,18 @@ export const subscribe = async (req: Request, res: Response): Promise<void> => {
 export const deleteSubscriber = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const subscriber = await prisma.newsletterSubscriber.findUnique({ where: { id } });
+    const authReq = req as AuthRequest;
+    const orgId = authReq.user?.organizationId ?? null;
+    const subscriber = await prisma.newsletterSubscriber.findFirst({
+      where: { id, organizationId: orgId },
+    });
     if (!subscriber) {
       res.status(404).json({ error: "Subscriber not found." });
       return;
     }
     await prisma.newsletterSubscriber.delete({ where: { id } });
-    const authReq = req as AuthRequest;
-    if (authReq.user?.id && authReq.user?.organizationId) {
-      createAuditLog(authReq.user.id, authReq.user.organizationId, "DELETE", "Newsletter", id, `Removed newsletter subscriber: ${subscriber.email}`, req).catch(() => {});
+    if (authReq.user?.id && orgId) {
+      createAuditLog(authReq.user.id, orgId, "DELETE", "Newsletter", id, `Removed newsletter subscriber: ${subscriber.email}`, req).catch(() => {});
     }
     res.json({ message: "Subscriber removed." });
   } catch {
@@ -56,12 +62,14 @@ export const deleteSubscriber = async (req: Request, res: Response): Promise<voi
 
 export const getSubscribers = async (req: Request, res: Response): Promise<void> => {
   try {
+    const authReq = req as AuthRequest;
+    const orgId = authReq.user?.organizationId ?? null;
     const subscribers = await prisma.newsletterSubscriber.findMany({
+      where: { organizationId: orgId },
       orderBy: { createdAt: "desc" },
     });
-    const authReq = req as AuthRequest;
-    if (authReq.user?.id && authReq.user?.organizationId) {
-      createAuditLog(authReq.user.id, authReq.user.organizationId, "EXPORT", "Newsletter", undefined, `Viewed newsletter subscribers (${subscribers.length} total)`, req).catch(() => {});
+    if (authReq.user?.id && orgId) {
+      createAuditLog(authReq.user.id, orgId, "EXPORT", "Newsletter", undefined, `Viewed newsletter subscribers (${subscribers.length} total)`, req).catch(() => {});
     }
     res.json(subscribers);
   } catch {

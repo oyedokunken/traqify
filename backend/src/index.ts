@@ -8,7 +8,15 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-import { errorHandler } from "./middleware/error.middleware";
+// M-8: Validate required environment variables at startup
+const REQUIRED_ENV = ["JWT_SECRET", "JWT_REFRESH_SECRET", "DATABASE_URL", "PAYSTACK_SECRET_KEY", "FRONTEND_URL"];
+for (const key of REQUIRED_ENV) {
+  if (!process.env[key]) {
+    throw new Error(`Missing required environment variable: ${key}`);
+  }
+}
+
+import { errorHandler, notFound } from "./middleware/error.middleware";
 import authRoutes from "./routes/auth.routes";
 import orgRoutes from "./routes/org.routes";
 import productRoutes from "./routes/product.routes";
@@ -32,7 +40,7 @@ const PORT = process.env.PORT || 5000;
 app.set("trust proxy", 1);
 
 app.use(helmet());
-app.use(morgan("combined"));
+app.use(morgan(process.env.NODE_ENV === "production" ? "short" : "dev"));
 
 app.use(
   cors({
@@ -90,6 +98,7 @@ app.use("/api/reviews", reviewRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/cron", cronRoutes);
 
+app.use(notFound);
 app.use(errorHandler);
 
 app.listen(PORT, () => {

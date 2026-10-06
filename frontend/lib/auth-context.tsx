@@ -65,6 +65,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const logout = () => {
+    // H-4: call server to increment tokenVersion, invalidating all existing tokens
+    api.post("/api/auth/logout").catch(() => {});
     clearAuthTokens();
     setUser(null);
     router.push("/login");

@@ -151,6 +151,10 @@ export const storeCheckout = async (req: Request, res: Response): Promise<void> 
           return;
         }
         verifiedAmount = paystackData.data.amount / 100;
+        if (Math.abs(verifiedAmount - totalAmount) > 0.01) {
+          res.status(402).json({ error: "Payment amount does not match order total. Please contact support." });
+          return;
+        }
       } catch {
         res.status(500).json({ error: "Payment verification failed. Please contact support." });
         return;

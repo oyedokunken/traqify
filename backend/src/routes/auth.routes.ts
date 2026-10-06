@@ -6,9 +6,9 @@ import {
   sendOTP,
   verifyEmail,
   login,
-  googleAuth,
   googleRedirect,
   googleCallback,
+  exchangeOAuthCode,
   changePassword,
   forgotPassword,
   resetPassword,
@@ -16,6 +16,7 @@ import {
   updateProfile,
   acceptInvite,
   refreshToken,
+  logout,
 } from "../controllers/auth.controller";
 import { authenticate, AuthRequest } from "../middleware/auth.middleware";
 import { upload, getSupabasePath } from "../middleware/upload.middleware";
@@ -29,9 +30,9 @@ router.post("/check-email", checkEmail);
 router.post("/send-otp", sendOTP);
 router.post("/verify-email", verifyEmail);
 router.post("/login", login);
-router.post("/google", googleAuth);
 router.get("/google-redirect", googleRedirect);
 router.get("/google-callback", googleCallback);
+router.get("/oauth-exchange/:code", exchangeOAuthCode);
 router.post("/forgot-password", forgotPassword);
 router.post("/reset-password", resetPassword);
 router.post("/refresh", refreshToken);
@@ -39,6 +40,7 @@ router.post("/accept-invite", acceptInvite);
 router.get("/me", authenticate, getMe);
 router.patch("/me", authenticate, updateProfile);
 router.post("/change-password", authenticate, changePassword);
+router.post("/logout", authenticate, logout);
 router.post(
   "/upload-avatar",
   authenticate,
