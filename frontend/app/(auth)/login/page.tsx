@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ErrorModal } from "@/components/shared/error-modal";
 import { useAuth } from "@/lib/auth-context";
-import api, { setAuthTokens } from "@/lib/api";
+import api, { setSession } from "@/lib/api";
 
 const schema = z.object({
   email: z.string().email("Please enter a valid email address."),
@@ -53,7 +53,7 @@ function LoginForm() {
   const onSubmit = async (data: FormData) => {
     try {
       const res = await api.post("/api/auth/login", data);
-      setAuthTokens(res.data.token, res.data.refreshToken, res.data.user);
+      setSession(res.data.token, res.data.user);
       setUser(res.data.user);
 
       if (!res.data.user.organizationId) {

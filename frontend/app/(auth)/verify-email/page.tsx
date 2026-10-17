@@ -8,7 +8,7 @@ import { RefreshCw, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ErrorModal } from "@/components/shared/error-modal";
 import { Logo } from "@/components/shared/logo";
-import api, { setAuthTokens } from "@/lib/api";
+import api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 
 function VerifyEmailForm() {
