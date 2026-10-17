@@ -1,6 +1,7 @@
 import { Response } from "express";
 import prisma from "../config/database";
-import { productSchema } from "../utils/validators";
+import { Prisma } from "@prisma/client";
+import { productSchema, productUpdateSchema } from "../utils/validators";
 import { createAuditLog } from "../utils/audit";
 import { AuthRequest } from "../middleware/auth.middleware";
 import { generateSlug } from "../utils/slug";
@@ -84,6 +85,11 @@ export const createProduct = async (req: AuthRequest, res: Response): Promise<vo
 
     const { name, sku, description, price, comparePrice, categoryId, imageUrl, imageUrls, status, isActive, variants, initialStock, lowStockAlert } = parsed.data;
 
+    if (categoryId && !(await prisma.productCategory.findFirst({ where: { id: categoryId, organizationId: orgId }, select: { id: true } }))) {
+      res.status(400).json({ error: "Category not found." });
+      return;
+    }
+
     const existing = await prisma.product.findUnique({ where: { sku_organizationId: { sku, organizationId: orgId } } });
     if (existing) {
       res.status(409).json({ error: `A product with SKU "${sku}" already exists.` });
@@ -134,17 +140,31 @@ export const updateProduct = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
-    const { variants, initialStock, lowStockAlert, ...rest } = req.body;
+    const parsed = productUpdateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.errors[0].message });
+      return;
+    }
+    const data = parsed.data;
+
+    if (data.categoryId && !(await prisma.productCategory.findFirst({ where: { id: data.categoryId, organizationId: orgId }, select: { id: true } }))) {
+      res.status(400).json({ error: "Category not found." });
+      return;
+    }
 
     const product = await prisma.product.update({
       where: { id },
-      data: rest,
+      data,
       include: { inventory: true, variants: true },
     });
 
     await createAuditLog(req.user!.id, orgId, "UPDATE", "Product", id, `Updated product: ${product.name}`, req);
     res.json(product);
-  } catch {
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      res.status(409).json({ error: "A product with this SKU already exists." });
+      return;
+    }
     res.status(500).json({ error: "Failed to update product." });
   }
 };
