@@ -55,7 +55,27 @@ export const requireMinRole = (minRole: UserRole) => {
   };
 };
 
+/**
+ * Allows exactly the listed roles. Unlike requireRole it does not use the hierarchy,
+ * so a role is never admitted just because it ranks above another one. Needed because
+ * AUDITOR ranks above CASHIER but must stay read-only.
+ */
+export const requireAnyRole = (...roles: UserRole[]) => {
+  return (req: AuthRequest, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      res.status(401).json({ error: "Authentication required." });
+      return;
+    }
+    if (!roles.includes(req.user.role as UserRole)) {
+      res.status(403).json({ error: "You do not have permission to perform this action." });
+      return;
+    }
+    next();
+  };
+};
+
 export const isOwnerOrManager = requireRole("OWNER", "MANAGER");
 export const isOwnerOnly = requireRole("OWNER");
-export const isAtLeastCashier = requireMinRole("CASHIER");
 export const isAtLeastAuditor = requireMinRole("AUDITOR");
+/** Roles that may create or change business data. AUDITOR is read-only. */
+export const canWrite = requireAnyRole("OWNER", "MANAGER", "CASHIER");
