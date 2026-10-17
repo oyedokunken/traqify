@@ -113,6 +113,8 @@ export const productSchema = z.object({
   description: z.string().min(1, "Description is required."),
   price: moneySchema,
   comparePrice: moneySchema.optional(),
+  productType: z.enum(["SIMPLE", "DOWNLOADABLE", "VARIABLE"]).default("SIMPLE"),
+  downloadUrl: z.string().url().nullable().optional(),
   category: z.string().optional(),
   categoryId: z.string().optional(),
   imageUrl: z.string().url().optional().or(z.literal("")),
@@ -234,6 +236,42 @@ export const storeTransferCheckoutSchema = z.object({
 export const storePaystackCompleteSchema = z.object({
   paymentMethod: z.literal("PAYSTACK"),
   reference: paystackReferenceSchema,
+});
+
+const paymentStatusSchema = z.enum(["PENDING", "COMPLETED", "FAILED", "REFUNDED"]);
+
+/** Form fields arrive as empty strings when left blank. */
+const blankToUndefined = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess((value) => (typeof value === "string" && value.trim() === "" ? undefined : value), schema.optional());
+
+export const createPaymentSchema = z.object({
+  amount: moneySchema,
+  currency: z.literal("NGN").default("NGN"),
+  status: paymentStatusSchema.default("PENDING"),
+  method: blankToUndefined(z.string().trim().max(50)),
+  reference: blankToUndefined(z.string().trim().max(100)),
+  notes: blankToUndefined(z.string().max(1000)),
+  orderId: blankToUndefined(z.string().min(1)),
+});
+
+/** Only these fields may change after creation; amount, currency and order link are fixed. */
+export const updatePaymentSchema = z.object({
+  status: paymentStatusSchema.optional(),
+  method: blankToUndefined(z.string().trim().max(50)),
+  reference: blankToUndefined(z.string().trim().max(100)),
+  notes: blankToUndefined(z.string().max(1000)),
+});
+
+export const orderStatusSchema = z.object({
+  status: z.enum(["PENDING", "APPROVED", "COMPLETED", "CANCELLED"], { errorMap: () => ({ message: "Invalid order status." }) }),
+});
+
+const isoDateString = z.string().refine((value) => !Number.isNaN(new Date(value).getTime()), "Invalid date.");
+
+export const reportEmailSchema = z.object({
+  to: z.string().trim().email("A valid recipient email address is required.").max(254),
+  from: isoDateString.optional(),
+  to_date: isoDateString.optional(),
 });
 
 export const updateUserSchema = z.object({
