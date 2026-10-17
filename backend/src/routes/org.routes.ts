@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import multer from "multer";
 import { createOrganization, getOrganization, updateOrganization, getPublicStore } from "../controllers/org.controller";
-import { authenticate, requireOrg } from "../middleware/auth.middleware";
+import { authenticate, requireOrg, AuthRequest } from "../middleware/auth.middleware";
 import { isOwnerOnly } from "../middleware/rbac.middleware";
 import { upload, getSupabasePath } from "../middleware/upload.middleware";
 import { uploadFile } from "../config/supabase";
@@ -32,9 +32,15 @@ router.post(
     try {
       if (!req.file) { res.status(400).json({ error: "No image provided." }); return; }
       const { slug } = req.params;
+      // The slug in the URL must be the caller's own organization; check before uploading anything.
+      const org = await prisma.organization.findUnique({ where: { slug }, select: { id: true } });
+      if (!org || org.id !== (req as AuthRequest).user?.organizationId) {
+        res.status(404).json({ error: "Organization not found." });
+        return;
+      }
       const filePath = getSupabasePath("avatars", req.file.originalname);
       const logoUrl = await uploadFile("avatars", filePath, req.file.buffer, req.file.mimetype);
-      await prisma.organization.update({ where: { slug }, data: { logoUrl } });
+      await prisma.organization.update({ where: { id: org.id }, data: { logoUrl } });
       res.json({ url: logoUrl });
     } catch (err: any) {
       console.error("[upload-logo] Error:", err);
