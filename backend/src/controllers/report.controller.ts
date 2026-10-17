@@ -227,7 +227,7 @@ const REPORT_LABELS: Record<string, string> = {
 
 const DATE_RANGE_TYPES = ["revenue", "orders", "payments", "audit-logs"];
 
-async function buildReportData(type: string, orgId: string, from: Date, to: Date) {
+export async function buildReportData(type: string, orgId: string, from: Date, to: Date) {
   if (type === "revenue") {
     return prisma.order.findMany({ where: { organizationId: orgId, createdAt: { gte: from, lte: to } }, include: { customer: true, orderItems: { include: { product: true } } }, orderBy: { createdAt: "desc" } });
   } else if (type === "products") {
@@ -241,7 +241,7 @@ async function buildReportData(type: string, orgId: string, from: Date, to: Date
   } else if (type === "staff") {
     return prisma.user.findMany({ where: { organizationId: orgId }, orderBy: { createdAt: "asc" } });
   } else if (type === "newsletter") {
-    return prisma.newsletterSubscriber.findMany({ orderBy: { createdAt: "desc" } });
+    return prisma.newsletterSubscriber.findMany({ where: { organizationId: orgId }, orderBy: { createdAt: "desc" } });
   } else if (type === "payments") {
     return prisma.payment.findMany({ where: { organizationId: orgId, createdAt: { gte: from, lte: to } }, include: { order: { select: { id: true } } }, orderBy: { createdAt: "desc" } });
   } else if (type === "audit-logs") {
