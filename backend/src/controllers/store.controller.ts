@@ -1,3 +1,4 @@
+import { MAX_UNPAGED_ROWS } from "../utils/pagination";
 import { Request, Response } from "express";
 import { OrderStatus, PaymentStatus } from "@prisma/client";
 import prisma from "../config/database";
@@ -30,7 +31,7 @@ export const getStoreProducts = async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    const rawProducts = await prisma.product.findMany({
+    const rawProducts = await prisma.product.findMany({ take: MAX_UNPAGED_ROWS,
       where: {
         organizationId: org.id,
         isActive: true,
@@ -61,7 +62,7 @@ export const getStoreProducts = async (req: Request, res: Response): Promise<voi
       return { ...rest, averageRating };
     });
 
-    const cats = await prisma.productCategory.findMany({
+    const cats = await prisma.productCategory.findMany({ take: MAX_UNPAGED_ROWS,
       where: { organizationId: org.id },
       select: { id: true, name: true, slug: true },
       orderBy: { name: "asc" },

@@ -56,7 +56,7 @@ export default function ReviewsPage({ params }: { params: { slug: string } }) {
     try {
       const [filteredRes, allRes] = await Promise.all([
         api.get(`/api/reviews?status=${statusFilter}&limit=50`),
-        initial ? api.get(`/api/reviews?limit=200`) : Promise.resolve(null),
+        initial ? api.get(`/api/reviews?limit=100`) : Promise.resolve(null),
       ]);
       setReviews(filteredRes.data.reviews);
       setTotal(filteredRes.data.total);

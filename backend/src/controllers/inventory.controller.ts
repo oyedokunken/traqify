@@ -1,3 +1,4 @@
+import { MAX_UNPAGED_ROWS } from "../utils/pagination";
 import { Response } from "express";
 import prisma from "../config/database";
 import { inventoryUpdateSchema } from "../utils/validators";
@@ -10,7 +11,7 @@ export const getInventory = async (req: AuthRequest, res: Response): Promise<voi
   try {
     const orgId = req.user!.organizationId!;
 
-    const inventory = await prisma.inventory.findMany({
+    const inventory = await prisma.inventory.findMany({ take: MAX_UNPAGED_ROWS,
       where: { product: { organizationId: orgId } },
       include: {
         product: {

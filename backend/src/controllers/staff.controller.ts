@@ -1,3 +1,4 @@
+import { MAX_UNPAGED_ROWS } from "../utils/pagination";
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
@@ -36,7 +37,7 @@ export const getStaff = async (req: AuthRequest, res: Response): Promise<void> =
   try {
     const orgId = req.user!.organizationId!;
 
-    const staff = await prisma.user.findMany({
+    const staff = await prisma.user.findMany({ take: MAX_UNPAGED_ROWS,
       where: { organizationId: orgId },
       select: {
         id: true,
@@ -63,7 +64,7 @@ export const getInvites = async (req: AuthRequest, res: Response): Promise<void>
   try {
     const orgId = req.user!.organizationId!;
 
-    const invites = await prisma.staffInvite.findMany({
+    const invites = await prisma.staffInvite.findMany({ take: MAX_UNPAGED_ROWS,
       where: { organizationId: orgId },
       orderBy: { createdAt: "desc" },
     });

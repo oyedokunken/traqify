@@ -1,3 +1,4 @@
+import { parsePagination } from "../utils/pagination";
 import { Response } from "express";
 import prisma from "../config/database";
 import { AuthRequest } from "../middleware/auth.middleware";
@@ -10,8 +11,8 @@ export const getPayments = async (req: AuthRequest, res: Response): Promise<void
   try {
     const orgId = req.user!.organizationId!;
 
-    const { status, search, from, to, page = "1", limit = "25" } = req.query;
-    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+    const { status, search, from, to } = req.query;
+    const { page, limit, skip, take } = parsePagination(req.query, 25);
 
     const where: any = {
       organizationId: orgId,
@@ -34,7 +35,7 @@ export const getPayments = async (req: AuthRequest, res: Response): Promise<void
         },
         orderBy: { createdAt: "desc" },
         skip,
-        take: parseInt(limit as string),
+        take,
       }),
       prisma.payment.count({ where }),
     ]);
@@ -51,8 +52,8 @@ export const getPayments = async (req: AuthRequest, res: Response): Promise<void
     res.json({
       payments,
       total,
-      page: parseInt(page as string),
-      limit: parseInt(limit as string),
+      page,
+      limit,
       stats: {
         total: { count: totalAmount._count, amount: totalAmount._sum.amount ?? 0 },
         pending: { count: pendingAgg._count, amount: pendingAgg._sum.amount ?? 0 },

@@ -1,3 +1,4 @@
+import { MAX_UNPAGED_ROWS } from "../utils/pagination";
 import { Response } from "express";
 import prisma from "../config/database";
 import { AuthRequest } from "../middleware/auth.middleware";
@@ -8,7 +9,7 @@ const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").repla
 export const getCategories = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const orgId = req.user!.organizationId!;
-    const cats = await prisma.productCategory.findMany({
+    const cats = await prisma.productCategory.findMany({ take: MAX_UNPAGED_ROWS,
       where: { organizationId: orgId },
       include: { _count: { select: { products: true } } },
       orderBy: { name: "asc" },
