@@ -1,6 +1,6 @@
 import { Response } from "express";
 import prisma from "../config/database";
-import { orderSchema } from "../utils/validators";
+import { orderSchema, orderStatusSchema } from "../utils/validators";
 import { createAuditLog } from "../utils/audit";
 import { AuthRequest } from "../middleware/auth.middleware";
 import { sendEmail } from "../config/email";
@@ -8,7 +8,8 @@ import { orderApprovedEmailTemplate, orderCompletedEmailTemplate, newOrderEmailT
 import https from "https";
 import { placeOrder } from "../utils/order-placement";
 import { generateOrderNumber } from "../utils/order-number";
-import { respondWithError } from "../middleware/error.middleware";
+import { AppError, respondWithError } from "../middleware/error.middleware";
+import { canTransitionOrder } from "../utils/status-transitions";
 
 
 export const getOrders = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -149,12 +150,12 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
   try {
     const { id } = req.params;
     const orgId = req.user!.organizationId!;
-    const { status } = req.body;
-
-    if (!["PENDING", "APPROVED", "COMPLETED", "CANCELLED"].includes(status)) {
-      res.status(400).json({ error: "Invalid order status." });
+    const parsed = orderStatusSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.errors[0].message });
       return;
     }
+    const { status } = parsed.data;
 
     const order = await prisma.order.findFirst({ where: { id, organizationId: orgId } });
     if (!order) {
@@ -162,17 +163,40 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
       return;
     }
 
-    const updated = await prisma.order.update({
-      where: { id },
-      data: { status },
-      include: {
-        customer: true,
-        orderItems: { include: { product: { select: { name: true, productType: true, downloadUrl: true } } } },
-        organization: { select: { name: true, logoUrl: true, email: true, phone: true, address: true } },
-      },
+    const include = {
+      customer: true,
+      orderItems: { include: { product: { select: { name: true, productType: true, downloadUrl: true } } } },
+      organization: { select: { name: true, logoUrl: true, email: true, phone: true, address: true } },
+    } as const;
+
+    if (order.status === status) {
+      // Repeating the current status is a no-op: no emails and no stock movement.
+      res.json(await prisma.order.findUniqueOrThrow({ where: { id }, include }));
+      return;
+    }
+    if (!canTransitionOrder(order.status, status)) {
+      res.status(409).json({ error: `An order that is ${order.status.toLowerCase()} cannot be changed to ${status.toLowerCase()}.` });
+      return;
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      // The old status is part of the condition, so two concurrent requests cannot both apply a transition.
+      const claimed = await tx.order.updateMany({ where: { id, organizationId: orgId, status: order.status }, data: { status } });
+      if (claimed.count === 0) {
+        throw new AppError("This order was changed by someone else. Refresh and try again.", 409);
+      }
+      if (status === "CANCELLED") {
+        // Stock was taken when the order was placed, so cancelling puts it back.
+        const items = await tx.orderItem.findMany({ where: { orderId: id }, select: { productId: true, quantity: true } });
+        for (const item of items) {
+          await tx.inventory.updateMany({ where: { productId: item.productId }, data: { quantity: { increment: item.quantity } } });
+        }
+        await tx.payment.updateMany({ where: { orderId: id, status: "PENDING" }, data: { status: "FAILED" } });
+      }
+      return tx.order.findUniqueOrThrow({ where: { id }, include });
     }) as any;
 
-    await createAuditLog(req.user!.id, orgId, "UPDATE", "Order", id, `Updated order ${order.orderNumber} status to ${status}`, req);
+    await createAuditLog(req.user!.id, orgId, "UPDATE", "Order", id, `Updated order ${order.orderNumber} status to ${status}${status === "CANCELLED" ? " (stock restored)" : ""}`, req);
 
     if (updated.customer?.email) {
       const items = updated.orderItems.map((i: any) => ({
@@ -231,8 +255,8 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
     }
 
     res.json(updated);
-  } catch {
-    res.status(500).json({ error: "Failed to update order status." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to update order status.");
   }
 };
 
