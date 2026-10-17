@@ -68,6 +68,10 @@ function VerifyEmailForm() {
     setIsVerifying(true);
     try {
       const verifyRes = await api.post("/api/auth/verify-email", { email, otp: code });
+      // New addresses receive a short-lived proof that the register step must present.
+      if (verifyRes.data.emailVerificationToken) {
+        try { sessionStorage.setItem("traqify_email_proof", verifyRes.data.emailVerificationToken); } catch { /* storage unavailable */ }
+      }
       setVerified(true);
 
       // If returning to register flow, redirect back with verified email

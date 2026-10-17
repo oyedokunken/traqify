@@ -123,7 +123,15 @@ function RegisterForm() {
       return;
     }
     try {
-      const res = await api.post("/api/auth/register", { ...data, email: emailData.email });
+      let emailVerificationToken: string | null = null;
+      try { emailVerificationToken = sessionStorage.getItem("traqify_email_proof"); } catch { /* storage unavailable */ }
+      if (!emailVerificationToken) {
+        setError("Please verify your email address before continuing.");
+        setStep(1);
+        return;
+      }
+      const res = await api.post("/api/auth/register", { ...data, email: emailData.email, emailVerificationToken });
+      try { sessionStorage.removeItem("traqify_email_proof"); } catch { /* storage unavailable */ }
       setStep2Data(data);
       if (res.data.token) {
         setPendingToken(res.data.token);

@@ -2,12 +2,13 @@ import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import prisma from "../config/database";
-import { signToken, signRefreshToken, verifyRefreshToken } from "../utils/jwt";
+import { signToken, signRefreshToken, verifyRefreshToken, signEmailVerificationToken, verifyEmailVerificationToken } from "../utils/jwt";
 import { createOTP, verifyOTP, generatePasswordResetToken, verifyPasswordResetToken, markPasswordResetTokenUsed } from "../utils/otp";
 import { sendEmail } from "../config/email";
 import { otpEmailTemplate, passwordResetEmailTemplate, passwordChangedEmailTemplate, newStaffJoinedEmailTemplate } from "../emails/templates";
 import {
   registerStep1Schema,
+  sendOTPSchema,
   verifyOTPSchema,
   loginSchema,
   forgotPasswordSchema,
@@ -27,7 +28,13 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const { email, password, name } = parsed.data;
+    const { email, password, name, emailVerificationToken } = parsed.data;
+
+    // The OTP step happens before registration, so the server must see proof that it was completed for this address.
+    if (!verifyEmailVerificationToken(emailVerificationToken, email)) {
+      res.status(400).json({ error: "Your email verification has expired or is invalid. Please verify your email again." });
+      return;
+    }
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
@@ -47,7 +54,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     const hashedPassword = await bcrypt.hash(password, 12);
 
     const user = await prisma.user.create({
-      data: { email, password: hashedPassword, name, emailVerified: true },
+      data: { email, password: hashedPassword, name, emailVerified: true }, // ownership proven by the verified OTP token above
     });
 
     // Create audit log for user registration
@@ -125,20 +132,26 @@ export const checkEmail = async (req: Request, res: Response): Promise<void> => 
 
 export const sendOTP = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email } = req.body;
-    if (!email) {
-      res.status(400).json({ error: "Email is required." });
+    const parsed = sendOTPSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.errors[0].message });
+      return;
+    }
+    const { email } = parsed.data;
+
+    // The response never reveals whether the address already has an account.
+    const response = { message: "If this address can be verified, a code has been sent to it." };
+
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (user?.emailVerified) {
+      res.json(response);
       return;
     }
 
-    // Look up user if they exist (for personalized greeting), but don't require it
-    const user = await prisma.user.findUnique({ where: { email } });
-    const name = user?.name || "there";
-
     const otp = await createOTP(email);
-    await sendEmail(email, "Your Traqify verification code", otpEmailTemplate(name, otp));
+    await sendEmail(email, "Your Traqify verification code", otpEmailTemplate(user?.name || "there", otp));
 
-    res.json({ message: "A verification code has been sent to your email." });
+    res.json(response);
   } catch {
     res.status(500).json({ error: "Failed to send verification code." });
   }
@@ -160,37 +173,22 @@ export const verifyEmail = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    // Only mark emailVerified if user exists (for old flow)
     const existingUser = await prisma.user.findUnique({ where: { email } });
-    if (existingUser) {
-      await prisma.user.update({
-        where: { email },
-        data: { emailVerified: true },
-      });
-    }
 
-    // If user doesn't exist (new register flow), just return success
+    // New address: hand back a short-lived proof that registration requires.
     if (!existingUser) {
-      res.json({ message: "Email verified successfully." });
+      res.json({
+        message: "Email verified successfully.",
+        emailVerificationToken: signEmailVerificationToken(email),
+      });
       return;
     }
 
-    const token = signToken({ userId: existingUser.id, email: existingUser.email });
-    const refresh = signRefreshToken({ userId: existingUser.id, email: existingUser.email });
-
-    res.json({
-      message: "Email verified successfully.",
-      token,
-      refreshToken: refresh,
-      user: {
-        id: existingUser.id,
-        email: existingUser.email,
-        name: existingUser.name,
-        emailVerified: existingUser.emailVerified,
-        organizationId: existingUser.organizationId,
-        role: existingUser.role,
-      },
-    });
+    // Existing account: confirm it. No session is issued here; the user signs in normally.
+    if (!existingUser.emailVerified) {
+      await prisma.user.update({ where: { email }, data: { emailVerified: true } });
+    }
+    res.json({ message: "Email verified successfully." });
   } catch {
     res.status(500).json({ error: "Email verification failed." });
   }

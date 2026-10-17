@@ -24,3 +24,7 @@ beforeEach(async () => {
 afterAll(async () => {
   await prisma.$disconnect();
 });
+
+beforeEach(() => {
+  jest.clearAllMocks();
+});
