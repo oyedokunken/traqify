@@ -5,7 +5,7 @@ import prisma from "../config/database";
 import { signToken, signRefreshToken, verifyRefreshToken } from "../utils/jwt";
 import { createOTP, verifyOTP, generatePasswordResetToken, verifyPasswordResetToken, markPasswordResetTokenUsed } from "../utils/otp";
 import { sendEmail } from "../config/email";
-import { otpEmailTemplate, passwordResetEmailTemplate, welcomeEmailTemplate, passwordChangedEmailTemplate, newStaffJoinedEmailTemplate } from "../emails/templates";
+import { otpEmailTemplate, passwordResetEmailTemplate, passwordChangedEmailTemplate, newStaffJoinedEmailTemplate } from "../emails/templates";
 import {
   registerStep1Schema,
   verifyOTPSchema,
@@ -17,7 +17,6 @@ import {
   changePasswordSchema,
 } from "../utils/validators";
 import { createAuditLog } from "../utils/audit";
-import { generateUniqueSlug } from "../utils/slug";
 import { AuthRequest } from "../middleware/auth.middleware";
 
 export const register = async (req: Request, res: Response): Promise<void> => {

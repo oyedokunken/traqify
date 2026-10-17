@@ -30,16 +30,6 @@ export const getLowStock = async (req: AuthRequest, res: Response): Promise<void
   try {
     const orgId = req.user!.organizationId!;
 
-    const lowStock = await prisma.inventory.findMany({
-      where: {
-        product: { organizationId: orgId, isActive: true },
-        quantity: { lte: prisma.inventory.fields.lowStockAlert },
-      },
-      include: {
-        product: { select: { id: true, name: true, sku: true, categoryId: true } },
-      },
-    });
-
     const results = await prisma.$queryRaw`
       SELECT i.*, p.name, p.sku, p."categoryId", p.id as product_id
       FROM inventory i

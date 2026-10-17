@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import multer from "multer";
 import { createOrganization, getOrganization, updateOrganization, getPublicStore } from "../controllers/org.controller";
 import { authenticate, requireOrg } from "../middleware/auth.middleware";
-import { isOwnerOrManager, isOwnerOnly } from "../middleware/rbac.middleware";
+import { isOwnerOnly } from "../middleware/rbac.middleware";
 import { upload, getSupabasePath } from "../middleware/upload.middleware";
 import { uploadFile } from "../config/supabase";
 import prisma from "../config/database";
