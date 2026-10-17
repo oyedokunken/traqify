@@ -92,9 +92,14 @@ export default function CheckoutPage({ params }: { params: { slug: string } }) {
     e.preventDefault();
     if (!name.trim() || !email.trim()) { setError("Name and email are required."); return; }
     if (parseInt(captchaInput) !== captcha.answer) { setError("Incorrect security answer. Please try again."); setCaptcha(makeCaptcha()); setCaptchaInput(""); return; }
+    const paystackKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
+    if (!paystackKey) {
+      setError("Online payment is not available for this store right now. Please contact the store.");
+      return;
+    }
     setError("");
     const handler = window.PaystackPop.setup({
-      key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "pk_test_97ea3775550f1bd74cdaa1818a57b6a280f177e8",
+      key: paystackKey,
       email,
       amount: Math.round(total * 100),
       currency: "NGN",
