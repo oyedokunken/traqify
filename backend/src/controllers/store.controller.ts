@@ -1,10 +1,14 @@
 import { Request, Response } from "express";
-import { OrderStatus } from "@prisma/client";
+import { OrderStatus, PaymentStatus } from "@prisma/client";
 import prisma from "../config/database";
 import { sendEmail } from "../config/email";
 import { wishlistReminderTemplate, newOrderEmailTemplate, storeOrderConfirmationEmailTemplate } from "../emails/templates";
 import { createAuditLog } from "../utils/audit";
-import https from "https";
+import { AppError, respondWithError } from "../middleware/error.middleware";
+import { storeCheckoutSchema } from "../utils/validators";
+import { placeOrder, quoteOrder } from "../utils/order-placement";
+import { verifyPaystackTransaction } from "../utils/paystack";
+import { toMinor } from "../utils/money";
 
 export const getStoreProducts = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -72,96 +76,18 @@ export const getStoreProducts = async (req: Request, res: Response): Promise<voi
 export const storeCheckout = async (req: Request, res: Response): Promise<void> => {
   try {
     const { slug } = req.params;
-    const { name, email, phone, address, items, paymentMethod, notes, paystackReference } = req.body;
-
-    if (!name || !email || !items || !Array.isArray(items) || items.length === 0) {
-      res.status(400).json({ error: "Name, email, and at least one item are required." });
+    const parsed = storeCheckoutSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.errors[0].message });
       return;
     }
+    const { name, email, phone, address, notes, items, paymentMethod, paystackReference } = parsed.data;
 
     const org = await prisma.organization.findUnique({ where: { slug } });
-    if (!org) {
+    if (!org || !org.storePublished) {
       res.status(404).json({ error: "Store not found." });
       return;
     }
-
-    let customer = await prisma.customer.findFirst({
-      where: { email, organizationId: org.id },
-    });
-    if (!customer) {
-      customer = await prisma.customer.create({
-        data: { name, email, phone, address, organizationId: org.id, source: "PURCHASE" },
-      });
-    }
-
-    const productIds = items.map((i: any) => i.productId);
-    const products = await prisma.product.findMany({
-      where: { id: { in: productIds }, organizationId: org.id, isActive: true },
-      include: { inventory: true },
-    });
-
-    if (products.length !== productIds.length) {
-      res.status(400).json({ error: "One or more products are unavailable." });
-      return;
-    }
-
-    let totalAmount = 0;
-    const orderItemsData: any[] = [];
-
-    for (const item of items) {
-      const product = products.find((p: typeof products[0]) => p.id === item.productId);
-      if (!product) continue;
-      const qty = parseInt(item.quantity) || 1;
-      if (product.inventory && product.inventory.quantity < qty) {
-        res.status(400).json({ error: `Insufficient stock for "${product.name}".` });
-        return;
-      }
-      const subtotal = product.price * qty;
-      totalAmount += subtotal;
-      orderItemsData.push({
-        productId: product.id,
-        quantity: qty,
-        unitPrice: product.price,
-        subtotal,
-      });
-    }
-
-    // Verify Paystack payment if reference provided
-    let verifiedAmount: number | null = null;
-    if (paystackReference && paymentMethod === "PAYSTACK") {
-      try {
-        const paystackData: any = await new Promise((resolve, reject) => {
-          const options = {
-            hostname: "api.paystack.co",
-            port: 443,
-            path: `/transaction/verify/${paystackReference}`,
-            method: "GET",
-            headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` },
-          };
-          const req2 = https.request(options, (r) => {
-            let data = "";
-            r.on("data", (c) => { data += c; });
-            r.on("end", () => resolve(JSON.parse(data)));
-          });
-          req2.on("error", reject);
-          req2.end();
-        });
-        if (!paystackData.status || paystackData.data?.status !== "success") {
-          res.status(402).json({ error: "Payment not verified. Please complete payment before placing order." });
-          return;
-        }
-        verifiedAmount = paystackData.data.amount / 100;
-        if (Math.abs(verifiedAmount - totalAmount) > 0.01) {
-          res.status(402).json({ error: "Payment amount does not match order total. Please contact support." });
-          return;
-        }
-      } catch {
-        res.status(500).json({ error: "Payment verification failed. Please contact support." });
-        return;
-      }
-    }
-
-    const orderNumber = `STR-${Date.now().toString(36).toUpperCase()}`;
 
     const orgOwner = await prisma.user.findFirst({
       where: { organizationId: org.id, role: "OWNER" },
@@ -172,46 +98,50 @@ export const storeCheckout = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const order = await prisma.order.create({
-      data: {
-        orderNumber,
-        organizationId: org.id,
-        customerId: customer.id,
-        createdById: orgOwner.id,
-        totalAmount,
-        status: paystackReference && verifiedAmount !== null ? OrderStatus.APPROVED : OrderStatus.PENDING,
-        paymentMethod: paymentMethod || "TRANSFER",
-        notes: notes || null,
-        orderItems: { create: orderItemsData },
-      },
-      include: {
-        orderItems: { include: { product: { select: { name: true } } } },
-      },
-    }) as any;
-
-    prisma.payment.create({
-      data: {
-        amount: totalAmount,
-        currency: "NGN",
-        status: paystackReference && verifiedAmount !== null ? "COMPLETED" : "PENDING",
-        method: paymentMethod || "TRANSFER",
-        reference: paystackReference || null,
-        organizationId: org.id,
-        orderId: order.id,
-      },
-    }).catch(() => {});
-
-    for (const item of orderItemsData) {
-      await prisma.inventory.updateMany({
-        where: { productId: item.productId },
-        data: { quantity: { decrement: item.quantity } },
-      });
+    // Paystack: the reference must be unused, successful, in NGN and for exactly the server-computed total.
+    let verifiedAmountKobo: number | undefined;
+    if (paymentMethod === "PAYSTACK" && paystackReference) {
+      if (await prisma.payment.findUnique({ where: { reference: paystackReference } })) {
+        throw new AppError("This payment reference has already been used.", 409);
+      }
+      const { total } = await quoteOrder(org.id, items);
+      const transaction = await verifyPaystackTransaction(paystackReference);
+      if (!transaction || transaction.status !== "success" || transaction.reference !== paystackReference) {
+        throw new AppError("Payment not verified. Please complete payment before placing order.", 402);
+      }
+      if (transaction.currency !== "NGN") {
+        throw new AppError("Payment currency does not match the store currency. Please contact support.", 402);
+      }
+      if (transaction.amountKobo !== toMinor(total)) {
+        throw new AppError("Payment amount does not match order total. Please contact support.", 402);
+      }
+      verifiedAmountKobo = transaction.amountKobo;
     }
+
+    const orderNumber = `STR-${Date.now().toString(36).toUpperCase()}`;
+    const verified = verifiedAmountKobo !== undefined;
+
+    const { order } = await placeOrder({
+      organizationId: org.id,
+      createdById: orgOwner.id,
+      orderNumber,
+      lines: items,
+      customer: { kind: "find-or-create", name, email, phone, address, source: "PURCHASE" },
+      status: verified ? OrderStatus.APPROVED : OrderStatus.PENDING,
+      paymentMethod,
+      notes,
+      payment: {
+        status: verified ? PaymentStatus.COMPLETED : PaymentStatus.PENDING,
+        reference: verified ? paystackReference : null,
+      },
+      verifiedAmountKobo,
+    });
+    const totalAmount = order.totalAmount;
 
     createAuditLog(orgOwner.id, org.id, "CREATE", "Order", order.id, `Store order ${orderNumber} placed by ${name} (${email}) - NGN ${totalAmount.toLocaleString()}`, req).catch(() => {});
 
     // Notify org owner by email
-    const emailItems = order.orderItems.map((i: { product: { name: string }; quantity: number; unitPrice: number; subtotal?: number }) => ({
+    const emailItems = order.orderItems.map((i) => ({
       name: i.product.name,
       qty: i.quantity,
       subtotal: i.subtotal ?? i.unitPrice * i.quantity,
@@ -238,7 +168,7 @@ export const storeCheckout = async (req: Request, res: Response): Promise<void> 
         emailItems,
         { email: orgContact?.email || null, phone: orgContact?.phone || null, address: orgContact?.address || null },
         orgContact?.logoUrl || null,
-        paymentMethod || "Bank Transfer"
+        paymentMethod === "PAYSTACK" ? "Paystack" : "Bank Transfer"
       )
     ).catch((emailErr) => console.error("Order confirmation email failed:", emailErr));
 
@@ -248,8 +178,8 @@ export const storeCheckout = async (req: Request, res: Response): Promise<void> 
       totalAmount: order.totalAmount,
       status: order.status,
     });
-  } catch {
-    res.status(500).json({ error: "Failed to process order." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to process order.");
   }
 };
 

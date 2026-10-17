@@ -6,6 +6,8 @@ import { AuthRequest } from "../middleware/auth.middleware";
 import { sendEmail } from "../config/email";
 import { orderApprovedEmailTemplate, orderCompletedEmailTemplate, newOrderEmailTemplate, storeOrderConfirmationEmailTemplate } from "../emails/templates";
 import https from "https";
+import { placeOrder } from "../utils/order-placement";
+import { respondWithError } from "../middleware/error.middleware";
 
 const generateOrderNumber = (): string => {
   const timestamp = Date.now().toString(36).toUpperCase();
@@ -86,104 +88,25 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
 
     const { items, customerId: rawCustomerId, newCustomer, notes, paymentMethod } = parsed.data;
 
-    let resolvedCustomerId: string | undefined = rawCustomerId;
-
-    if (!resolvedCustomerId && newCustomer?.name) {
-      const email = newCustomer.email || null;
-      let customer = email
-        ? await prisma.customer.findFirst({ where: { email, organizationId: orgId } })
-        : null;
-      if (!customer) {
-        customer = await prisma.customer.create({
-          data: {
-            name: newCustomer.name,
-            email: email || undefined,
-            phone: newCustomer.phone || undefined,
-            address: newCustomer.address || undefined,
-            organizationId: orgId,
-            source: "MANUAL",
-          },
-        });
-        await createAuditLog(req.user!.id, orgId, "CREATE", "Customer", customer.id, `Customer ${customer.name} added via manual order`, req);
-      }
-      resolvedCustomerId = customer.id;
-    }
-
-    const products = await prisma.product.findMany({
-      where: {
-        id: { in: items.map((i) => i.productId) },
-        organizationId: orgId,
-        isActive: true,
-      },
-      include: { inventory: true },
+    const { order, customerCreated } = await placeOrder({
+      organizationId: orgId,
+      createdById: req.user!.id,
+      orderNumber: generateOrderNumber(),
+      lines: items,
+      customer: rawCustomerId
+        ? { kind: "existing", id: rawCustomerId }
+        : newCustomer?.name
+          ? { kind: "find-or-create", name: newCustomer.name, email: newCustomer.email || null, phone: newCustomer.phone, address: newCustomer.address, source: "MANUAL" }
+          : null,
+      status: "APPROVED",
+      paymentMethod: paymentMethod || "TRANSFER",
+      notes,
+      payment: { status: "COMPLETED" },
     });
 
-    if (products.length !== items.length) {
-      res.status(400).json({ error: "One or more products were not found or are inactive." });
-      return;
+    if (customerCreated && order.customer) {
+      await createAuditLog(req.user!.id, orgId, "CREATE", "Customer", order.customer.id, `Customer ${order.customer.name} added via manual order`, req);
     }
-
-    for (const item of items) {
-      const product = products.find((p) => p.id === item.productId)!;
-      if (!product.inventory || product.inventory.quantity < item.quantity) {
-        res.status(400).json({
-          error: `Insufficient stock for "${product.name}". Available: ${product.inventory?.quantity ?? 0}.`,
-        });
-        return;
-      }
-    }
-
-    const orderItems = items.map((item) => {
-      const product = products.find((p) => p.id === item.productId)!;
-      return {
-        productId: item.productId,
-        quantity: item.quantity,
-        unitPrice: product.price,
-        subtotal: product.price * item.quantity,
-      };
-    });
-
-    const totalAmount = orderItems.reduce((sum, i) => sum + i.subtotal, 0);
-
-    const order = await prisma.$transaction(async (tx) => {
-      const newOrder = await tx.order.create({
-        data: {
-          orderNumber: generateOrderNumber(),
-          organizationId: orgId,
-          createdById: req.user!.id,
-          customerId: resolvedCustomerId || undefined,
-          notes,
-          paymentMethod,
-          totalAmount,
-          status: "APPROVED",
-          orderItems: { create: orderItems },
-        },
-        include: {
-          orderItems: { include: { product: true } },
-          customer: true,
-        },
-      });
-
-      for (const item of items) {
-        await tx.inventory.update({
-          where: { productId: item.productId },
-          data: { quantity: { decrement: item.quantity } },
-        });
-      }
-
-      await tx.payment.create({
-        data: {
-          amount: totalAmount,
-          currency: "NGN",
-          status: "COMPLETED",
-          method: paymentMethod || "TRANSFER",
-          organizationId: orgId,
-          orderId: newOrder.id,
-        },
-      });
-
-      return newOrder;
-    });
 
     await createAuditLog(req.user!.id, orgId, "CREATE", "Order", order.id, `Created order ${order.orderNumber}`, req);
 
@@ -221,8 +144,8 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
     }
 
     res.status(201).json(order);
-  } catch {
-    res.status(500).json({ error: "Failed to create order." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to create order.");
   }
 };
 

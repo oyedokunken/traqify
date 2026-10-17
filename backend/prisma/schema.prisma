@@ -384,7 +384,7 @@ model Payment {
   currency       String        @default("NGN")
   status         PaymentStatus @default(PENDING)
   method         String?
-  reference      String?
+  reference      String?       @unique
   notes          String?
 
   organizationId String
