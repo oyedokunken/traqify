@@ -1,3 +1,4 @@
+import { reportEmailSchema } from "../utils/validators";
 import { Response } from "express";
 import prisma from "../config/database";
 import { AuthRequest } from "../middleware/auth.middleware";
@@ -403,11 +404,12 @@ export const downloadReport = async (req: AuthRequest, res: Response): Promise<v
 export const emailReport = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { type } = req.params;
-    const { to, from, to_date } = req.body;
     const orgId = req.user!.organizationId!;
     const label = REPORT_LABELS[type];
     if (!label) { res.status(400).json({ error: "Invalid report type." }); return; }
-    if (!to) { res.status(400).json({ error: "Recipient email is required." }); return; }
+    const parsed = reportEmailSchema.safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({ error: parsed.error.errors[0].message }); return; }
+    const { to, from, to_date } = parsed.data;
 
     const today = new Date(); today.setHours(23, 59, 59, 999);
     const fromDate = from ? new Date(from) : new Date(Date.now() - 30 * 86400000);
