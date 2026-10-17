@@ -1,3 +1,4 @@
+import { MAX_UNPAGED_ROWS } from "../utils/pagination";
 import { Request, Response } from "express";
 import prisma from "../config/database";
 import { sendEmail } from "../config/email";
@@ -64,7 +65,7 @@ export const getSubscribers = async (req: Request, res: Response): Promise<void>
   try {
     const authReq = req as AuthRequest;
     const orgId = authReq.user?.organizationId ?? null;
-    const subscribers = await prisma.newsletterSubscriber.findMany({
+    const subscribers = await prisma.newsletterSubscriber.findMany({ take: MAX_UNPAGED_ROWS,
       where: { organizationId: orgId },
       orderBy: { createdAt: "desc" },
     });

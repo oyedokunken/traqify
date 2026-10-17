@@ -1,3 +1,4 @@
+import { parsePagination } from "../utils/pagination";
 import { Response } from "express";
 import prisma from "../config/database";
 import { AuthRequest } from "../middleware/auth.middleware";
@@ -5,8 +6,8 @@ import { AuthRequest } from "../middleware/auth.middleware";
 export const getAuditLogs = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const orgId = req.user!.organizationId!;
-    const { entity, action, userId, from, to, isRead, page = "1", limit = "50" } = req.query;
-    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+    const { entity, action, userId, from, to, isRead } = req.query;
+    const { page, limit, skip, take } = parsePagination(req.query, 50);
 
     const where: any = {
       organizationId: orgId,
@@ -25,13 +26,13 @@ export const getAuditLogs = async (req: AuthRequest, res: Response): Promise<voi
         },
         orderBy: { createdAt: "desc" },
         skip,
-        take: parseInt(limit as string),
+        take,
       }),
       prisma.auditLog.count({ where }),
       prisma.auditLog.count({ where: { organizationId: orgId, isRead: false } }),
     ]);
 
-    res.json({ logs, total, unreadCount, page: parseInt(page as string), limit: parseInt(limit as string) });
+    res.json({ logs, total, unreadCount, page, limit });
   } catch {
     res.status(500).json({ error: "Failed to fetch audit logs." });
   }

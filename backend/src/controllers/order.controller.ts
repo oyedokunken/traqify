@@ -1,3 +1,5 @@
+import { OrderStatus } from "@prisma/client";
+import { parsePagination } from "../utils/pagination";
 import { Response } from "express";
 import prisma from "../config/database";
 import { orderSchema, orderStatusSchema } from "../utils/validators";
@@ -15,18 +17,25 @@ import { canTransitionOrder } from "../utils/status-transitions";
 export const getOrders = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const orgId = req.user!.organizationId!;
-    const { status, customerId, page = "1", limit = "20" } = req.query;
+    const { status, customerId } = req.query;
+    const { page, limit, skip, take } = parsePagination(req.query, 20);
 
-    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+    if (status !== undefined && status !== "" && !orderStatusSchema.shape.status.safeParse(status).success) {
+      res.status(400).json({ error: "Invalid order status." });
+      return;
+    }
+
+    // The same filter drives the list and the total, so a cashier's count matches what they can see.
+    const where = {
+      organizationId: orgId,
+      ...(req.user!.role === "CASHIER" && { createdById: req.user!.id }),
+      ...(status && { status: status as OrderStatus }),
+      ...(typeof customerId === "string" && customerId && { customerId }),
+    };
 
     const [orders, total] = await Promise.all([
       prisma.order.findMany({
-        where: {
-          organizationId: orgId,
-          ...(req.user!.role === "CASHIER" && { createdById: req.user!.id }),
-          ...(status && { status: status as any }),
-          ...(customerId && { customerId: customerId as string }),
-        },
+        where,
         include: {
           customer: { select: { id: true, name: true, email: true } },
           createdBy: { select: { id: true, name: true } },
@@ -36,12 +45,12 @@ export const getOrders = async (req: AuthRequest, res: Response): Promise<void> 
         },
         orderBy: { createdAt: "desc" },
         skip,
-        take: parseInt(limit as string),
+        take,
       }),
-      prisma.order.count({ where: { organizationId: orgId, ...(status && { status: status as any }), ...(customerId && { customerId: customerId as string }) } }),
+      prisma.order.count({ where }),
     ]);
 
-    res.json({ orders, total, page: parseInt(page as string), limit: parseInt(limit as string) });
+    res.json({ orders, total, page, limit });
   } catch {
     res.status(500).json({ error: "Failed to fetch orders." });
   }

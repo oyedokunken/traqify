@@ -1,3 +1,4 @@
+import { parsePagination } from "../utils/pagination";
 import { Response } from "express";
 import prisma from "../config/database";
 import { Prisma } from "@prisma/client";
@@ -9,9 +10,8 @@ import { generateSlug } from "../utils/slug";
 export const getProducts = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const orgId = req.user!.organizationId!;
-    const { search, categoryId, isActive, status, productType, page, limit } = req.query;
-    const take = parseInt((limit as string) || "50");
-    const skip = (parseInt((page as string) || "1") - 1) * take;
+    const { search, categoryId, isActive, status, productType } = req.query;
+    const { skip, take } = parsePagination(req.query, 50);
 
     const where: any = {
       organizationId: orgId,

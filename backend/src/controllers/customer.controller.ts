@@ -1,3 +1,4 @@
+import { parsePagination } from "../utils/pagination";
 import { Response } from "express";
 import prisma from "../config/database";
 import { customerSchema, customerUpdateSchema } from "../utils/validators";
@@ -7,9 +8,8 @@ import { AuthRequest } from "../middleware/auth.middleware";
 export const getCustomers = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const orgId = req.user!.organizationId!;
-    const { search, page = "1", limit = "25" } = req.query;
-    const take = parseInt(limit as string);
-    const skip = (parseInt(page as string) - 1) * take;
+    const { search } = req.query;
+    const { skip, take } = parsePagination(req.query, 25);
 
     const where: any = {
       organizationId: orgId,

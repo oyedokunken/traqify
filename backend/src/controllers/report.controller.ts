@@ -1,3 +1,4 @@
+import { parsePagination } from "../utils/pagination";
 import { reportEmailSchema } from "../utils/validators";
 import { Response } from "express";
 import prisma from "../config/database";
@@ -97,14 +98,14 @@ export const getSalesReport = async (req: AuthRequest, res: Response): Promise<v
 export const getTopProducts = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const orgId = req.user!.organizationId!;
-    const { limit = "10" } = req.query;
+    const { take } = parsePagination(req.query, 10);
 
     const topProducts = await prisma.orderItem.groupBy({
       by: ["productId"],
       where: { order: { organizationId: orgId, status: "COMPLETED" } },
       _sum: { quantity: true, subtotal: true },
       orderBy: { _sum: { subtotal: "desc" } },
-      take: parseInt(limit as string),
+      take,
     });
 
     const productIds = topProducts.map((p: any) => p.productId);
