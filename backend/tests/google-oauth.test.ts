@@ -3,6 +3,7 @@ import prisma from "../src/config/database";
 import app from "../src/app";
 import { createUser } from "./helpers/factories";
 import { mockGoogle } from "./helpers/google";
+import { cookiePair, refresh } from "./helpers/session";
 
 const FRONTEND = "http://localhost:3000";
 
@@ -121,22 +122,25 @@ describe("Google-issued sessions can be revoked", () => {
     const code = new URL(res.headers.location).searchParams.get("code");
     const exchange = await request(app).get(`/api/auth/oauth-exchange/${code}`);
     expect(exchange.status).toBe(200);
-    return exchange.body as { token: string; refreshToken: string };
+    // The refresh token travels only in an httpOnly cookie, never in the response body.
+    expect(exchange.body.refreshToken).toBeUndefined();
+    return { token: exchange.body.token as string, cookie: cookiePair(exchange) };
   }
 
   it("refreshes while the session is current", async () => {
-    const { refreshToken } = await googleSession("fresh@example.com");
-    const res = await request(app).post("/api/auth/refresh").send({ refreshToken });
+    const { cookie } = await googleSession("fresh@example.com");
+    expect(cookie).toBeDefined();
+    const res = await refresh(cookie);
     expect(res.status).toBe(200);
     expect(res.body.token).toEqual(expect.any(String));
   });
 
   it("rejects the refresh token and the access token after tokenVersion is bumped", async () => {
-    const { token, refreshToken } = await googleSession("revoked@example.com");
+    const { token, cookie } = await googleSession("revoked@example.com");
     await prisma.user.update({ where: { email: "revoked@example.com" }, data: { tokenVersion: { increment: 1 } } });
 
-    const refresh = await request(app).post("/api/auth/refresh").send({ refreshToken });
-    expect(refresh.status).toBe(401);
+    const refreshed = await refresh(cookie);
+    expect(refreshed.status).toBe(401);
     const me = await request(app).get("/api/auth/me").set("Authorization", `Bearer ${token}`);
     expect(me.status).toBe(401);
   });

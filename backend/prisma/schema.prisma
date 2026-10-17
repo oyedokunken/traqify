@@ -81,6 +81,7 @@ model User {
 
   orders         Order[]
   auditLogs      AuditLog[]
+  refreshTokens  RefreshToken[]
 
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
@@ -345,9 +346,11 @@ model NewsletterSubscriber {
 model OAuthSession {
   id           String   @id @default(cuid())
   code         String   @unique
-  token        String
-  refreshToken String
-  userData     String
+  userId       String?
+  // Legacy columns: sessions no longer store live tokens, tokens are minted when the code is exchanged.
+  token        String?
+  refreshToken String?
+  userData     String?
   expiresAt    DateTime
 
   createdAt    DateTime @default(now())
@@ -458,4 +461,25 @@ model CheckoutSession {
 
   @@index([organizationId])
   @@map("checkout_sessions")
+}
+
+/// Opaque refresh tokens, stored as SHA-256 hashes. Each use rotates the token; a token
+/// that is presented again after it was used revokes the user's sessions (token theft).
+model RefreshToken {
+  id           String    @id @default(cuid())
+  tokenHash    String    @unique
+  familyId     String
+  tokenVersion Int
+  expiresAt    DateTime
+  usedAt       DateTime?
+
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt    DateTime  @default(now())
+
+  @@index([familyId])
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
 }

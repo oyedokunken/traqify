@@ -6,7 +6,6 @@ process.env.NODE_ENV = "test";
 process.env.DATABASE_URL = url;
 process.env.DIRECT_URL = url;
 process.env.JWT_SECRET = "test_only_not_a_secret_jwt";
-process.env.JWT_REFRESH_SECRET = "test_only_not_a_secret_refresh";
 process.env.PAYSTACK_SECRET_KEY = "test_only_not_a_secret_paystack";
 process.env.FRONTEND_URL = "http://localhost:3000";
 process.env.API_URL = "http://localhost:5000";

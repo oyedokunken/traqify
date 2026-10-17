@@ -1,6 +1,6 @@
 import dotenv from "dotenv";
 
-const REQUIRED_ENV = ["JWT_SECRET", "JWT_REFRESH_SECRET", "DATABASE_URL", "PAYSTACK_SECRET_KEY", "FRONTEND_URL"];
+const REQUIRED_ENV = ["JWT_SECRET", "DATABASE_URL", "PAYSTACK_SECRET_KEY", "FRONTEND_URL"];
 
 export function validateEnv(env: NodeJS.ProcessEnv = process.env): void {
   for (const key of REQUIRED_ENV) {

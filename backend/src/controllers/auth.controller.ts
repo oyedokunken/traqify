@@ -2,7 +2,8 @@ import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import prisma from "../config/database";
-import { signToken, signRefreshToken, verifyRefreshToken, signEmailVerificationToken, verifyEmailVerificationToken } from "../utils/jwt";
+import { signToken, signEmailVerificationToken, verifyEmailVerificationToken } from "../utils/jwt";
+import { REFRESH_COOKIE, clearRefreshCookie, endSession, rotateSession, startSession } from "../utils/session";
 import { createOTP, verifyOTP, generatePasswordResetToken, verifyPasswordResetToken, markPasswordResetTokenUsed } from "../utils/otp";
 import { sendEmail } from "../config/email";
 import { otpEmailTemplate, passwordResetEmailTemplate, passwordChangedEmailTemplate, newStaffJoinedEmailTemplate } from "../emails/templates";
@@ -70,12 +71,11 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       role: user.role,
       tokenVersion: user.tokenVersion,
     });
-    const refresh = signRefreshToken({ userId: user.id, email: user.email, tokenVersion: user.tokenVersion });
+    await startSession(res, user);
 
     res.status(201).json({
       message: "Account created successfully.",
       token,
-      refreshToken: refresh,
       user: {
         id: user.id,
         email: user.email,
@@ -252,11 +252,10 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       role: user.role,
       tokenVersion: user.tokenVersion,
     });
-    const refresh = signRefreshToken({ userId: user.id, email: user.email, tokenVersion: user.tokenVersion });
+    await startSession(res, user);
 
     res.json({
       token,
-      refreshToken: refresh,
       user: {
         id: user.id,
         email: user.email,
@@ -388,30 +387,10 @@ export const googleCallback = async (req: Request, res: Response): Promise<void>
       }) as any;
     }
 
-    const token = signToken({
-      userId: user!.id,
-      email: user!.email,
-      organizationId: user!.organizationId || undefined,
-      role: user!.role,
-      tokenVersion: (user as any).tokenVersion ?? 0,
-    });
-    const refresh = signRefreshToken({ userId: user!.id, email: user!.email, tokenVersion: (user as any).tokenVersion ?? 0 });
-
-    const userData = {
-      id: user!.id,
-      email: user!.email,
-      name: user!.name,
-      role: user!.role,
-      organizationId: user!.organizationId,
-      avatarUrl: user!.avatarUrl,
-      organization: (user as any).organization || null,
-    };
-
-    // H-1: Store tokens server-side; redirect with a short-lived one-time code only
+    // The one-time code only identifies who signed in; tokens are minted when the browser exchanges it.
     const oauthCode = crypto.randomBytes(24).toString("hex");
-    const expiresAt = new Date(Date.now() + 2 * 60 * 1000); // 2 minutes
     await prisma.oAuthSession.create({
-      data: { code: oauthCode, token, refreshToken: refresh, userData: JSON.stringify(userData), expiresAt },
+      data: { code: oauthCode, userId: user!.id, expiresAt: new Date(Date.now() + 2 * 60 * 1000) },
     });
 
     res.redirect(`${frontendUrl}/auth-callback?code=${oauthCode}`);
@@ -455,12 +434,12 @@ export const changePassword = async (req: Request, res: Response): Promise<void>
 
 export const logout = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!req.user) { res.status(401).json({ error: "Authentication required." }); return; }
-    // Increment tokenVersion so all existing access and refresh tokens are invalidated
-    await prisma.user.update({
-      where: { id: req.user.id },
-      data: { tokenVersion: { increment: 1 } },
-    });
+    await endSession(req.cookies?.[REFRESH_COOKIE]);
+    clearRefreshCookie(res);
+    // A valid access token means a full sign out: bump tokenVersion so every token the user holds stops working.
+    if (req.user) {
+      await prisma.user.update({ where: { id: req.user.id }, data: { tokenVersion: { increment: 1 } } });
+    }
     res.json({ message: "Logged out successfully." });
   } catch {
     res.status(500).json({ error: "Logout failed." });
@@ -522,37 +501,39 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
 
 export const refreshToken = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { refreshToken } = req.body;
-    if (!refreshToken) {
-      res.status(400).json({ error: "Refresh token is required." });
+    const result = await rotateSession(res, req.cookies?.[REFRESH_COOKIE]);
+
+    if (!result.ok) {
+      if (result.reason === "in_progress") {
+        // Another request is rotating this very token; the client retries with the cookie that request sets.
+        res.status(409).json({ error: "A refresh is already in progress. Please retry." });
+        return;
+      }
+      clearRefreshCookie(res);
+      res.status(401).json({
+        error: result.reason === "reuse" ? "Session has been revoked. Please log in again." : "Invalid or expired session.",
+      });
       return;
     }
 
-    const payload = verifyRefreshToken(refreshToken);
-    const user = await prisma.user.findUnique({ where: { id: payload.userId } });
-
+    const user = await prisma.user.findUnique({ where: { id: result.userId } });
     if (!user) {
-      res.status(401).json({ error: "Invalid refresh token." });
+      clearRefreshCookie(res);
+      res.status(401).json({ error: "Invalid or expired session." });
       return;
     }
 
-    // Reject refresh tokens that predate a logout or password change
-    if (payload.tokenVersion !== undefined && payload.tokenVersion !== user.tokenVersion) {
-      res.status(401).json({ error: "Session has been revoked. Please log in again." });
-      return;
-    }
-
-    const newToken = signToken({
-      userId: user.id,
-      email: user.email,
-      organizationId: user.organizationId || undefined,
-      role: user.role,
-      tokenVersion: user.tokenVersion,
+    res.json({
+      token: signToken({
+        userId: user.id,
+        email: user.email,
+        organizationId: user.organizationId || undefined,
+        role: user.role,
+        tokenVersion: user.tokenVersion,
+      }),
     });
-
-    res.json({ token: newToken });
   } catch {
-    res.status(401).json({ error: "Invalid or expired refresh token." });
+    res.status(500).json({ error: "Could not refresh the session." });
   }
 };
 
@@ -677,12 +658,11 @@ export const acceptInvite = async (req: Request, res: Response): Promise<void> =
       role: user.role,
       tokenVersion: user.tokenVersion,
     });
-    const refresh = signRefreshToken({ userId: user.id, email: user.email, tokenVersion: user.tokenVersion });
+    await startSession(res, user);
 
     res.status(201).json({
       message: "Invitation accepted. Welcome to the team.",
       token: authToken,
-      refreshToken: refresh,
       user: {
         id: user.id,
         email: user.email,
@@ -703,18 +683,41 @@ export const exchangeOAuthCode = async (req: Request, res: Response): Promise<vo
     if (!code) { res.status(400).json({ error: "Code is required." }); return; }
 
     const session = await prisma.oAuthSession.findUnique({ where: { code } });
-    if (!session || session.expiresAt < new Date()) {
+    if (!session || !session.userId || session.expiresAt < new Date()) {
       res.status(400).json({ error: "OAuth code is invalid or has expired." });
       return;
     }
 
-    // Delete immediately — one-time use
+    // Delete immediately: one-time use
     await prisma.oAuthSession.delete({ where: { code } });
 
+    const user = await prisma.user.findUnique({
+      where: { id: session.userId },
+      include: { organization: { select: { id: true, name: true, slug: true, logoUrl: true } } },
+    });
+    if (!user || !user.isActive) {
+      res.status(400).json({ error: "OAuth code is invalid or has expired." });
+      return;
+    }
+
+    await startSession(res, user);
     res.json({
-      token: session.token,
-      refreshToken: session.refreshToken,
-      user: JSON.parse(session.userData),
+      token: signToken({
+        userId: user.id,
+        email: user.email,
+        organizationId: user.organizationId || undefined,
+        role: user.role,
+        tokenVersion: user.tokenVersion,
+      }),
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        organizationId: user.organizationId,
+        avatarUrl: user.avatarUrl,
+        organization: user.organization || null,
+      },
     });
   } catch {
     res.status(500).json({ error: "OAuth code exchange failed." });

@@ -18,7 +18,8 @@ import {
   refreshToken,
   logout,
 } from "../controllers/auth.controller";
-import { authenticate, AuthRequest } from "../middleware/auth.middleware";
+import { authenticate, optionalAuthenticate, AuthRequest } from "../middleware/auth.middleware";
+import { requireTrustedOrigin } from "../middleware/csrf.middleware";
 import { sendOtpEmailLimiter, sendOtpIpLimiter, verifyOtpEmailLimiter, verifyOtpIpLimiter } from "../middleware/rate-limit";
 import { upload, getSupabasePath } from "../middleware/upload.middleware";
 import { uploadFile } from "../config/supabase";
@@ -36,12 +37,12 @@ router.get("/google-callback", googleCallback);
 router.get("/oauth-exchange/:code", exchangeOAuthCode);
 router.post("/forgot-password", forgotPassword);
 router.post("/reset-password", resetPassword);
-router.post("/refresh", refreshToken);
+router.post("/refresh", requireTrustedOrigin, refreshToken);
 router.post("/accept-invite", acceptInvite);
 router.get("/me", authenticate, getMe);
 router.patch("/me", authenticate, updateProfile);
 router.post("/change-password", authenticate, changePassword);
-router.post("/logout", authenticate, logout);
+router.post("/logout", requireTrustedOrigin, optionalAuthenticate, logout);
 router.post(
   "/upload-avatar",
   authenticate,
