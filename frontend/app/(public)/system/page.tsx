@@ -487,7 +487,7 @@ NewsletterSubscriber
               <div className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto mb-4">
                 <code className="text-sm">cd frontend<br/>npm install<br/>cp .env.local.example .env.local</code>
               </div>
-              <p className="text-gray-600 mb-4">Fill in NEXT_PUBLIC_API_URL and NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY.</p>
+              <p className="text-gray-600 mb-4">Fill in NEXT_PUBLIC_API_URL.</p>
               <p className="text-gray-600 mb-4">Start the frontend:</p>
               <div className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto">
                 <code className="text-sm">npm run dev</code>
