@@ -1,14 +1,18 @@
 import nodemailer from "nodemailer";
 
+const smtpPort = parseInt(process.env.SMTP_PORT || "587", 10);
+
+// Certificates are always verified. Port 465 uses implicit TLS; any other port must upgrade with STARTTLS
+// before credentials are sent, otherwise the connection is refused.
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || "smtp.gmail.com",
-  port: parseInt(process.env.SMTP_PORT || "587"),
-  secure: false,
+  port: smtpPort,
+  secure: smtpPort === 465,
+  requireTLS: smtpPort !== 465,
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
-  tls: { rejectUnauthorized: false },
 });
 
 interface Attachment { filename: string; content: Buffer | string; contentType?: string; }
