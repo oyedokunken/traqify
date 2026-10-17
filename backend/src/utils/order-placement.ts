@@ -24,6 +24,8 @@ export interface PlaceOrderInput {
   payment: { status: PaymentStatus; reference?: string | null };
   /** When set, the server-computed total must equal this amount (in kobo) or nothing is written. */
   verifiedAmountKobo?: number;
+  /** Runs inside the transaction after the order exists; throwing rolls everything back. */
+  onPlaced?: (tx: Prisma.TransactionClient, order: { id: string }) => Promise<void>;
 }
 
 type Tx = Prisma.TransactionClient;
@@ -49,9 +51,23 @@ async function priceLines(tx: Tx, organizationId: string, lines: OrderLine[]) {
   return { priced, total: sumMoney(priced.map((p) => p.subtotal)) };
 }
 
-/** Prices an order from current database prices without writing anything. */
+/**
+ * Prices an order from current database prices and checks that every line is in
+ * stock, without writing anything. Used to fail early, before a customer is
+ * asked to pay; placeOrder repeats both checks atomically.
+ */
 export async function quoteOrder(organizationId: string, lines: OrderLine[]): Promise<{ total: number }> {
-  const { total } = await priceLines(prisma, organizationId, lines);
+  const { priced, total } = await priceLines(prisma, organizationId, lines);
+  const stock = await prisma.inventory.findMany({
+    where: { productId: { in: priced.map((p) => p.productId) } },
+    select: { productId: true, quantity: true },
+  });
+  for (const line of priced) {
+    const available = stock.find((s) => s.productId === line.productId)?.quantity ?? 0;
+    if (available < line.quantity) {
+      throw new AppError(`Insufficient stock for "${line.name}".`, 400);
+    }
+  }
   return { total };
 }
 
@@ -156,6 +172,8 @@ export async function placeOrder(input: PlaceOrderInput) {
           orderId: order.id,
         },
       });
+
+      if (input.onPlaced) await input.onPlaced(tx, order);
 
       return { order, customerCreated: customer.created };
     });

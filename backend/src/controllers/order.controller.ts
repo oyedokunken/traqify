@@ -7,13 +7,9 @@ import { sendEmail } from "../config/email";
 import { orderApprovedEmailTemplate, orderCompletedEmailTemplate, newOrderEmailTemplate, storeOrderConfirmationEmailTemplate } from "../emails/templates";
 import https from "https";
 import { placeOrder } from "../utils/order-placement";
+import { generateOrderNumber } from "../utils/order-number";
 import { respondWithError } from "../middleware/error.middleware";
 
-const generateOrderNumber = (): string => {
-  const timestamp = Date.now().toString(36).toUpperCase();
-  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-  return `ORD-${timestamp}-${random}`;
-};
 
 export const getOrders = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -91,7 +87,7 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
     const { order, customerCreated } = await placeOrder({
       organizationId: orgId,
       createdById: req.user!.id,
-      orderNumber: generateOrderNumber(),
+      orderNumber: generateOrderNumber("ORD"),
       lines: items,
       customer: rawCustomerId
         ? { kind: "existing", id: rawCustomerId }

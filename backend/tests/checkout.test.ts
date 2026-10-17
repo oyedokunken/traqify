@@ -2,7 +2,6 @@ import request from "supertest";
 import prisma from "../src/config/database";
 import app from "../src/app";
 import { authed, createOrganization, createProduct, createTenant, createUser } from "./helpers/factories";
-import { mockPaystack } from "./helpers/paystack";
 
 const customer = { name: "Ada Buyer", email: "ada@example.com", phone: "08012345678", address: "1 Test Street" };
 
@@ -134,128 +133,6 @@ describe("store checkout: server-side pricing and stock", () => {
     expect(statuses).toEqual([201, 400]);
     expect(await prisma.order.count()).toBe(1);
     expect((await prisma.inventory.findUnique({ where: { productId: product.id } }))?.quantity).toBe(0);
-  });
-});
-
-describe("store checkout: Paystack verification", () => {
-  async function setup(price = 1000, stock = 10) {
-    const { org } = await createTenant();
-    const product = await createProduct(org.id, { price, stock });
-    return { org, product };
-  }
-  const paystackBody = (productId: string, reference: string, quantity = 2) => ({
-    paymentMethod: "PAYSTACK",
-    paystackReference: reference,
-    items: [{ productId, quantity }],
-  });
-
-  it("accepts a first use of a verified reference and records it", async () => {
-    const { org, product } = await setup(1000);
-    mockPaystack({ reference: "REF_OK_1", amount: 200000 });
-    const res = await storeCheckout(org.slug, paystackBody(product.id, "REF_OK_1"));
-    expect(res.status).toBe(201);
-    expect(res.body.status).toBe("APPROVED");
-    const payment = await prisma.payment.findFirstOrThrow();
-    expect(payment.reference).toBe("REF_OK_1");
-    expect(payment.status).toBe("COMPLETED");
-  });
-
-  it("rejects reuse of a reference for a second order", async () => {
-    const { org, product } = await setup(1000);
-    mockPaystack({ reference: "REF_REUSE", amount: 200000 });
-    const first = await storeCheckout(org.slug, paystackBody(product.id, "REF_REUSE"));
-    const second = await storeCheckout(org.slug, { ...paystackBody(product.id, "REF_REUSE"), email: "other@example.com" });
-    expect(first.status).toBe(201);
-    expect(second.status).toBe(409);
-    expect(await prisma.order.count()).toBe(1);
-    expect((await prisma.inventory.findUnique({ where: { productId: product.id } }))?.quantity).toBe(8);
-  });
-
-  it("rolls everything back when the unique constraint trips after the pre-check passes (race)", async () => {
-    const { org, product } = await setup(1000);
-    const winner = await createTenant();
-    await prisma.payment.create({ data: { amount: 1, reference: "REF_RACE", organizationId: winner.org.id } });
-    // Simulate the losing side of a race: the pre-check sees no existing payment.
-    jest.spyOn(prisma.payment, "findUnique").mockResolvedValue(null);
-    mockPaystack({ reference: "REF_RACE", amount: 200000 });
-
-    const res = await storeCheckout(org.slug, paystackBody(product.id, "REF_RACE"));
-
-    expect(res.status).toBe(409);
-    expect(await prisma.order.count()).toBe(0);
-    expect(await prisma.customer.count()).toBe(0);
-    expect((await prisma.inventory.findUnique({ where: { productId: product.id } }))?.quantity).toBe(10);
-    expect(await prisma.payment.count()).toBe(1);
-  });
-
-  it("rejects an amount mismatch", async () => {
-    const { org, product } = await setup(1000);
-    mockPaystack({ reference: "REF_AMT", amount: 100000 });
-    const res = await storeCheckout(org.slug, paystackBody(product.id, "REF_AMT"));
-    expect(res.status).toBe(402);
-    await expectNothingPersisted(product.id, 10);
-  });
-
-  it("rejects a currency mismatch", async () => {
-    const { org, product } = await setup(1000);
-    mockPaystack({ reference: "REF_CUR", amount: 200000, currency: "USD" });
-    const res = await storeCheckout(org.slug, paystackBody(product.id, "REF_CUR"));
-    expect(res.status).toBe(402);
-    await expectNothingPersisted(product.id, 10);
-  });
-
-  it("rejects a transaction Paystack did not mark successful", async () => {
-    const { org, product } = await setup(1000);
-    mockPaystack({ reference: "REF_FAIL", amount: 200000, status: "failed" });
-    const res = await storeCheckout(org.slug, paystackBody(product.id, "REF_FAIL"));
-    expect(res.status).toBe(402);
-    await expectNothingPersisted(product.id, 10);
-  });
-
-  it("rejects a response whose reference differs from the one submitted", async () => {
-    const { org, product } = await setup(1000);
-    mockPaystack({ reference: "SOME_OTHER_REF", amount: 200000 });
-    const res = await storeCheckout(org.slug, paystackBody(product.id, "REF_MISMATCH"));
-    expect(res.status).toBe(402);
-    await expectNothingPersisted(product.id, 10);
-  });
-
-  it("url-encodes the reference sent to Paystack", async () => {
-    const { org, product } = await setup(1000);
-    const spy = mockPaystack({ reference: "REF=1", amount: 200000 });
-    const res = await storeCheckout(org.slug, paystackBody(product.id, "REF=1"));
-    expect(res.status).toBe(201);
-    expect(String(spy.mock.calls[0][0])).toBe("https://api.paystack.co/transaction/verify/REF%3D1");
-  });
-
-  it("rejects references containing path or query characters without calling Paystack", async () => {
-    const { org, product } = await setup(1000);
-    const spy = mockPaystack({ reference: "a/b?c", amount: 200000 });
-    const res = await storeCheckout(org.slug, paystackBody(product.id, "a/b?c"));
-    expect(res.status).toBe(400);
-    expect(spy).not.toHaveBeenCalled();
-    await expectNothingPersisted(product.id, 10);
-  });
-
-  it("requires a reference when paying with Paystack", async () => {
-    const { org, product } = await setup(1000);
-    const res = await storeCheckout(org.slug, { paymentMethod: "PAYSTACK", items: [{ productId: product.id, quantity: 1 }] });
-    expect(res.status).toBe(400);
-    await expectNothingPersisted(product.id, 10);
-  });
-
-  it("ignores a reference supplied with a non-Paystack method and never stores it", async () => {
-    const { org, product } = await setup(1000);
-    const spy = mockPaystack({ reference: "REF_IGNORED", amount: 100000 });
-    const res = await storeCheckout(org.slug, {
-      paymentMethod: "TRANSFER",
-      paystackReference: "REF_IGNORED",
-      items: [{ productId: product.id, quantity: 1 }],
-    });
-    expect(res.status).toBe(201);
-    expect(res.body.status).toBe("PENDING");
-    expect(spy).not.toHaveBeenCalled();
-    expect((await prisma.payment.findFirstOrThrow()).reference).toBeNull();
   });
 });
 

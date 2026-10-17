@@ -112,6 +112,7 @@ model Organization {
   wishlists   Wishlist[]
   reviews     Review[]
   payments    Payment[]
+  checkoutSessions CheckoutSession[]
   newsletters NewsletterSubscriber[]
 
   createdAt   DateTime    @default(now())
@@ -418,4 +419,43 @@ model AuditLog {
   createdAt      DateTime     @default(now())
 
   @@map("audit_logs")
+}
+
+enum CheckoutSessionStatus {
+  PENDING
+  COMPLETED
+  REFUNDED
+  REFUND_FAILED
+}
+
+/// A storefront Paystack checkout created by the server. The cart, customer and
+/// amount are fixed here at initialization, so the client never supplies a
+/// reference or a price and a reference is only honoured if it lives in this table.
+model CheckoutSession {
+  id              String                @id @default(cuid())
+  reference       String                @unique
+  accessCode      String?
+  status          CheckoutSessionStatus @default(PENDING)
+
+  customerName    String
+  customerEmail   String
+  customerPhone   String?
+  customerAddress String?
+  notes           String?
+  items           Json
+  amountKobo      Int
+  currency        String                @default("NGN")
+
+  orderId         String?               @unique
+  failureReason   String?
+  expiresAt       DateTime
+
+  organizationId  String
+  organization    Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  @@index([organizationId])
+  @@map("checkout_sessions")
 }
