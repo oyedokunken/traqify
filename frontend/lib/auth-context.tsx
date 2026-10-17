@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import api, { setAuthTokens, clearAuthTokens, getStoredUser } from "./api";
+import api, { setSession, clearSession, getStoredUser } from "./api";
 
 export interface AuthUser {
   id: string;
@@ -51,23 +51,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const { data } = await api.get("/api/auth/me");
       setUser(data);
-      localStorage.setItem("traqify_user", JSON.stringify(data));
+      try { localStorage.setItem("traqify_user", JSON.stringify(data)); } catch { /* storage unavailable */ }
     } catch {
-      clearAuthTokens();
+      clearSession();
       setUser(null);
     }
   };
 
   const login = async (email: string, password: string) => {
     const { data } = await api.post("/api/auth/login", { email, password });
-    setAuthTokens(data.token, data.refreshToken, data.user);
+    setSession(data.token, data.user);
     setUser(data.user);
   };
 
   const logout = () => {
-    // H-4: call server to increment tokenVersion, invalidating all existing tokens
-    api.post("/api/auth/logout").catch(() => {});
-    clearAuthTokens();
+    // Ends the session on the server (clears the refresh cookie and invalidates every token), then forgets it here.
+    api.post("/api/auth/logout", {}, { headers: { "X-Requested-By": "traqify" } }).catch(() => {});
+    clearSession();
     setUser(null);
     router.push("/login");
   };

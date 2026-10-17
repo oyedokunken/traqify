@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ErrorModal } from "@/components/shared/error-modal";
-import api from "@/lib/api";
+import api, { setAccessToken } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { INDUSTRY_OPTIONS, ORG_SIZE_OPTIONS } from "@/lib/utils";
 import PhoneInput from "react-phone-number-input";
@@ -135,7 +135,7 @@ function RegisterForm() {
       setStep2Data(data);
       if (res.data.token) {
         setPendingToken(res.data.token);
-        api.defaults.headers.common["Authorization"] = `Bearer ${res.data.token}`;
+        setAccessToken(res.data.token);
       }
       setStep(3);
     } catch (err: any) {
