@@ -83,7 +83,7 @@ export const createProduct = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
-    const { name, sku, description, price, comparePrice, categoryId, imageUrl, imageUrls, status, isActive, variants, initialStock, lowStockAlert } = parsed.data;
+    const { name, sku, description, price, comparePrice, categoryId, imageUrl, imageUrls, status, isActive, variants, initialStock, lowStockAlert, productType, downloadUrl } = parsed.data;
 
     if (categoryId && !(await prisma.productCategory.findFirst({ where: { id: categoryId, organizationId: orgId }, select: { id: true } }))) {
       res.status(400).json({ error: "Category not found." });
@@ -109,6 +109,8 @@ export const createProduct = async (req: AuthRequest, res: Response): Promise<vo
     const product = await prisma.product.create({
       data: {
         name, sku, description, price, comparePrice,
+        productType,
+        downloadUrl: productType === "DOWNLOADABLE" ? downloadUrl ?? undefined : undefined,
         slug: productSlug,
         categoryId: categoryId || undefined,
         imageUrl: imageUrl || (imageUrls && imageUrls[0]) || undefined,
