@@ -3,9 +3,10 @@ import cors from "cors";
 import path from "path";
 import helmet from "helmet";
 import morgan from "morgan";
-import rateLimit from "express-rate-limit";
+import cookieParser from "cookie-parser";
 
 import { errorHandler, notFound } from "./middleware/error.middleware";
+import { authLimiter, generalLimiter } from "./middleware/rate-limit";
 import authRoutes from "./routes/auth.routes";
 import orgRoutes from "./routes/org.routes";
 import productRoutes from "./routes/product.routes";
@@ -40,23 +41,8 @@ app.use(
   })
 );
 
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 200,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many requests, please try again later." },
-});
-
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many authentication attempts, please try again later." },
-});
-
-app.use(limiter);
+app.use(generalLimiter);
+app.use(cookieParser());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));

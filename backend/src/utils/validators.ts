@@ -28,6 +28,11 @@ export const registerStep1Schema = z.object({
     .regex(/[0-9]/, "Password must contain at least one number.")
     .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character."),
   name: z.string().min(2, "Name must be at least 2 characters.").max(100),
+  emailVerificationToken: z.string().min(1, "Please verify your email address before creating an account."),
+});
+
+export const sendOTPSchema = z.object({
+  email: z.string().email("Please enter a valid email address."),
 });
 
 export const verifyOTPSchema = z.object({

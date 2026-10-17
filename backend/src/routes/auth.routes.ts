@@ -19,6 +19,7 @@ import {
   logout,
 } from "../controllers/auth.controller";
 import { authenticate, AuthRequest } from "../middleware/auth.middleware";
+import { sendOtpEmailLimiter, sendOtpIpLimiter, verifyOtpEmailLimiter, verifyOtpIpLimiter } from "../middleware/rate-limit";
 import { upload, getSupabasePath } from "../middleware/upload.middleware";
 import { uploadFile } from "../config/supabase";
 import prisma from "../config/database";
@@ -27,8 +28,8 @@ const router = Router();
 
 router.post("/register", register);
 router.post("/check-email", checkEmail);
-router.post("/send-otp", sendOTP);
-router.post("/verify-email", verifyEmail);
+router.post("/send-otp", sendOtpIpLimiter, sendOtpEmailLimiter, sendOTP);
+router.post("/verify-email", verifyOtpIpLimiter, verifyOtpEmailLimiter, verifyEmail);
 router.post("/login", login);
 router.get("/google-redirect", googleRedirect);
 router.get("/google-callback", googleCallback);
