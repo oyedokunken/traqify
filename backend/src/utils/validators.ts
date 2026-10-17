@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { roundMoney } from "./money";
 
 const DISPOSABLE_DOMAINS = [
   "mailinator.com", "tempmail.com", "guerrillamail.com", "10minutemail.com",
@@ -103,12 +104,15 @@ export const changePasswordSchema = z.object({
     .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character."),
 });
 
+/** A price: positive, finite, capped, and rounded to two decimals. */
+export const moneySchema = z.number().positive("Price must be a positive number.").finite().max(1_000_000_000).transform(roundMoney);
+
 export const productSchema = z.object({
   name: z.string().min(1, "Product name is required.").max(200),
   sku: z.string().min(1, "SKU is required.").max(50),
   description: z.string().min(1, "Description is required."),
-  price: z.number().positive("Price must be a positive number."),
-  comparePrice: z.number().positive().optional(),
+  price: moneySchema,
+  comparePrice: moneySchema.optional(),
   category: z.string().optional(),
   categoryId: z.string().optional(),
   imageUrl: z.string().url().optional().or(z.literal("")),
@@ -129,6 +133,27 @@ export const productSchema = z.object({
   lowStockAlert: z.number().int().min(0).optional().default(10),
 });
 
+/**
+ * Fields a product update may change. Anything else in the request body is
+ * dropped, so ownership and identity fields can never be written by a client.
+ */
+export const productUpdateSchema = z
+  .object({
+    name: z.string().min(1, "Product name is required.").max(200),
+    sku: z.string().min(1, "SKU is required.").max(50),
+    description: z.string().max(10000),
+    price: moneySchema,
+    comparePrice: moneySchema.nullable(),
+    categoryId: z.preprocess((value) => (value === "" ? null : value), z.string().nullable()),
+    imageUrl: z.string().url().or(z.literal("")).nullable(),
+    imageUrls: z.array(z.string().url()).max(20),
+    status: z.string().max(30),
+    productType: z.enum(["SIMPLE", "DOWNLOADABLE", "VARIABLE"]),
+    downloadUrl: z.string().url().nullable(),
+    isActive: z.boolean(),
+  })
+  .partial();
+
 export const inventoryUpdateSchema = z.object({
   quantity: z.number().int().min(0, "Quantity cannot be negative."),
   lowStockAlert: z.number().int().min(0).optional(),
@@ -142,6 +167,8 @@ export const customerSchema = z.object({
   address: z.string().optional(),
   notes: z.string().optional(),
 });
+
+export const customerUpdateSchema = customerSchema.partial();
 
 export const MAX_ORDER_ITEMS = 50;
 export const MAX_ITEM_QUANTITY = 100;
