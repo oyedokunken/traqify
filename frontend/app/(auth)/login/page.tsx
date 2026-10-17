@@ -42,6 +42,9 @@ function LoginForm() {
     const hint = searchParams.get("hint");
     const emailParam = searchParams.get("email");
     if (e === "oauth_failed") setError("Google sign-in failed. Please try again.");
+    if (e === "email_not_verified") setError("Google has not verified this email address, so it cannot be used to sign in.");
+    if (e === "account_unverified") setError("An account with this email exists but has not been verified. Sign in with your password and verify your email first.");
+    if (e === "account_restricted") setError("Your account has been restricted. Please contact your administrator.");
     if (e === "invited_user") setError("This email has been invited to join an organization. You can only belong to one organization at a time. Please use the invitation link sent to your email to get started.");
     if (hint === "exists") setError("You already have an account with this email. Please sign in.");
     if (emailParam) setValue("email", emailParam);

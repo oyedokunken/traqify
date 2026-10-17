@@ -273,7 +273,27 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
+const OAUTH_STATE_COOKIE = "oauth_state";
+
+const oauthStateCookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax" as const,
+  path: "/api/auth",
+});
+
+const statesMatch = (a: unknown, b: unknown): boolean => {
+  if (typeof a !== "string" || typeof b !== "string") return false;
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  return bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB);
+};
+
 export const googleRedirect = (_req: Request, res: Response): void => {
+  // Random state bound to this browser by a cookie; the callback refuses anything that does not match (login CSRF).
+  const state = crypto.randomBytes(32).toString("hex");
+  res.cookie(OAUTH_STATE_COOKIE, state, { ...oauthStateCookieOptions(), maxAge: 10 * 60 * 1000 });
+
   const params = new URLSearchParams({
     client_id: process.env.GOOGLE_CLIENT_ID || "",
     redirect_uri: `${process.env.API_URL || "http://localhost:5000"}/api/auth/google-callback`,
@@ -281,6 +301,7 @@ export const googleRedirect = (_req: Request, res: Response): void => {
     scope: "openid email profile",
     access_type: "offline",
     prompt: "select_account",
+    state,
   });
   res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
 };
@@ -288,8 +309,10 @@ export const googleRedirect = (_req: Request, res: Response): void => {
 export const googleCallback = async (req: Request, res: Response): Promise<void> => {
   const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
   try {
-    const { code } = req.query;
-    if (!code || typeof code !== "string") {
+    const { code, state } = req.query;
+    const expectedState = req.cookies?.[OAUTH_STATE_COOKIE];
+    res.clearCookie(OAUTH_STATE_COOKIE, oauthStateCookieOptions());
+    if (!code || typeof code !== "string" || !statesMatch(state, expectedState)) {
       res.redirect(`${frontendUrl}/login?error=oauth_failed`);
       return;
     }
@@ -317,6 +340,12 @@ export const googleCallback = async (req: Request, res: Response): Promise<void>
     });
     const googleUser = await userRes.json() as any;
 
+    // Only trust an email address Google itself has verified.
+    if (!googleUser.email || googleUser.verified_email !== true) {
+      res.redirect(`${frontendUrl}/login?error=email_not_verified`);
+      return;
+    }
+
     let user = await prisma.user.findUnique({
       where: { email: googleUser.email },
       include: { organization: { select: { id: true, name: true, slug: true, logoUrl: true } } },
@@ -343,6 +372,15 @@ export const googleCallback = async (req: Request, res: Response): Promise<void>
         include: { organization: { select: { id: true, name: true, slug: true, logoUrl: true } } },
       }) as any;
     } else {
+      // Never attach a Google login to an account whose email was not verified, and never to a deactivated one.
+      if (!user.emailVerified) {
+        res.redirect(`${frontendUrl}/login?error=account_unverified`);
+        return;
+      }
+      if (!user.isActive) {
+        res.redirect(`${frontendUrl}/login?error=account_restricted`);
+        return;
+      }
       user = await prisma.user.update({
         where: { id: user.id },
         data: { lastLoginAt: new Date(), avatarUrl: googleUser.picture || user.avatarUrl },
