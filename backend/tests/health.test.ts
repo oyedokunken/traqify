@@ -23,10 +23,18 @@ describe("smoke", () => {
 
 describe("test database guard", () => {
   it("accepts a database whose name ends in _test", () => {
-    expect(getTestDatabaseUrl({ DATABASE_URL_TEST: "postgresql://u:p@localhost:5433/foo_test" })).toContain("foo_test");
+    expect(getTestDatabaseUrl({ DATABASE_URL_TEST: "postgresql://localhost:5433/foo_test" })).toContain("foo_test");
   });
 
   it("refuses any other database name", () => {
-    expect(() => getTestDatabaseUrl({ DATABASE_URL_TEST: "postgresql://u:p@host:5432/postgres" })).toThrow(/_test/);
+    expect(() => getTestDatabaseUrl({ DATABASE_URL_TEST: "postgresql://localhost:5432/postgres" })).toThrow(/_test/);
+  });
+});
+
+describe("test database defaults", () => {
+  it("builds the default URL from parts and honours overrides", () => {
+    const url = new URL(getTestDatabaseUrl({ TEST_DB_PORT: "5432" }));
+    expect(url.port).toBe("5432");
+    expect(url.pathname).toBe("/traqify_test");
   });
 });

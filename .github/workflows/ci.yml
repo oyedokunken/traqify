@@ -23,19 +23,20 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: traqify
-          POSTGRES_PASSWORD: traqify
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_only_not_a_secret
           POSTGRES_DB: traqify_test
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U traqify -d traqify_test"
+          --health-cmd "pg_isready -U test_user -d traqify_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
     env:
-      # The test suite refuses to run unless the database name ends in _test.
-      DATABASE_URL_TEST: postgresql://traqify:traqify@localhost:5432/traqify_test
+      # Throwaway service-container credentials. The test suite refuses to run
+      # unless the database name ends in _test.
+      TEST_DB_PORT: "5432"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -74,7 +75,7 @@ jobs:
           NEXT_PUBLIC_API_URL: http://localhost:5000
           # Placeholders: the client is constructed at import time and needs a URL to build.
           NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: test_only_not_a_key
       # Advisory only until the framework upgrade tracked in the audit report lands.
       - name: Audit production dependencies (advisory)
         run: npm audit --omit=dev --audit-level=high
