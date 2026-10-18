@@ -92,3 +92,19 @@ export const verifyOtpEmailLimiter = createRateLimiter({
   message: "Too many verification attempts for this address. Please try again later.",
   keyGenerator: emailKey("otp-verify"),
 });
+
+export const forgotPasswordIpLimiter = createRateLimiter({
+  prefix: "forgot-password",
+  windowMs: HOUR,
+  max: 10,
+  message: "Too many password reset requests. Please try again later.",
+  keyGenerator: ipKey("forgot-password"),
+});
+
+export const forgotPasswordEmailLimiter = createRateLimiter({
+  prefix: "forgot-password",
+  windowMs: HOUR,
+  max: 3,
+  message: "Too many password reset requests for this address. Please try again later.",
+  keyGenerator: emailKey("forgot-password"),
+});

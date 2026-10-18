@@ -20,7 +20,7 @@ import {
 } from "../controllers/auth.controller";
 import { authenticate, optionalAuthenticate, AuthRequest } from "../middleware/auth.middleware";
 import { requireTrustedOrigin } from "../middleware/csrf.middleware";
-import { sendOtpEmailLimiter, sendOtpIpLimiter, verifyOtpEmailLimiter, verifyOtpIpLimiter } from "../middleware/rate-limit";
+import { forgotPasswordEmailLimiter, forgotPasswordIpLimiter, sendOtpEmailLimiter, sendOtpIpLimiter, verifyOtpEmailLimiter, verifyOtpIpLimiter } from "../middleware/rate-limit";
 import { upload, getSupabasePath } from "../middleware/upload.middleware";
 import { uploadFile } from "../config/supabase";
 import prisma from "../config/database";
@@ -35,7 +35,7 @@ router.post("/login", login);
 router.get("/google-redirect", googleRedirect);
 router.get("/google-callback", googleCallback);
 router.get("/oauth-exchange/:code", exchangeOAuthCode);
-router.post("/forgot-password", forgotPassword);
+router.post("/forgot-password", forgotPasswordIpLimiter, forgotPasswordEmailLimiter, forgotPassword);
 router.post("/reset-password", resetPassword);
 router.post("/refresh", requireTrustedOrigin, refreshToken);
 router.post("/accept-invite", acceptInvite);
