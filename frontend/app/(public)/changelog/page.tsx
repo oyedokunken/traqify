@@ -30,6 +30,52 @@ export default function ChangelogPage() {
 
       <div className="max-w-4xl mx-auto px-5 sm:px-6 lg:px-8 py-16">
 
+        {/* v1.24.0 */}
+        <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.05 }} className="mb-16">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-lg bg-[#DE1010]/10 flex items-center justify-center">
+              <GitCommit className="w-5 h-5 text-[#DE1010]" />
+            </div>
+            <h2 className="text-2xl font-semibold text-[#0a0a0a]">v1.24.0 - 2026-10-19</h2>
+          </div>
+          <div className="grid md:grid-cols-3 gap-4">
+            <div className="bg-green-50 p-4 rounded-xl border border-green-200 md:col-span-2">
+              <div className="flex items-center gap-2 mb-3">
+                <PlusCircle className="w-4 h-4 text-green-600" />
+                <h3 className="font-medium text-[#0a0a0a]">Security & Architecture</h3>
+              </div>
+              <ul className="space-y-1 columns-1 md:columns-2">
+                <li className="text-sm text-gray-600">Same-origin session enforcement via Vercel proxy</li>
+                <li className="text-sm text-gray-600">httpOnly refresh cookies (Secure, SameSite=Lax, Path=/api/auth)</li>
+                <li className="text-sm text-gray-600">Trusted client IP configuration behind proxy</li>
+                <li className="text-sm text-gray-600">Signed direct uploads to Supabase Storage</li>
+                <li className="text-sm text-gray-600">Private downloadable files with signed URLs</li>
+                <li className="text-sm text-gray-600">Hashed staff invitation tokens (SHA-256)</li>
+                <li className="text-sm text-gray-600">Stock restoration on order deletion</li>
+              </ul>
+            </div>
+            <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
+              <div className="flex items-center gap-2 mb-3">
+                <Wrench className="w-4 h-4 text-blue-600" />
+                <h3 className="font-medium text-[#0a0a0a]">Changed</h3>
+              </div>
+              <ul className="space-y-1">
+                <li className="text-sm text-gray-600">Image upload limit increased from 2 MB to 5 MB</li>
+                <li className="text-sm text-gray-600">Paystack error logging for security audit trail</li>
+              </ul>
+            </div>
+            <div className="bg-orange-50 p-4 rounded-xl border border-orange-200 md:col-span-3">
+              <div className="flex items-center gap-2 mb-3">
+                <Bug className="w-4 h-4 text-orange-600" />
+                <h3 className="font-medium text-[#0a0a0a]">Fixed</h3>
+              </div>
+              <ul className="space-y-1">
+                <li className="text-sm text-gray-600">Paystack email validation now returns clear 400 instead of 502</li>
+              </ul>
+            </div>
+          </div>
+        </motion.section>
+
         {/* v1.23.0 */}
         <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }} className="mb-16">
           <div className="flex items-center gap-3 mb-4">

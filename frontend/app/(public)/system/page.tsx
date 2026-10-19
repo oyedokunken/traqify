@@ -67,6 +67,15 @@ export default function SystemPage() {
          +-----------+          +-----------+
          |                                  |
 +--------v-----------+          +-----------v-----------+
+||  PostgreSQL (via   |          |  Supabase Storage      |
+||  Supabase)         |          |  (products, avatars,   |
+||                    |          |   downloadables)        |
+||  Prisma ORM        |          |  Signed direct uploads  |
++--------------------+          +-----------------------+
+                     |          |
+         +-----------+          +-----------+
+         |                                  |
++--------v-----------+          +-----------v-----------+
 |  PostgreSQL (via   |          |  Supabase Storage      |
 |  Supabase)         |          |  (product images,      |
 |                    |          |   avatars)             |

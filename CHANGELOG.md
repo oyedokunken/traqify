@@ -5,6 +5,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v1.24.0] - 2026-10-19
+
+### Added
+- **Same-origin session enforcement** - Frontend now calls the API through its own origin via a Vercel proxy; all requests are same-origin with the site's domain
+- **httpOnly refresh cookies** - Refresh tokens are now stored in httpOnly Secure cookies with SameSite=Lax and Path=/api/auth instead of localStorage; access tokens remain in memory (15-minute expiry)
+- **Trusted client IP configuration** - API accepts refresh cookies only from trusted client IPs behind the proxy; X-Forwarded-For header validated
+- **Signed direct uploads to Supabase Storage** - Product images, avatars, and downloadable files now use signed URLs for direct uploads; no server-side file buffering
+- **Private downloadable files** - Downloadable product files are stored in a private Supabase bucket with signed download URLs; files are not publicly accessible
+- **Hashed staff invitation tokens** - Staff invitation tokens are now SHA-256 hashed before storage; only the hash is persisted
+- **Stock restoration on order deletion** - When a PENDING or APPROVED order is deleted, inventory quantities are automatically restored
+
+### Changed
+- **File upload limits** - Image upload limit increased from 2 MB to 5 MB for product images and avatars
+- **Paystack error logging** - Paystack API failures (initialize, verify, refund) now log the operation, HTTP status, and Paystack's error message for security audit trail; never logs the secret key, request bodies, or response data
+
+### Fixed
+- **Paystack email validation** - Emails that Paystack refuses (invalid format) now return a clear 400 error instead of a generic 502
+
+---
+
 ## [v1.23.0] - 2026-05-20
 
 ### Added
