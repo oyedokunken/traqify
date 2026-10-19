@@ -34,7 +34,7 @@
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "nodemailer": "^10.1.2",
-    "pdfkit": "^0.18.0",
+    "pdfkit": "^0.20.2",
     "slugify": "^1.6.6",
     "zod": "^3.23.8"
   },
