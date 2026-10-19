@@ -1,4 +1,5 @@
 import { parsePagination } from "../utils/pagination";
+import { isStorageReference, storagePathOf } from "../utils/downloads";
 import { Response } from "express";
 import prisma from "../config/database";
 import { Prisma } from "@prisma/client";
@@ -6,6 +7,15 @@ import { productSchema, productUpdateSchema } from "../utils/validators";
 import { createAuditLog } from "../utils/audit";
 import { AuthRequest } from "../middleware/auth.middleware";
 import { generateSlug } from "../utils/slug";
+
+/** A "storage:" reference must point at a file this organization uploaded and the server accepted. */
+async function ownsStoredFile(organizationId: string, reference: string): Promise<boolean> {
+  const upload = await prisma.upload.findFirst({
+    where: { path: storagePathOf(reference), organizationId, purpose: "DOWNLOADABLE", status: "CONFIRMED" },
+    select: { id: true },
+  });
+  return upload !== null;
+}
 
 export const getProducts = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -89,6 +99,10 @@ export const createProduct = async (req: AuthRequest, res: Response): Promise<vo
       res.status(400).json({ error: "Category not found." });
       return;
     }
+    if (downloadUrl && isStorageReference(downloadUrl) && !(await ownsStoredFile(orgId, downloadUrl))) {
+      res.status(400).json({ error: "File not found. Upload it again." });
+      return;
+    }
 
     const existing = await prisma.product.findUnique({ where: { sku_organizationId: { sku, organizationId: orgId } } });
     if (existing) {
@@ -151,6 +165,11 @@ export const updateProduct = async (req: AuthRequest, res: Response): Promise<vo
 
     if (data.categoryId && !(await prisma.productCategory.findFirst({ where: { id: data.categoryId, organizationId: orgId }, select: { id: true } }))) {
       res.status(400).json({ error: "Category not found." });
+      return;
+    }
+
+    if (data.downloadUrl && isStorageReference(data.downloadUrl) && !(await ownsStoredFile(orgId, data.downloadUrl))) {
+      res.status(400).json({ error: "File not found. Upload it again." });
       return;
     }
 

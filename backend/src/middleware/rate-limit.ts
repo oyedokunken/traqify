@@ -108,3 +108,12 @@ export const forgotPasswordEmailLimiter = createRateLimiter({
   message: "Too many password reset requests for this address. Please try again later.",
   keyGenerator: emailKey("forgot-password"),
 });
+
+/** Limits how many upload URLs one signed-in user can request. Runs after authentication, so it keys by user. */
+export const uploadSignLimiter = createRateLimiter({
+  prefix: "upload-sign",
+  windowMs: HOUR,
+  max: 60,
+  message: "Too many uploads. Please try again later.",
+  keyGenerator: (req) => `upload-sign:user:${(req as { user?: { id: string } }).user?.id ?? req.ip}`,
+});

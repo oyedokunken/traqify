@@ -104,6 +104,12 @@ export const changePasswordSchema = z.object({
     .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character."),
 });
 
+/** A product's file: a reference to a file uploaded through the API ("storage:<path>"), or the owner's own https link. */
+export const downloadReferenceSchema = z
+  .string()
+  .max(2048)
+  .refine((value) => value.startsWith("storage:") || /^https:\/\/\S+$/.test(value), "Use a file you uploaded or an https link.");
+
 /** A price: positive, finite, capped, and rounded to two decimals. */
 export const moneySchema = z.number().positive("Price must be a positive number.").finite().max(1_000_000_000).transform(roundMoney);
 
@@ -114,7 +120,7 @@ export const productSchema = z.object({
   price: moneySchema,
   comparePrice: moneySchema.optional(),
   productType: z.enum(["SIMPLE", "DOWNLOADABLE", "VARIABLE"]).default("SIMPLE"),
-  downloadUrl: z.string().url().nullable().optional(),
+  downloadUrl: downloadReferenceSchema.nullable().optional(),
   category: z.string().optional(),
   categoryId: z.string().optional(),
   imageUrl: z.string().url().optional().or(z.literal("")),
@@ -151,7 +157,7 @@ export const productUpdateSchema = z
     imageUrls: z.array(z.string().url()).max(20),
     status: z.string().max(30),
     productType: z.enum(["SIMPLE", "DOWNLOADABLE", "VARIABLE"]),
-    downloadUrl: z.string().url().nullable(),
+    downloadUrl: downloadReferenceSchema.nullable(),
     isActive: z.boolean(),
   })
   .partial();

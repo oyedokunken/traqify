@@ -1,5 +1,4 @@
-import { Router, Request, Response, NextFunction } from "express";
-import multer from "multer";
+import { Router } from "express";
 import {
   register,
   checkEmail,
@@ -18,12 +17,9 @@ import {
   refreshToken,
   logout,
 } from "../controllers/auth.controller";
-import { authenticate, optionalAuthenticate, AuthRequest } from "../middleware/auth.middleware";
+import { authenticate, optionalAuthenticate } from "../middleware/auth.middleware";
 import { requireTrustedOrigin } from "../middleware/csrf.middleware";
 import { forgotPasswordEmailLimiter, forgotPasswordIpLimiter, sendOtpEmailLimiter, sendOtpIpLimiter, verifyOtpEmailLimiter, verifyOtpIpLimiter } from "../middleware/rate-limit";
-import { upload, getSupabasePath } from "../middleware/upload.middleware";
-import { uploadFile } from "../config/supabase";
-import prisma from "../config/database";
 
 const router = Router();
 
@@ -43,33 +39,5 @@ router.get("/me", authenticate, getMe);
 router.patch("/me", authenticate, updateProfile);
 router.post("/change-password", authenticate, changePassword);
 router.post("/logout", requireTrustedOrigin, optionalAuthenticate, logout);
-router.post(
-  "/upload-avatar",
-  authenticate,
-  (req: Request, res: Response, next: NextFunction) => {
-    upload.single("avatar")(req, res, (err: any) => {
-      if (err instanceof multer.MulterError) {
-        res.status(400).json({ error: err.message }); return;
-      }
-      if (err) {
-        res.status(400).json({ error: err.message || "Invalid file." }); return;
-      }
-      next();
-    });
-  },
-  async (req: Request, res: Response) => {
-    try {
-      if (!req.file) { res.status(400).json({ error: "No image provided." }); return; }
-      const userId = (req as AuthRequest).user!.id;
-      const filePath = getSupabasePath("avatars", req.file.originalname);
-      const avatarUrl = await uploadFile("avatars", filePath, req.file.buffer, req.file.mimetype);
-      await prisma.user.update({ where: { id: userId }, data: { avatarUrl } });
-      res.json({ url: avatarUrl });
-    } catch (err: any) {
-      console.error("[upload-avatar] Error:", err);
-      res.status(500).json({ error: err?.message || "Upload failed." });
-    }
-  }
-);
 
 export default router;
