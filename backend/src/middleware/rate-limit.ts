@@ -54,11 +54,26 @@ export const generalLimiter = createRateLimiter({
   message: "Too many requests, please try again later.",
 });
 
+/**
+ * For endpoints that take credentials or one-time secrets (login, register, password reset, invitations, OAuth
+ * hand-off). It must not sit in front of the session endpoints (/me, /refresh, /logout): a signed in user hits those
+ * on every page load and every token expiry, so a per-IP budget would lock out normal users, and everyone behind one
+ * office or household address together.
+ */
 export const authLimiter = createRateLimiter({
   prefix: "auth",
   windowMs: QUARTER_HOUR,
   max: 20,
   message: "Too many authentication attempts, please try again later.",
+});
+
+/** Slows guessing against a single account no matter how many addresses the guesses come from. */
+export const loginEmailLimiter = createRateLimiter({
+  prefix: "login",
+  windowMs: QUARTER_HOUR,
+  max: 10,
+  message: "Too many sign in attempts for this account. Please try again later.",
+  keyGenerator: emailKey("login"),
 });
 
 export const sendOtpIpLimiter = createRateLimiter({
