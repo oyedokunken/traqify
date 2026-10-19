@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { roundMoney } from "./money";
 
 const DISPOSABLE_DOMAINS = [
   "mailinator.com", "tempmail.com", "guerrillamail.com", "10minutemail.com",
@@ -28,6 +29,11 @@ export const registerStep1Schema = z.object({
     .regex(/[0-9]/, "Password must contain at least one number.")
     .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character."),
   name: z.string().min(2, "Name must be at least 2 characters.").max(100),
+  emailVerificationToken: z.string().min(1, "Please verify your email address before creating an account."),
+});
+
+export const sendOTPSchema = z.object({
+  email: z.string().email("Please enter a valid email address."),
 });
 
 export const verifyOTPSchema = z.object({
@@ -98,12 +104,23 @@ export const changePasswordSchema = z.object({
     .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character."),
 });
 
+/** A product's file: a reference to a file uploaded through the API ("storage:<path>"), or the owner's own https link. */
+export const downloadReferenceSchema = z
+  .string()
+  .max(2048)
+  .refine((value) => value.startsWith("storage:") || /^https:\/\/\S+$/.test(value), "Use a file you uploaded or an https link.");
+
+/** A price: positive, finite, capped, and rounded to two decimals. */
+export const moneySchema = z.number().positive("Price must be a positive number.").finite().max(1_000_000_000).transform(roundMoney);
+
 export const productSchema = z.object({
   name: z.string().min(1, "Product name is required.").max(200),
   sku: z.string().min(1, "SKU is required.").max(50),
   description: z.string().min(1, "Description is required."),
-  price: z.number().positive("Price must be a positive number."),
-  comparePrice: z.number().positive().optional(),
+  price: moneySchema,
+  comparePrice: moneySchema.optional(),
+  productType: z.enum(["SIMPLE", "DOWNLOADABLE", "VARIABLE"]).default("SIMPLE"),
+  downloadUrl: downloadReferenceSchema.nullable().optional(),
   category: z.string().optional(),
   categoryId: z.string().optional(),
   imageUrl: z.string().url().optional().or(z.literal("")),
@@ -124,6 +141,27 @@ export const productSchema = z.object({
   lowStockAlert: z.number().int().min(0).optional().default(10),
 });
 
+/**
+ * Fields a product update may change. Anything else in the request body is
+ * dropped, so ownership and identity fields can never be written by a client.
+ */
+export const productUpdateSchema = z
+  .object({
+    name: z.string().min(1, "Product name is required.").max(200),
+    sku: z.string().min(1, "SKU is required.").max(50),
+    description: z.string().max(10000),
+    price: moneySchema,
+    comparePrice: moneySchema.nullable(),
+    categoryId: z.preprocess((value) => (value === "" ? null : value), z.string().nullable()),
+    imageUrl: z.string().url().or(z.literal("")).nullable(),
+    imageUrls: z.array(z.string().url()).max(20),
+    status: z.string().max(30),
+    productType: z.enum(["SIMPLE", "DOWNLOADABLE", "VARIABLE"]),
+    downloadUrl: downloadReferenceSchema.nullable(),
+    isActive: z.boolean(),
+  })
+  .partial();
+
 export const inventoryUpdateSchema = z.object({
   quantity: z.number().int().min(0, "Quantity cannot be negative."),
   lowStockAlert: z.number().int().min(0).optional(),
@@ -138,24 +176,108 @@ export const customerSchema = z.object({
   notes: z.string().optional(),
 });
 
+export const customerUpdateSchema = customerSchema.partial();
+
+export const MAX_ORDER_ITEMS = 50;
+export const MAX_ITEM_QUANTITY = 100;
+
+/** Line items shared by the dashboard and storefront order paths. */
+export const orderItemsSchema = z
+  .array(
+    z.object({
+      productId: z.string().min(1),
+      quantity: z
+        .number({ invalid_type_error: "Quantity must be a number." })
+        .int("Quantity must be a whole number.")
+        .min(1, "Quantity must be at least 1.")
+        .max(MAX_ITEM_QUANTITY, `Quantity cannot exceed ${MAX_ITEM_QUANTITY} per item.`),
+    })
+  )
+  .min(1, "Order must contain at least one item.")
+  .max(MAX_ORDER_ITEMS, `An order cannot contain more than ${MAX_ORDER_ITEMS} items.`)
+  .refine((items) => new Set(items.map((i) => i.productId)).size === items.length, {
+    message: "Each product may appear only once per order.",
+  });
+
 export const orderSchema = z.object({
   customerId: z.string().optional(),
   newCustomer: z.object({
-    name: z.string().min(1, "Customer name is required."),
+    name: z.string().min(1, "Customer name is required.").max(200),
     email: z.string().email("A valid email address is required."),
-    phone: z.string().min(6, "A phone number is required."),
-    address: z.string().optional(),
+    phone: z.string().min(6, "A phone number is required.").max(30),
+    address: z.string().max(500).optional(),
   }).optional(),
-  notes: z.string().optional(),
-  paymentMethod: z.string().optional(),
-  items: z
-    .array(
-      z.object({
-        productId: z.string().min(1),
-        quantity: z.number().int().positive("Quantity must be at least 1."),
-      })
-    )
-    .min(1, "Order must contain at least one item."),
+  notes: z.string().max(1000).optional(),
+  paymentMethod: z.string().max(50).optional(),
+  items: orderItemsSchema,
+});
+
+/** Paystack references are issued by the server; only safe characters are accepted back. */
+export const paystackReferenceSchema = z
+  .string()
+  .min(1)
+  .max(100)
+  .regex(/^[A-Za-z0-9._=-]+$/, "Invalid payment reference.");
+
+/** Customer and cart details for a storefront order. No prices or totals are accepted. */
+const storeCartFields = {
+  name: z.string().trim().min(1, "Name is required.").max(200),
+  email: z.string().trim().email("A valid email address is required.").max(254),
+  phone: z.string().max(30).optional(),
+  address: z.string().max(500).optional(),
+  notes: z.string().max(1000).optional(),
+  items: orderItemsSchema,
+};
+
+/** Starts a Paystack checkout: the server prices the cart and creates the transaction. */
+export const storeInitializeSchema = z.object(storeCartFields);
+
+/** Bank transfer order: placed immediately as pending. */
+export const storeTransferCheckoutSchema = z.object({
+  ...storeCartFields,
+  paymentMethod: z.literal("TRANSFER").default("TRANSFER"),
+});
+
+/** Completes a Paystack checkout. The reference must belong to a session the server created. */
+export const storePaystackCompleteSchema = z.object({
+  paymentMethod: z.literal("PAYSTACK"),
+  reference: paystackReferenceSchema,
+});
+
+const paymentStatusSchema = z.enum(["PENDING", "COMPLETED", "FAILED", "REFUNDED"]);
+
+/** Form fields arrive as empty strings when left blank. */
+const blankToUndefined = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess((value) => (typeof value === "string" && value.trim() === "" ? undefined : value), schema.optional());
+
+export const createPaymentSchema = z.object({
+  amount: moneySchema,
+  currency: z.literal("NGN").default("NGN"),
+  status: paymentStatusSchema.default("PENDING"),
+  method: blankToUndefined(z.string().trim().max(50)),
+  reference: blankToUndefined(z.string().trim().max(100)),
+  notes: blankToUndefined(z.string().max(1000)),
+  orderId: blankToUndefined(z.string().min(1)),
+});
+
+/** Only these fields may change after creation; amount, currency and order link are fixed. */
+export const updatePaymentSchema = z.object({
+  status: paymentStatusSchema.optional(),
+  method: blankToUndefined(z.string().trim().max(50)),
+  reference: blankToUndefined(z.string().trim().max(100)),
+  notes: blankToUndefined(z.string().max(1000)),
+});
+
+export const orderStatusSchema = z.object({
+  status: z.enum(["PENDING", "APPROVED", "COMPLETED", "CANCELLED"], { errorMap: () => ({ message: "Invalid order status." }) }),
+});
+
+const isoDateString = z.string().refine((value) => !Number.isNaN(new Date(value).getTime()), "Invalid date.");
+
+export const reportEmailSchema = z.object({
+  to: z.string().trim().email("A valid recipient email address is required.").max(254),
+  from: isoDateString.optional(),
+  to_date: isoDateString.optional(),
 });
 
 export const updateUserSchema = z.object({

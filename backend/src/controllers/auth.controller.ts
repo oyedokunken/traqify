@@ -1,13 +1,16 @@
+import { hashToken } from "../utils/token-hash";
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import prisma from "../config/database";
-import { signToken, signRefreshToken, verifyRefreshToken } from "../utils/jwt";
+import { signToken, signEmailVerificationToken, verifyEmailVerificationToken } from "../utils/jwt";
+import { REFRESH_COOKIE, clearRefreshCookie, endSession, rotateSession, startSession } from "../utils/session";
 import { createOTP, verifyOTP, generatePasswordResetToken, verifyPasswordResetToken, markPasswordResetTokenUsed } from "../utils/otp";
 import { sendEmail } from "../config/email";
-import { otpEmailTemplate, passwordResetEmailTemplate, welcomeEmailTemplate, passwordChangedEmailTemplate, newStaffJoinedEmailTemplate } from "../emails/templates";
+import { otpEmailTemplate, passwordResetEmailTemplate, passwordChangedEmailTemplate, newStaffJoinedEmailTemplate } from "../emails/templates";
 import {
   registerStep1Schema,
+  sendOTPSchema,
   verifyOTPSchema,
   loginSchema,
   forgotPasswordSchema,
@@ -17,7 +20,6 @@ import {
   changePasswordSchema,
 } from "../utils/validators";
 import { createAuditLog } from "../utils/audit";
-import { generateUniqueSlug } from "../utils/slug";
 import { AuthRequest } from "../middleware/auth.middleware";
 
 export const register = async (req: Request, res: Response): Promise<void> => {
@@ -28,7 +30,13 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const { email, password, name } = parsed.data;
+    const { email, password, name, emailVerificationToken } = parsed.data;
+
+    // The OTP step happens before registration, so the server must see proof that it was completed for this address.
+    if (!verifyEmailVerificationToken(emailVerificationToken, email)) {
+      res.status(400).json({ error: "Your email verification has expired or is invalid. Please verify your email again." });
+      return;
+    }
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
@@ -48,7 +56,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     const hashedPassword = await bcrypt.hash(password, 12);
 
     const user = await prisma.user.create({
-      data: { email, password: hashedPassword, name, emailVerified: true },
+      data: { email, password: hashedPassword, name, emailVerified: true }, // ownership proven by the verified OTP token above
     });
 
     // Create audit log for user registration
@@ -64,12 +72,11 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       role: user.role,
       tokenVersion: user.tokenVersion,
     });
-    const refresh = signRefreshToken({ userId: user.id, email: user.email, tokenVersion: user.tokenVersion });
+    await startSession(res, user);
 
     res.status(201).json({
       message: "Account created successfully.",
       token,
-      refreshToken: refresh,
       user: {
         id: user.id,
         email: user.email,
@@ -126,20 +133,26 @@ export const checkEmail = async (req: Request, res: Response): Promise<void> => 
 
 export const sendOTP = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email } = req.body;
-    if (!email) {
-      res.status(400).json({ error: "Email is required." });
+    const parsed = sendOTPSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.errors[0].message });
+      return;
+    }
+    const { email } = parsed.data;
+
+    // The response never reveals whether the address already has an account.
+    const response = { message: "If this address can be verified, a code has been sent to it." };
+
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (user?.emailVerified) {
+      res.json(response);
       return;
     }
 
-    // Look up user if they exist (for personalized greeting), but don't require it
-    const user = await prisma.user.findUnique({ where: { email } });
-    const name = user?.name || "there";
-
     const otp = await createOTP(email);
-    await sendEmail(email, "Your Traqify verification code", otpEmailTemplate(name, otp));
+    await sendEmail(email, "Your Traqify verification code", otpEmailTemplate(user?.name || "there", otp));
 
-    res.json({ message: "A verification code has been sent to your email." });
+    res.json(response);
   } catch {
     res.status(500).json({ error: "Failed to send verification code." });
   }
@@ -161,37 +174,22 @@ export const verifyEmail = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    // Only mark emailVerified if user exists (for old flow)
     const existingUser = await prisma.user.findUnique({ where: { email } });
-    if (existingUser) {
-      await prisma.user.update({
-        where: { email },
-        data: { emailVerified: true },
-      });
-    }
 
-    // If user doesn't exist (new register flow), just return success
+    // New address: hand back a short-lived proof that registration requires.
     if (!existingUser) {
-      res.json({ message: "Email verified successfully." });
+      res.json({
+        message: "Email verified successfully.",
+        emailVerificationToken: signEmailVerificationToken(email),
+      });
       return;
     }
 
-    const token = signToken({ userId: existingUser.id, email: existingUser.email });
-    const refresh = signRefreshToken({ userId: existingUser.id, email: existingUser.email });
-
-    res.json({
-      message: "Email verified successfully.",
-      token,
-      refreshToken: refresh,
-      user: {
-        id: existingUser.id,
-        email: existingUser.email,
-        name: existingUser.name,
-        emailVerified: existingUser.emailVerified,
-        organizationId: existingUser.organizationId,
-        role: existingUser.role,
-      },
-    });
+    // Existing account: confirm it. No session is issued here; the user signs in normally.
+    if (!existingUser.emailVerified) {
+      await prisma.user.update({ where: { email }, data: { emailVerified: true } });
+    }
+    res.json({ message: "Email verified successfully." });
   } catch {
     res.status(500).json({ error: "Email verification failed." });
   }
@@ -255,11 +253,10 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       role: user.role,
       tokenVersion: user.tokenVersion,
     });
-    const refresh = signRefreshToken({ userId: user.id, email: user.email, tokenVersion: user.tokenVersion });
+    await startSession(res, user);
 
     res.json({
       token,
-      refreshToken: refresh,
       user: {
         id: user.id,
         email: user.email,
@@ -276,14 +273,39 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
+// Google sends the browser back to the frontend origin; the proxy forwards it here. That keeps the whole sign in on
+// one origin, so the state cookie set when it starts is first party when the callback arrives.
+const googleRedirectUri = (): string => `${process.env.FRONTEND_URL || "http://localhost:3000"}/api/auth/google-callback`;
+
+const OAUTH_STATE_COOKIE = "oauth_state";
+
+const oauthStateCookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax" as const,
+  path: "/api/auth",
+});
+
+const statesMatch = (a: unknown, b: unknown): boolean => {
+  if (typeof a !== "string" || typeof b !== "string") return false;
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  return bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB);
+};
+
 export const googleRedirect = (_req: Request, res: Response): void => {
+  // Random state bound to this browser by a cookie; the callback refuses anything that does not match (login CSRF).
+  const state = crypto.randomBytes(32).toString("hex");
+  res.cookie(OAUTH_STATE_COOKIE, state, { ...oauthStateCookieOptions(), maxAge: 10 * 60 * 1000 });
+
   const params = new URLSearchParams({
     client_id: process.env.GOOGLE_CLIENT_ID || "",
-    redirect_uri: `${process.env.API_URL || "http://localhost:5000"}/api/auth/google-callback`,
+    redirect_uri: googleRedirectUri(),
     response_type: "code",
     scope: "openid email profile",
     access_type: "offline",
     prompt: "select_account",
+    state,
   });
   res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
 };
@@ -291,8 +313,10 @@ export const googleRedirect = (_req: Request, res: Response): void => {
 export const googleCallback = async (req: Request, res: Response): Promise<void> => {
   const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
   try {
-    const { code } = req.query;
-    if (!code || typeof code !== "string") {
+    const { code, state } = req.query;
+    const expectedState = req.cookies?.[OAUTH_STATE_COOKIE];
+    res.clearCookie(OAUTH_STATE_COOKIE, oauthStateCookieOptions());
+    if (!code || typeof code !== "string" || !statesMatch(state, expectedState)) {
       res.redirect(`${frontendUrl}/login?error=oauth_failed`);
       return;
     }
@@ -304,7 +328,7 @@ export const googleCallback = async (req: Request, res: Response): Promise<void>
         code,
         client_id: process.env.GOOGLE_CLIENT_ID || "",
         client_secret: process.env.GOOGLE_CLIENT_SECRET || "",
-        redirect_uri: `${process.env.API_URL || "http://localhost:5000"}/api/auth/google-callback`,
+        redirect_uri: googleRedirectUri(),
         grant_type: "authorization_code",
       }),
     });
@@ -319,6 +343,12 @@ export const googleCallback = async (req: Request, res: Response): Promise<void>
       headers: { Authorization: `Bearer ${tokenData.access_token}` },
     });
     const googleUser = await userRes.json() as any;
+
+    // Only trust an email address Google itself has verified.
+    if (!googleUser.email || googleUser.verified_email !== true) {
+      res.redirect(`${frontendUrl}/login?error=email_not_verified`);
+      return;
+    }
 
     let user = await prisma.user.findUnique({
       where: { email: googleUser.email },
@@ -346,6 +376,15 @@ export const googleCallback = async (req: Request, res: Response): Promise<void>
         include: { organization: { select: { id: true, name: true, slug: true, logoUrl: true } } },
       }) as any;
     } else {
+      // Never attach a Google login to an account whose email was not verified, and never to a deactivated one.
+      if (!user.emailVerified) {
+        res.redirect(`${frontendUrl}/login?error=account_unverified`);
+        return;
+      }
+      if (!user.isActive) {
+        res.redirect(`${frontendUrl}/login?error=account_restricted`);
+        return;
+      }
       user = await prisma.user.update({
         where: { id: user.id },
         data: { lastLoginAt: new Date(), avatarUrl: googleUser.picture || user.avatarUrl },
@@ -353,30 +392,10 @@ export const googleCallback = async (req: Request, res: Response): Promise<void>
       }) as any;
     }
 
-    const token = signToken({
-      userId: user!.id,
-      email: user!.email,
-      organizationId: user!.organizationId || undefined,
-      role: user!.role,
-      tokenVersion: (user as any).tokenVersion ?? 0,
-    });
-    const refresh = signRefreshToken({ userId: user!.id, email: user!.email, tokenVersion: (user as any).tokenVersion ?? 0 });
-
-    const userData = {
-      id: user!.id,
-      email: user!.email,
-      name: user!.name,
-      role: user!.role,
-      organizationId: user!.organizationId,
-      avatarUrl: user!.avatarUrl,
-      organization: (user as any).organization || null,
-    };
-
-    // H-1: Store tokens server-side; redirect with a short-lived one-time code only
+    // The one-time code only identifies who signed in; tokens are minted when the browser exchanges it.
     const oauthCode = crypto.randomBytes(24).toString("hex");
-    const expiresAt = new Date(Date.now() + 2 * 60 * 1000); // 2 minutes
     await prisma.oAuthSession.create({
-      data: { code: oauthCode, token, refreshToken: refresh, userData: JSON.stringify(userData), expiresAt },
+      data: { code: oauthCode, userId: user!.id, expiresAt: new Date(Date.now() + 2 * 60 * 1000) },
     });
 
     res.redirect(`${frontendUrl}/auth-callback?code=${oauthCode}`);
@@ -420,12 +439,12 @@ export const changePassword = async (req: Request, res: Response): Promise<void>
 
 export const logout = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!req.user) { res.status(401).json({ error: "Authentication required." }); return; }
-    // Increment tokenVersion so all existing access and refresh tokens are invalidated
-    await prisma.user.update({
-      where: { id: req.user.id },
-      data: { tokenVersion: { increment: 1 } },
-    });
+    await endSession(req.cookies?.[REFRESH_COOKIE]);
+    clearRefreshCookie(res);
+    // A valid access token means a full sign out: bump tokenVersion so every token the user holds stops working.
+    if (req.user) {
+      await prisma.user.update({ where: { id: req.user.id }, data: { tokenVersion: { increment: 1 } } });
+    }
     res.json({ message: "Logged out successfully." });
   } catch {
     res.status(500).json({ error: "Logout failed." });
@@ -487,37 +506,39 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
 
 export const refreshToken = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { refreshToken } = req.body;
-    if (!refreshToken) {
-      res.status(400).json({ error: "Refresh token is required." });
+    const result = await rotateSession(res, req.cookies?.[REFRESH_COOKIE]);
+
+    if (!result.ok) {
+      if (result.reason === "in_progress") {
+        // Another request is rotating this very token; the client retries with the cookie that request sets.
+        res.status(409).json({ error: "A refresh is already in progress. Please retry." });
+        return;
+      }
+      clearRefreshCookie(res);
+      res.status(401).json({
+        error: result.reason === "reuse" ? "Session has been revoked. Please log in again." : "Invalid or expired session.",
+      });
       return;
     }
 
-    const payload = verifyRefreshToken(refreshToken);
-    const user = await prisma.user.findUnique({ where: { id: payload.userId } });
-
+    const user = await prisma.user.findUnique({ where: { id: result.userId } });
     if (!user) {
-      res.status(401).json({ error: "Invalid refresh token." });
+      clearRefreshCookie(res);
+      res.status(401).json({ error: "Invalid or expired session." });
       return;
     }
 
-    // Reject refresh tokens that predate a logout or password change
-    if (payload.tokenVersion !== undefined && payload.tokenVersion !== user.tokenVersion) {
-      res.status(401).json({ error: "Session has been revoked. Please log in again." });
-      return;
-    }
-
-    const newToken = signToken({
-      userId: user.id,
-      email: user.email,
-      organizationId: user.organizationId || undefined,
-      role: user.role,
-      tokenVersion: user.tokenVersion,
+    res.json({
+      token: signToken({
+        userId: user.id,
+        email: user.email,
+        organizationId: user.organizationId || undefined,
+        role: user.role,
+        tokenVersion: user.tokenVersion,
+      }),
     });
-
-    res.json({ token: newToken });
   } catch {
-    res.status(401).json({ error: "Invalid or expired refresh token." });
+    res.status(500).json({ error: "Could not refresh the session." });
   }
 };
 
@@ -595,7 +616,7 @@ export const acceptInvite = async (req: Request, res: Response): Promise<void> =
 
     const { token, name, password } = parsed.data;
 
-    const invite = await prisma.staffInvite.findUnique({ where: { token } });
+    const invite = await prisma.staffInvite.findUnique({ where: { token: hashToken(token) } });
     if (!invite || invite.status !== "PENDING" || invite.expiresAt < new Date()) {
       res.status(400).json({ error: "This invitation is invalid or has expired." });
       return;
@@ -642,12 +663,11 @@ export const acceptInvite = async (req: Request, res: Response): Promise<void> =
       role: user.role,
       tokenVersion: user.tokenVersion,
     });
-    const refresh = signRefreshToken({ userId: user.id, email: user.email, tokenVersion: user.tokenVersion });
+    await startSession(res, user);
 
     res.status(201).json({
       message: "Invitation accepted. Welcome to the team.",
       token: authToken,
-      refreshToken: refresh,
       user: {
         id: user.id,
         email: user.email,
@@ -668,18 +688,41 @@ export const exchangeOAuthCode = async (req: Request, res: Response): Promise<vo
     if (!code) { res.status(400).json({ error: "Code is required." }); return; }
 
     const session = await prisma.oAuthSession.findUnique({ where: { code } });
-    if (!session || session.expiresAt < new Date()) {
+    if (!session || !session.userId || session.expiresAt < new Date()) {
       res.status(400).json({ error: "OAuth code is invalid or has expired." });
       return;
     }
 
-    // Delete immediately — one-time use
+    // Delete immediately: one-time use
     await prisma.oAuthSession.delete({ where: { code } });
 
+    const user = await prisma.user.findUnique({
+      where: { id: session.userId },
+      include: { organization: { select: { id: true, name: true, slug: true, logoUrl: true } } },
+    });
+    if (!user || !user.isActive) {
+      res.status(400).json({ error: "OAuth code is invalid or has expired." });
+      return;
+    }
+
+    await startSession(res, user);
     res.json({
-      token: session.token,
-      refreshToken: session.refreshToken,
-      user: JSON.parse(session.userData),
+      token: signToken({
+        userId: user.id,
+        email: user.email,
+        organizationId: user.organizationId || undefined,
+        role: user.role,
+        tokenVersion: user.tokenVersion,
+      }),
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        organizationId: user.organizationId,
+        avatarUrl: user.avatarUrl,
+        organization: user.organization || null,
+      },
     });
   } catch {
     res.status(500).json({ error: "OAuth code exchange failed." });

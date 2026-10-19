@@ -118,7 +118,7 @@ export function OrderDetailModal({ order, onClose, onUpdated }: Props) {
           </div>
         </div>
 
-        {canManage && order.status !== "CANCELLED" && (
+        {canManage && (order.status === "PENDING" || order.status === "APPROVED") && (
           <div className="flex justify-between gap-3 p-6 border-t border-gray-100">
             <Button variant="outline" size="sm" className="text-[#DE1010] border-red-200 hover:bg-red-50" onClick={() => updateStatus("CANCELLED")} disabled={loading}>
               Cancel order

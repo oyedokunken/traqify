@@ -99,8 +99,8 @@ export default function SecurityPage() {
           </h2>
           <div className="grid md:grid-cols-2 gap-4">
             {[
-              { icon: Lock, title: "JWT Access Tokens", desc: "7-day default lifetime; signed with JWT_SECRET; carry tokenVersion — incremented on logout and password change to invalidate all outstanding tokens immediately" },
-              { icon: Key, title: "Refresh Tokens", desc: "30-day lifetime; signed with JWT_REFRESH_SECRET; validated against tokenVersion on every use" },
+              { icon: Lock, title: "JWT Access Tokens", desc: "15-minute lifetime, HS256 only; signed with JWT_SECRET; carry tokenVersion — incremented on logout and password change to invalidate all outstanding tokens immediately" },
+              { icon: Key, title: "Refresh Tokens", desc: "30-day opaque token stored only as a SHA-256 hash; sent as an httpOnly cookie that scripts cannot read; rotated on every use, and reuse of an old token revokes the session" },
               { icon: Globe, title: "Google OAuth 2.0", desc: "Server-side code exchange; tokens stored in OAuthSession (2 min TTL); browser only receives an opaque one-time code — tokens never appear in the URL" },
               { icon: Mail, title: "OTP Email Verification", desc: "SHA-256 hashed before storage; expires after 10 minutes; invalidated after 5 failed attempts" },
               { icon: Shield, title: "Password Hashing", desc: "bcrypt cost factor 12; changePassword requires current password and enforces full complexity rules (uppercase, lowercase, digit, special character)" },
@@ -158,7 +158,7 @@ export default function SecurityPage() {
               { icon: Upload, title: "File Uploads", desc: "Product images: JPEG/PNG/WebP max 5 MB. Downloadable files: explicit MIME allowlist max 4 MB. Multer memoryStorage — no disk writes" },
               { icon: FileText, title: "Input Validation", desc: "Zod schemas on every request body; all auth routes have full password complexity rules (uppercase, lowercase, digit, special character)" },
               { icon: Eye, title: "Audit Logging", desc: "Every create/update/delete/login/export event logged with actor, entity, IP, user agent, and timestamp; append-only" },
-              { icon: Database, title: "Startup Validation", desc: "Server throws before accepting any traffic if JWT_SECRET, JWT_REFRESH_SECRET, DATABASE_URL, PAYSTACK_SECRET_KEY, or FRONTEND_URL are absent" },
+              { icon: Database, title: "Startup Validation", desc: "Server throws before accepting any traffic if JWT_SECRET, DATABASE_URL, PAYSTACK_SECRET_KEY, or FRONTEND_URL are absent" },
               { icon: Shield, title: "Paystack Verification", desc: "Transaction verified server-side via Paystack API before any order is created; verified amount must match server-calculated total" },
               { icon: Lock, title: "SSRF Protection", desc: "Downloadable product file URLs are validated with URL.hostname.endsWith('.supabase.co') before any server-side fetch" },
               { icon: Key, title: "Cron Job Security", desc: "GET /api/cron/ping requires Authorization: Bearer <CRON_SECRET>; Vercel injects the header automatically; the endpoint is not publicly exploitable" },

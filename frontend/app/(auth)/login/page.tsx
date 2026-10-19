@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ErrorModal } from "@/components/shared/error-modal";
 import { useAuth } from "@/lib/auth-context";
-import api, { setAuthTokens } from "@/lib/api";
+import api, { setSession } from "@/lib/api";
 
 const schema = z.object({
   email: z.string().email("Please enter a valid email address."),
@@ -42,6 +42,9 @@ function LoginForm() {
     const hint = searchParams.get("hint");
     const emailParam = searchParams.get("email");
     if (e === "oauth_failed") setError("Google sign-in failed. Please try again.");
+    if (e === "email_not_verified") setError("Google has not verified this email address, so it cannot be used to sign in.");
+    if (e === "account_unverified") setError("An account with this email exists but has not been verified. Sign in with your password and verify your email first.");
+    if (e === "account_restricted") setError("Your account has been restricted. Please contact your administrator.");
     if (e === "invited_user") setError("This email has been invited to join an organization. You can only belong to one organization at a time. Please use the invitation link sent to your email to get started.");
     if (hint === "exists") setError("You already have an account with this email. Please sign in.");
     if (emailParam) setValue("email", emailParam);
@@ -50,7 +53,7 @@ function LoginForm() {
   const onSubmit = async (data: FormData) => {
     try {
       const res = await api.post("/api/auth/login", data);
-      setAuthTokens(res.data.token, res.data.refreshToken, res.data.user);
+      setSession(res.data.token, res.data.user);
       setUser(res.data.user);
 
       if (!res.data.user.organizationId) {
@@ -145,7 +148,7 @@ function LoginForm() {
               disabled={isGoogleLoading}
               onClick={() => {
                 setIsGoogleLoading(true);
-                window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/api/auth/google-redirect`;
+                window.location.href = "/api/auth/google-redirect";
               }}
             >
               <Image src="/google-logo.png" alt="Google" width={18} height={18} className="w-4.5 h-4.5 object-contain" />

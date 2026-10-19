@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { verifyToken, JWTPayload } from "../utils/jwt";
+import { verifyToken } from "../utils/jwt";
 import prisma from "../config/database";
 
 export interface AuthRequest extends Request {
@@ -13,22 +13,20 @@ export interface AuthRequest extends Request {
   };
 }
 
-export const authenticate = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
+type Resolution =
+  | { ok: true; user: NonNullable<AuthRequest["user"]> }
+  | { ok: false; status: 401 | 403; error: string };
+
+/** Verifies a bearer token and loads the user it belongs to. */
+async function resolveUser(authHeader: string | undefined): Promise<Resolution> {
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return { ok: false, status: 401, error: "Authentication required." };
+  }
+
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      res.status(401).json({ error: "Authentication required." });
-      return;
-    }
+    const payload = verifyToken(authHeader.split(" ")[1]);
 
-    const token = authHeader.split(" ")[1];
-    const payload: JWTPayload = verifyToken(token);
-
-    const user = await prisma.user.findUnique({
+    const found = await prisma.user.findUnique({
       where: { id: payload.userId },
       select: {
         id: true,
@@ -41,27 +39,45 @@ export const authenticate = async (
       },
     });
 
-    if (!user) {
-      res.status(401).json({ error: "User not found." });
-      return;
+    if (!found) return { ok: false, status: 401, error: "User not found." };
+    if (!found.isActive) {
+      return { ok: false, status: 403, error: "Your account has been deactivated. Please contact your administrator." };
     }
-
-    if (!user.isActive) {
-      res.status(403).json({ error: "Your account has been deactivated. Please contact your administrator." });
-      return;
-    }
-
     // Reject tokens issued before a password change or explicit logout
-    if (payload.tokenVersion !== undefined && payload.tokenVersion !== user.tokenVersion) {
-      res.status(401).json({ error: "Session expired. Please log in again." });
-      return;
+    if (payload.tokenVersion !== undefined && payload.tokenVersion !== found.tokenVersion) {
+      return { ok: false, status: 401, error: "Session expired. Please log in again." };
     }
 
-    req.user = user;
-    next();
+    const { tokenVersion: _tokenVersion, ...user } = found;
+    return { ok: true, user };
   } catch {
-    res.status(401).json({ error: "Invalid or expired token." });
+    return { ok: false, status: 401, error: "Invalid or expired token." };
   }
+}
+
+export const authenticate = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  const result = await resolveUser(req.headers.authorization);
+  if (!result.ok) {
+    res.status(result.status).json({ error: result.error });
+    return;
+  }
+  req.user = result.user;
+  next();
+};
+
+/** Attaches the user when a valid access token is present and carries on either way. */
+export const optionalAuthenticate = async (
+  req: AuthRequest,
+  _res: Response,
+  next: NextFunction
+): Promise<void> => {
+  const result = await resolveUser(req.headers.authorization);
+  if (result.ok) req.user = result.user;
+  next();
 };
 
 export const requireOrg = (

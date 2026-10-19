@@ -1,0 +1,18 @@
+# Disposable Postgres for the test suite. Port 5433 avoids clashing with a local Postgres on 5432.
+#   docker compose -f docker-compose.test.yml up -d
+services:
+  postgres-test:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_only_not_a_secret
+      POSTGRES_DB: traqify_test
+    ports:
+      - "5433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user -d traqify_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 20

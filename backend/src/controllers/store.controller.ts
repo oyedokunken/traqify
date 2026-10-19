@@ -1,10 +1,15 @@
+import { MAX_UNPAGED_ROWS } from "../utils/pagination";
 import { Request, Response } from "express";
-import { OrderStatus } from "@prisma/client";
+import { OrderStatus, PaymentStatus } from "@prisma/client";
 import prisma from "../config/database";
 import { sendEmail } from "../config/email";
 import { wishlistReminderTemplate, newOrderEmailTemplate, storeOrderConfirmationEmailTemplate } from "../emails/templates";
 import { createAuditLog } from "../utils/audit";
-import https from "https";
+import { AppError, respondWithError } from "../middleware/error.middleware";
+import { storeInitializeSchema, storePaystackCompleteSchema, storeTransferCheckoutSchema } from "../utils/validators";
+import { placeOrder } from "../utils/order-placement";
+import { completeCheckout, initializeCheckout } from "../utils/paystack-checkout";
+import { generateOrderNumber } from "../utils/order-number";
 
 export const getStoreProducts = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -26,7 +31,7 @@ export const getStoreProducts = async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    const rawProducts = await prisma.product.findMany({
+    const rawProducts = await prisma.product.findMany({ take: MAX_UNPAGED_ROWS,
       where: {
         organizationId: org.id,
         isActive: true,
@@ -57,7 +62,7 @@ export const getStoreProducts = async (req: Request, res: Response): Promise<voi
       return { ...rest, averageRating };
     });
 
-    const cats = await prisma.productCategory.findMany({
+    const cats = await prisma.productCategory.findMany({ take: MAX_UNPAGED_ROWS,
       where: { organizationId: org.id },
       select: { id: true, name: true, slug: true },
       orderBy: { name: "asc" },
@@ -69,187 +74,147 @@ export const getStoreProducts = async (req: Request, res: Response): Promise<voi
   }
 };
 
+interface PlacedOrderView {
+  id: string;
+  orderNumber: string;
+  totalAmount: number;
+  orderItems: { quantity: number; unitPrice: number; subtotal: number | null; product: { name: string } }[];
+}
+
+/** Audit entry plus the owner and customer emails. Failures are logged, never thrown. */
+async function notifyStoreOrder(args: {
+  req: Request;
+  org: { id: string; name: string; slug: string };
+  owner: { id: string; email: string };
+  order: PlacedOrderView;
+  customer: { name: string; email: string };
+  paymentLabel: string;
+}): Promise<void> {
+  const { req, org, owner, order, customer, paymentLabel } = args;
+  const totalAmount = order.totalAmount;
+
+  createAuditLog(owner.id, org.id, "CREATE", "Order", order.id, `Store order ${order.orderNumber} placed by ${customer.name} (${customer.email}) - NGN ${totalAmount.toLocaleString()}`, req).catch(() => {});
+
+  const emailItems = order.orderItems.map((i) => ({
+    name: i.product.name,
+    qty: i.quantity,
+    subtotal: i.subtotal ?? i.unitPrice * i.quantity,
+  }));
+
+  sendEmail(
+    owner.email,
+    `New store order received: ${org.name}`,
+    newOrderEmailTemplate(org.name, order.id, customer.name, totalAmount, emailItems, `${process.env.FRONTEND_URL || "http://localhost:3000"}/dashboard/${org.slug}/orders`)
+  ).catch((e) => console.error("[Email] Store order notification failed:", e.message));
+
+  const orgContact = await prisma.organization.findUnique({
+    where: { id: org.id },
+    select: { email: true, phone: true, address: true, logoUrl: true },
+  });
+
+  sendEmail(
+    customer.email,
+    `Order ${order.orderNumber} confirmed - ${org.name}`,
+    storeOrderConfirmationEmailTemplate(
+      customer.name,
+      order.orderNumber,
+      org.name,
+      totalAmount,
+      emailItems,
+      { email: orgContact?.email || null, phone: orgContact?.phone || null, address: orgContact?.address || null },
+      orgContact?.logoUrl || null,
+      paymentLabel
+    )
+  ).catch((emailErr) => console.error("Order confirmation email failed:", emailErr));
+}
+
+async function loadPublishedStore(slug: string) {
+  const org = await prisma.organization.findUnique({ where: { slug }, select: { id: true, slug: true, name: true, storePublished: true } });
+  if (!org || !org.storePublished) throw new AppError("Store not found.", 404);
+  const owner = await prisma.user.findFirst({ where: { organizationId: org.id, role: "OWNER" }, select: { id: true, email: true } });
+  if (!owner) throw new AppError("Store configuration error.", 500);
+  return { org, owner };
+}
+
+/**
+ * POST /api/store/:slug/checkout/initialize
+ * Prices the cart on the server and creates the Paystack transaction. The
+ * response carries the reference and access code the browser needs to pay.
+ */
+export const storeInitializeCheckout = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const parsed = storeInitializeSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.errors[0].message });
+      return;
+    }
+    const { org } = await loadPublishedStore(req.params.slug);
+    const { items, ...customer } = parsed.data;
+    res.status(201).json(await initializeCheckout(org, customer, items));
+  } catch (err) {
+    respondWithError(res, err, "Failed to start checkout.");
+  }
+};
+
+/**
+ * POST /api/store/:slug/checkout
+ * Bank transfer: places a pending order from the submitted cart.
+ * Paystack: completes a checkout the server created, identified only by its reference.
+ */
 export const storeCheckout = async (req: Request, res: Response): Promise<void> => {
   try {
     const { slug } = req.params;
-    const { name, email, phone, address, items, paymentMethod, notes, paystackReference } = req.body;
+    const method = req.body?.paymentMethod ?? "TRANSFER";
 
-    if (!name || !email || !items || !Array.isArray(items) || items.length === 0) {
-      res.status(400).json({ error: "Name, email, and at least one item are required." });
-      return;
-    }
-
-    const org = await prisma.organization.findUnique({ where: { slug } });
-    if (!org) {
-      res.status(404).json({ error: "Store not found." });
-      return;
-    }
-
-    let customer = await prisma.customer.findFirst({
-      where: { email, organizationId: org.id },
-    });
-    if (!customer) {
-      customer = await prisma.customer.create({
-        data: { name, email, phone, address, organizationId: org.id, source: "PURCHASE" },
-      });
-    }
-
-    const productIds = items.map((i: any) => i.productId);
-    const products = await prisma.product.findMany({
-      where: { id: { in: productIds }, organizationId: org.id, isActive: true },
-      include: { inventory: true },
-    });
-
-    if (products.length !== productIds.length) {
-      res.status(400).json({ error: "One or more products are unavailable." });
-      return;
-    }
-
-    let totalAmount = 0;
-    const orderItemsData: any[] = [];
-
-    for (const item of items) {
-      const product = products.find((p: typeof products[0]) => p.id === item.productId);
-      if (!product) continue;
-      const qty = parseInt(item.quantity) || 1;
-      if (product.inventory && product.inventory.quantity < qty) {
-        res.status(400).json({ error: `Insufficient stock for "${product.name}".` });
+    if (method === "PAYSTACK") {
+      const parsed = storePaystackCompleteSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error.errors[0].message });
         return;
       }
-      const subtotal = product.price * qty;
-      totalAmount += subtotal;
-      orderItemsData.push({
-        productId: product.id,
-        quantity: qty,
-        unitPrice: product.price,
-        subtotal,
-      });
-    }
+      const { org, owner } = await loadPublishedStore(slug);
+      const outcome = await completeCheckout(org, parsed.data.reference, owner.id);
 
-    // Verify Paystack payment if reference provided
-    let verifiedAmount: number | null = null;
-    if (paystackReference && paymentMethod === "PAYSTACK") {
-      try {
-        const paystackData: any = await new Promise((resolve, reject) => {
-          const options = {
-            hostname: "api.paystack.co",
-            port: 443,
-            path: `/transaction/verify/${paystackReference}`,
-            method: "GET",
-            headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` },
-          };
-          const req2 = https.request(options, (r) => {
-            let data = "";
-            r.on("data", (c) => { data += c; });
-            r.on("end", () => resolve(JSON.parse(data)));
-          });
-          req2.on("error", reject);
-          req2.end();
-        });
-        if (!paystackData.status || paystackData.data?.status !== "success") {
-          res.status(402).json({ error: "Payment not verified. Please complete payment before placing order." });
-          return;
-        }
-        verifiedAmount = paystackData.data.amount / 100;
-        if (Math.abs(verifiedAmount - totalAmount) > 0.01) {
-          res.status(402).json({ error: "Payment amount does not match order total. Please contact support." });
-          return;
-        }
-      } catch {
-        res.status(500).json({ error: "Payment verification failed. Please contact support." });
+      if (outcome.kind === "existing") {
+        const { id, orderNumber, totalAmount, status } = outcome.order;
+        res.status(200).json({ id, orderNumber, totalAmount, status });
         return;
       }
-    }
 
-    const orderNumber = `STR-${Date.now().toString(36).toUpperCase()}`;
-
-    const orgOwner = await prisma.user.findFirst({
-      where: { organizationId: org.id, role: "OWNER" },
-      select: { id: true, email: true },
-    });
-    if (!orgOwner) {
-      res.status(500).json({ error: "Store configuration error." });
+      const { order, session } = outcome;
+      await notifyStoreOrder({
+        req, org, owner, order,
+        customer: { name: session.customerName, email: session.customerEmail },
+        paymentLabel: "Paystack",
+      });
+      res.status(201).json({ id: order.id, orderNumber: order.orderNumber, totalAmount: order.totalAmount, status: order.status });
       return;
     }
 
-    const order = await prisma.order.create({
-      data: {
-        orderNumber,
-        organizationId: org.id,
-        customerId: customer.id,
-        createdById: orgOwner.id,
-        totalAmount,
-        status: paystackReference && verifiedAmount !== null ? OrderStatus.APPROVED : OrderStatus.PENDING,
-        paymentMethod: paymentMethod || "TRANSFER",
-        notes: notes || null,
-        orderItems: { create: orderItemsData },
-      },
-      include: {
-        orderItems: { include: { product: { select: { name: true } } } },
-      },
-    }) as any;
-
-    prisma.payment.create({
-      data: {
-        amount: totalAmount,
-        currency: "NGN",
-        status: paystackReference && verifiedAmount !== null ? "COMPLETED" : "PENDING",
-        method: paymentMethod || "TRANSFER",
-        reference: paystackReference || null,
-        organizationId: org.id,
-        orderId: order.id,
-      },
-    }).catch(() => {});
-
-    for (const item of orderItemsData) {
-      await prisma.inventory.updateMany({
-        where: { productId: item.productId },
-        data: { quantity: { decrement: item.quantity } },
-      });
+    const parsed = storeTransferCheckoutSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.errors[0].message });
+      return;
     }
+    const { name, email, phone, address, notes, items } = parsed.data;
+    const { org, owner } = await loadPublishedStore(slug);
 
-    createAuditLog(orgOwner.id, org.id, "CREATE", "Order", order.id, `Store order ${orderNumber} placed by ${name} (${email}) - NGN ${totalAmount.toLocaleString()}`, req).catch(() => {});
-
-    // Notify org owner by email
-    const emailItems = order.orderItems.map((i: { product: { name: string }; quantity: number; unitPrice: number; subtotal?: number }) => ({
-      name: i.product.name,
-      qty: i.quantity,
-      subtotal: i.subtotal ?? i.unitPrice * i.quantity,
-    }));
-    sendEmail(
-      orgOwner.email,
-      `New store order received: ${org.name}`,
-      newOrderEmailTemplate(org.name, order.id, name, totalAmount, emailItems, `${process.env.FRONTEND_URL || "http://localhost:3000"}/dashboard/${org.slug}/orders`)
-    ).catch((e) => console.error("[Email] Store order notification failed:", e.message));
-
-    const orgContact = await prisma.organization.findUnique({
-      where: { id: org.id },
-      select: { email: true, phone: true, address: true, logoUrl: true },
+    const { order } = await placeOrder({
+      organizationId: org.id,
+      createdById: owner.id,
+      orderNumber: generateOrderNumber("STR"),
+      lines: items,
+      customer: { kind: "find-or-create", name, email, phone, address, source: "PURCHASE" },
+      status: OrderStatus.PENDING,
+      paymentMethod: "TRANSFER",
+      notes,
+      payment: { status: PaymentStatus.PENDING },
     });
 
-    sendEmail(
-      email,
-      `Order ${orderNumber} confirmed - ${org.name}`,
-      storeOrderConfirmationEmailTemplate(
-        name,
-        orderNumber,
-        org.name,
-        totalAmount,
-        emailItems,
-        { email: orgContact?.email || null, phone: orgContact?.phone || null, address: orgContact?.address || null },
-        orgContact?.logoUrl || null,
-        paymentMethod || "Bank Transfer"
-      )
-    ).catch((emailErr) => console.error("Order confirmation email failed:", emailErr));
-
-    res.status(201).json({
-      id: order.id,
-      orderNumber: order.orderNumber,
-      totalAmount: order.totalAmount,
-      status: order.status,
-    });
-  } catch {
-    res.status(500).json({ error: "Failed to process order." });
+    await notifyStoreOrder({ req, org, owner, order, customer: { name, email }, paymentLabel: "Bank Transfer" });
+    res.status(201).json({ id: order.id, orderNumber: order.orderNumber, totalAmount: order.totalAmount, status: order.status });
+  } catch (err) {
+    respondWithError(res, err, "Failed to process order.");
   }
 };
 

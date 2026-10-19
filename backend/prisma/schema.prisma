@@ -81,6 +81,8 @@ model User {
 
   orders         Order[]
   auditLogs      AuditLog[]
+  refreshTokens  RefreshToken[]
+  uploads        Upload[]
 
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
@@ -112,6 +114,8 @@ model Organization {
   wishlists   Wishlist[]
   reviews     Review[]
   payments    Payment[]
+  checkoutSessions CheckoutSession[]
+  uploads     Upload[]
   newsletters NewsletterSubscriber[]
 
   createdAt   DateTime    @default(now())
@@ -344,9 +348,11 @@ model NewsletterSubscriber {
 model OAuthSession {
   id           String   @id @default(cuid())
   code         String   @unique
-  token        String
-  refreshToken String
-  userData     String
+  userId       String?
+  // Legacy columns: sessions no longer store live tokens, tokens are minted when the code is exchanged.
+  token        String?
+  refreshToken String?
+  userData     String?
   expiresAt    DateTime
 
   createdAt    DateTime @default(now())
@@ -384,7 +390,7 @@ model Payment {
   currency       String        @default("NGN")
   status         PaymentStatus @default(PENDING)
   method         String?
-  reference      String?
+  reference      String?       @unique
   notes          String?
 
   organizationId String
@@ -418,4 +424,105 @@ model AuditLog {
   createdAt      DateTime     @default(now())
 
   @@map("audit_logs")
+}
+
+enum CheckoutSessionStatus {
+  PENDING
+  COMPLETED
+  REFUNDED
+  REFUND_FAILED
+}
+
+/// A storefront Paystack checkout created by the server. The cart, customer and
+/// amount are fixed here at initialization, so the client never supplies a
+/// reference or a price and a reference is only honoured if it lives in this table.
+model CheckoutSession {
+  id              String                @id @default(cuid())
+  reference       String                @unique
+  accessCode      String?
+  status          CheckoutSessionStatus @default(PENDING)
+
+  customerName    String
+  customerEmail   String
+  customerPhone   String?
+  customerAddress String?
+  notes           String?
+  items           Json
+  amountKobo      Int
+  currency        String                @default("NGN")
+
+  orderId         String?               @unique
+  failureReason   String?
+  expiresAt       DateTime
+
+  organizationId  String
+  organization    Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  @@index([organizationId])
+  @@map("checkout_sessions")
+}
+
+/// Opaque refresh tokens, stored as SHA-256 hashes. Each use rotates the token; a token
+/// that is presented again after it was used revokes the user's sessions (token theft).
+model RefreshToken {
+  id           String    @id @default(cuid())
+  tokenHash    String    @unique
+  familyId     String
+  tokenVersion Int
+  expiresAt    DateTime
+  usedAt       DateTime?
+
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt    DateTime  @default(now())
+
+  @@index([familyId])
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+enum UploadPurpose {
+  AVATAR
+  ORG_LOGO
+  PRODUCT_IMAGE
+  DOWNLOADABLE
+}
+
+enum UploadStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+}
+
+/// A file the browser uploads straight to storage with a signed URL. The server picks the path and limits
+/// when it signs, then inspects the stored bytes before the file counts as an upload at all.
+model Upload {
+  id             String        @id @default(cuid())
+  bucket         String
+  path           String        @unique
+  purpose        UploadPurpose
+  status         UploadStatus  @default(PENDING)
+  declaredType   String
+  detectedType   String?
+  maxBytes       Int
+  sizeBytes      Int?
+  expiresAt      DateTime
+
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([userId])
+  @@index([organizationId])
+  @@map("uploads")
 }

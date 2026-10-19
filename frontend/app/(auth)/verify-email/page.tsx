@@ -8,7 +8,7 @@ import { RefreshCw, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ErrorModal } from "@/components/shared/error-modal";
 import { Logo } from "@/components/shared/logo";
-import api, { setAuthTokens } from "@/lib/api";
+import api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 
 function VerifyEmailForm() {
@@ -68,6 +68,10 @@ function VerifyEmailForm() {
     setIsVerifying(true);
     try {
       const verifyRes = await api.post("/api/auth/verify-email", { email, otp: code });
+      // New addresses receive a short-lived proof that the register step must present.
+      if (verifyRes.data.emailVerificationToken) {
+        try { sessionStorage.setItem("traqify_email_proof", verifyRes.data.emailVerificationToken); } catch { /* storage unavailable */ }
+      }
       setVerified(true);
 
       // If returning to register flow, redirect back with verified email

@@ -2,7 +2,7 @@
 
 import { useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { setAuthTokens } from "@/lib/api";
+import api, { setSession } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 
 function AuthCallbackContent() {
@@ -17,13 +17,12 @@ function AuthCallbackContent() {
       return;
     }
 
-    // Exchange the one-time code for tokens (H-1: tokens never exposed in URL)
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-    fetch(`${API_URL}/api/auth/oauth-exchange/${code}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (!data.token || !data.refreshToken || !data.user) throw new Error("Invalid response");
-        setAuthTokens(data.token, data.refreshToken, data.user);
+    // Exchange the one-time code for a session. Tokens are never placed in the URL, and the
+    // refresh token arrives only as an httpOnly cookie.
+    api.get(`/api/auth/oauth-exchange/${code}`)
+      .then(({ data }) => {
+        if (!data.token || !data.user) throw new Error("Invalid response");
+        setSession(data.token, data.user);
         setUser(data.user);
         if (!data.user.organizationId) {
           router.push("/create-organization");

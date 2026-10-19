@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Logo } from "@/components/shared/logo";
-import api from "@/lib/api";
+import api, { refreshSession } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { INDUSTRY_OPTIONS, ORG_SIZE_OPTIONS } from "@/lib/utils";
 import { ErrorModal } from "@/components/shared/error-modal";
@@ -62,16 +62,7 @@ export default function CreateOrganizationPage() {
     try {
       const res = await api.post("/api/organizations", data);
       // Refresh JWT to embed the new organizationId (Google OAuth / any OAuth user)
-      try {
-        const rfr = typeof window !== "undefined" ? localStorage.getItem("traqify_refresh") : null;
-        if (rfr) {
-          const rfRes = await api.post("/api/auth/refresh", { refreshToken: rfr });
-          if (rfRes.data.token) {
-            localStorage.setItem("traqify_token", rfRes.data.token);
-            api.defaults.headers.common["Authorization"] = `Bearer ${rfRes.data.token}`;
-          }
-        }
-      } catch {}
+      await refreshSession();
       await refreshUser();
       router.push(`/dashboard/${res.data.slug}/overview`);
     } catch (err: any) {

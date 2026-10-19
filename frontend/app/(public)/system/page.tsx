@@ -201,8 +201,8 @@ export default function SystemPage() {
               <ul className="space-y-2 text-gray-600">
                 <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>Email + password with OTP email verification (6-digit, 10-minute expiry)</span></li>
                 <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>Google OAuth 2.0 via redirect flow (no third-party popups)</span></li>
-                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>JWT access token (7-day default) + refresh token pair</span></li>
-                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>Axios interceptor catches 401 and silently refreshes the token</span></li>
+                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>JWT access token (15 minutes, kept in memory) + rotating httpOnly refresh cookie</span></li>
+                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>Axios interceptor catches 401, refreshes once through the cookie and retries the request</span></li>
                 <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>Account lock by admin with notification email</span></li>
               </ul>
             </div>
@@ -292,11 +292,11 @@ export default function SystemPage() {
               <ul className="space-y-2 text-gray-600">
                 <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>OTP email verification — 6-digit code generated with crypto.randomInt, SHA-256 hashed before storage, expires after 10 minutes, invalidated after 5 failed attempts</span></li>
                 <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>bcrypt password hashing — cost factor 12; no plain-text passwords stored anywhere</span></li>
-                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>JWT access token — 7-day default lifetime; carries userId, email, organizationId, role, and tokenVersion</span></li>
+                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>JWT access token — 15 minute lifetime; carries userId, email, organizationId, role, and tokenVersion</span></li>
                 <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>Token version invalidation — tokenVersion incremented on logout and password change; all outstanding tokens for a user are rejected immediately regardless of their remaining TTL</span></li>
-                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>JWT refresh token — separate secret; used by Axios interceptor to silently re-issue access tokens on 401</span></li>
+                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>Refresh token: 30-day opaque value stored as a SHA-256 hash, sent as an httpOnly cookie and rotated on every use; reusing an old one revokes the session</span></li>
                 <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>Google OAuth 2.0 — tokens stored in a short-lived OAuthSession; browser receives only an opaque one-time code; tokens are never placed in the URL</span></li>
-                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>Startup validation — server throws before accepting traffic if JWT_SECRET, JWT_REFRESH_SECRET, DATABASE_URL, PAYSTACK_SECRET_KEY, or FRONTEND_URL are missing</span></li>
+                <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>Startup validation — server throws before accepting traffic if JWT_SECRET, DATABASE_URL, PAYSTACK_SECRET_KEY, or FRONTEND_URL are missing</span></li>
                 <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#DE1010] flex-shrink-0 mt-0.5" /><span>Invited user registration block — users with a pending staff invitation cannot create new accounts; they must use their invitation link or sign in</span></li>
               </ul>
             </div>
@@ -418,7 +418,7 @@ OTPVerification
   attempts Int                             -- invalidated after 5 failures
 
 OAuthSession
-  id, code (unique), token, refreshToken
+  id, code (unique), userId, expiresAt
   userData, expiresAt                      -- 2 minute TTL; deleted on exchange
 
 PasswordResetToken
@@ -472,7 +472,7 @@ NewsletterSubscriber
               <div className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto mb-4">
                 <code className="text-sm">cd backend<br/>npm install<br/>cp .env.example .env</code>
               </div>
-              <p className="text-gray-600 mb-4">Open .env and fill in the required environment variables (DATABASE_URL, DIRECT_URL, SMTP_USER, SMTP_PASS, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, JWT_SECRET, JWT_REFRESH_SECRET).</p>
+              <p className="text-gray-600 mb-4">Open .env and fill in the required environment variables (DATABASE_URL, DIRECT_URL, SMTP_USER, SMTP_PASS, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, JWT_SECRET).</p>
               <p className="text-gray-600 mb-4">Push the schema to your database:</p>
               <div className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto mb-4">
                 <code className="text-sm">npx prisma db push</code>
@@ -487,7 +487,7 @@ NewsletterSubscriber
               <div className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto mb-4">
                 <code className="text-sm">cd frontend<br/>npm install<br/>cp .env.local.example .env.local</code>
               </div>
-              <p className="text-gray-600 mb-4">Fill in NEXT_PUBLIC_API_URL, NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY.</p>
+              <p className="text-gray-600 mb-4">Fill in API_ORIGIN (the API's address) and PROXY_SHARED_SECRET (the same value as the API).</p>
               <p className="text-gray-600 mb-4">Start the frontend:</p>
               <div className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto">
                 <code className="text-sm">npm run dev</code>
