@@ -1,3 +1,5 @@
+import { getLogger } from "../config/logger";
+import { respondWithError } from "../middleware/error.middleware";
 import { Request, Response } from "express";
 import prisma from "../config/database";
 
@@ -23,10 +25,9 @@ export const pingDb = async (req: Request, res: Response): Promise<void> => {
   try {
     await prisma.$queryRaw`SELECT 1`;
     const ts = new Date().toISOString();
-    console.log(`[cron] db ping OK at ${ts}`);
+    getLogger().info("database ping ok");
     res.json({ status: "ok", pinged: ts });
-  } catch (err: any) {
-    console.error("[cron] db ping failed:", err.message);
-    res.status(500).json({ error: "DB ping failed", detail: err.message });
+  } catch (err) {
+    respondWithError(res, err, "DB ping failed");
   }
 };

@@ -1,3 +1,5 @@
+import { logAndIgnore } from "../config/logger";
+import { respondWithError } from "../middleware/error.middleware";
 import { parsePagination } from "../utils/pagination";
 import { reportEmailSchema } from "../utils/validators";
 import { Response } from "express";
@@ -60,8 +62,8 @@ export const getOverview = async (req: AuthRequest, res: Response): Promise<void
       storePublished: org?.storePublished || false,
       orgSlug: org?.slug || "",
     });
-  } catch {
-    res.status(500).json({ error: "Failed to fetch overview data." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to fetch overview data.");
   }
 };
 
@@ -90,8 +92,8 @@ export const getSalesReport = async (req: AuthRequest, res: Response): Promise<v
     const totalItems = orders.reduce((sum: number, o: any) => sum + o.orderItems.reduce((s: number, i: any) => s + i.quantity, 0), 0);
 
     res.json({ orders, totalRevenue, totalItems, orderCount: orders.length });
-  } catch {
-    res.status(500).json({ error: "Failed to generate sales report." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to generate sales report.");
   }
 };
 
@@ -120,8 +122,8 @@ export const getTopProducts = async (req: AuthRequest, res: Response): Promise<v
     }));
 
     res.json(result);
-  } catch {
-    res.status(500).json({ error: "Failed to fetch top products." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to fetch top products.");
   }
 };
 
@@ -170,8 +172,8 @@ export const getRevenueChart = async (req: AuthRequest, res: Response): Promise<
     }
 
     res.json(result);
-  } catch {
-    res.status(500).json({ error: "Failed to fetch revenue chart data." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to fetch revenue chart data.");
   }
 };
 
@@ -214,8 +216,8 @@ export const getCustomerChart = async (req: AuthRequest, res: Response): Promise
     }
 
     res.json(result);
-  } catch {
-    res.status(500).json({ error: "Failed to fetch customer chart data." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to fetch customer chart data.");
   }
 };
 
@@ -395,10 +397,10 @@ export const downloadReport = async (req: AuthRequest, res: Response): Promise<v
     const rows = await buildReportData(type, orgId, fromDate, toDate);
     const pdf = await buildPDF(type, label, org, from || "", to || "", rows as any[]);
     res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${type}-report.pdf"` });
-    createAuditLog(req.user!.id, orgId, "EXPORT", "Report", undefined, `Downloaded ${label}`, req).catch(() => {});
+    createAuditLog(req.user!.id, orgId, "EXPORT", "Report", undefined, `Downloaded ${label}`, req).catch(logAndIgnore("audit log"));
     res.send(pdf);
-  } catch {
-    res.status(500).json({ error: "Failed to generate PDF." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to generate PDF.");
   }
 };
 
@@ -424,9 +426,9 @@ export const emailReport = async (req: AuthRequest, res: Response): Promise<void
     const html = reportEmailTemplate(org?.name || "", label, from || fmt(fromDate), to_date || fmt(toDate), `${frontendUrl}/dashboard/${org?.slug || ""}/reports`);
 
     await sendEmail(to, `${label} - ${org?.name}`, html, [{ filename: `${type}-report.pdf`, content: pdf, contentType: "application/pdf" }]);
-    createAuditLog(req.user!.id, orgId, "EXPORT", "Report", undefined, `Emailed ${label} to ${to}`, req).catch(() => {});
+    createAuditLog(req.user!.id, orgId, "EXPORT", "Report", undefined, `Emailed ${label} to ${to}`, req).catch(logAndIgnore("audit log"));
     res.json({ message: `Report sent to ${to}.` });
-  } catch {
-    res.status(500).json({ error: "Failed to send report email." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to send report email.");
   }
 };

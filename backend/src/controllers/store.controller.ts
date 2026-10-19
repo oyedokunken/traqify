@@ -1,3 +1,4 @@
+import { logAndIgnore, getLogger } from "../config/logger";
 import { MAX_UNPAGED_ROWS } from "../utils/pagination";
 import { Request, Response } from "express";
 import { OrderStatus, PaymentStatus } from "@prisma/client";
@@ -69,8 +70,8 @@ export const getStoreProducts = async (req: Request, res: Response): Promise<voi
     });
 
     res.json({ org, products, categories: cats });
-  } catch {
-    res.status(500).json({ error: "Failed to load store." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to load store.");
   }
 };
 
@@ -93,7 +94,7 @@ async function notifyStoreOrder(args: {
   const { req, org, owner, order, customer, paymentLabel } = args;
   const totalAmount = order.totalAmount;
 
-  createAuditLog(owner.id, org.id, "CREATE", "Order", order.id, `Store order ${order.orderNumber} placed by ${customer.name} (${customer.email}) - NGN ${totalAmount.toLocaleString()}`, req).catch(() => {});
+  createAuditLog(owner.id, org.id, "CREATE", "Order", order.id, `Store order ${order.orderNumber} placed by ${customer.name} (${customer.email}) - NGN ${totalAmount.toLocaleString()}`, req).catch(logAndIgnore("audit log"));
 
   const emailItems = order.orderItems.map((i) => ({
     name: i.product.name,
@@ -105,7 +106,7 @@ async function notifyStoreOrder(args: {
     owner.email,
     `New store order received: ${org.name}`,
     newOrderEmailTemplate(org.name, order.id, customer.name, totalAmount, emailItems, `${process.env.FRONTEND_URL || "http://localhost:3000"}/dashboard/${org.slug}/orders`)
-  ).catch((e) => console.error("[Email] Store order notification failed:", e.message));
+  ).catch(logAndIgnore("Store order notification"));
 
   const orgContact = await prisma.organization.findUnique({
     where: { id: org.id },
@@ -125,7 +126,7 @@ async function notifyStoreOrder(args: {
       orgContact?.logoUrl || null,
       paymentLabel
     )
-  ).catch((emailErr) => console.error("Order confirmation email failed:", emailErr));
+  ).catch(logAndIgnore("Order confirmation email"));
 }
 
 async function loadPublishedStore(slug: string) {
@@ -244,8 +245,8 @@ export const saveWishlist = async (req: Request, res: Response): Promise<void> =
       update: { email: email || undefined, productIds, updatedAt: new Date() },
     });
     res.json({ id: wishlist.id });
-  } catch {
-    res.status(500).json({ error: "Failed to save wishlist." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to save wishlist.");
   }
 };
 
@@ -288,7 +289,7 @@ export const processWishlistEmails = async (): Promise<void> => {
         await sendEmail(wl.email!, `Your wishlist at ${wl.organization.name} is waiting`, html);
         await prisma.wishlist.update({ where: { id: wl.id }, data: { [schedule.field]: true } });
       } catch (err) {
-        console.error(`Wishlist email failed for ${wl.id}:`, err);
+        getLogger().warn({ err, wishlistId: wl.id }, "wishlist reminder failed");
       }
     }
   }

@@ -1,3 +1,4 @@
+import { respondWithError } from "../middleware/error.middleware";
 import { parsePagination } from "../utils/pagination";
 import { Response } from "express";
 import prisma from "../config/database";
@@ -28,8 +29,8 @@ export const getCustomers = async (req: AuthRequest, res: Response): Promise<voi
     ]);
 
     res.json({ customers, total });
-  } catch {
-    res.status(500).json({ error: "Failed to fetch customers." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to fetch customers.");
   }
 };
 
@@ -55,8 +56,8 @@ export const getCustomer = async (req: AuthRequest, res: Response): Promise<void
     }
 
     res.json(customer);
-  } catch {
-    res.status(500).json({ error: "Failed to fetch customer." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to fetch customer.");
   }
 };
 
@@ -75,8 +76,8 @@ export const createCustomer = async (req: AuthRequest, res: Response): Promise<v
 
     await createAuditLog(req.user!.id, orgId, "CREATE", "Customer", customer.id, `Created customer: ${parsed.data.name}`, req);
     res.status(201).json(customer);
-  } catch {
-    res.status(500).json({ error: "Failed to create customer." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to create customer.");
   }
 };
 
@@ -100,8 +101,8 @@ export const updateCustomer = async (req: AuthRequest, res: Response): Promise<v
     const customer = await prisma.customer.update({ where: { id }, data: parsed.data });
     await createAuditLog(req.user!.id, orgId, "UPDATE", "Customer", id, `Updated customer: ${customer.name}`, req);
     res.json(customer);
-  } catch {
-    res.status(500).json({ error: "Failed to update customer." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to update customer.");
   }
 };
 
@@ -119,7 +120,7 @@ export const deleteCustomer = async (req: AuthRequest, res: Response): Promise<v
     await prisma.customer.delete({ where: { id } });
     await createAuditLog(req.user!.id, orgId, "DELETE", "Customer", id, `Deleted customer: ${customer.name}`, req);
     res.json({ message: "Customer deleted successfully." });
-  } catch {
-    res.status(500).json({ error: "Failed to delete customer." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to delete customer.");
   }
 };

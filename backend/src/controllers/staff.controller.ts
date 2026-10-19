@@ -1,3 +1,5 @@
+import { logAndIgnore } from "../config/logger";
+import { respondWithError } from "../middleware/error.middleware";
 import { hashToken } from "../utils/token-hash";
 import { MAX_UNPAGED_ROWS } from "../utils/pagination";
 import { Request, Response } from "express";
@@ -32,8 +34,8 @@ export const getInviteDetails = async (req: Request, res: Response): Promise<voi
       organizationName: invite.organization.name,
       organizationLogo: invite.organization.logoUrl,
     });
-  } catch {
-    res.status(500).json({ error: "Failed to fetch invitation details." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to fetch invitation details.");
   }
 };
 
@@ -59,8 +61,8 @@ export const getStaff = async (req: AuthRequest, res: Response): Promise<void> =
     });
 
     res.json(staff);
-  } catch {
-    res.status(500).json({ error: "Failed to fetch staff." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to fetch staff.");
   }
 };
 
@@ -78,13 +80,13 @@ export const getInvites = async (req: AuthRequest, res: Response): Promise<void>
     const now = new Date();
     const justExpired = invites.filter((i) => i.status === "PENDING" && i.expiresAt < now);
     for (const inv of justExpired) {
-      prisma.staffInvite.update({ where: { id: inv.id }, data: { status: "EXPIRED" } }).catch(() => {});
-      createAuditLog(req.user!.id, orgId, "UPDATE", "StaffInvite", inv.id, `Invitation for ${inv.email} has expired`, req).catch(() => {});
+      prisma.staffInvite.update({ where: { id: inv.id }, data: { status: "EXPIRED" } }).catch(logAndIgnore("background task"));
+      createAuditLog(req.user!.id, orgId, "UPDATE", "StaffInvite", inv.id, `Invitation for ${inv.email} has expired`, req).catch(logAndIgnore("audit log"));
     }
 
     res.json(invites);
-  } catch {
-    res.status(500).json({ error: "Failed to fetch invites." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to fetch invites.");
   }
 };
 
@@ -127,8 +129,8 @@ export const inviteStaff = async (req: AuthRequest, res: Response): Promise<void
 
     await createAuditLog(req.user!.id, orgId, "CREATE", "StaffInvite", invite.id, `Invited ${email} as ${role}`, req);
     res.status(201).json({ message: `Invitation sent to ${email}.`, invite });
-  } catch {
-    res.status(500).json({ error: "Failed to send invitation." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to send invitation.");
   }
 };
 
@@ -157,8 +159,8 @@ export const updateStaffRole = async (req: AuthRequest, res: Response): Promise<
     const updated = await prisma.user.update({ where: { id: userId }, data: { role } });
     await createAuditLog(req.user!.id, orgId, "UPDATE", "User", userId, `Changed ${member.name}'s role to ${role}`, req);
     res.json(updated);
-  } catch {
-    res.status(500).json({ error: "Failed to update role." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to update role.");
   }
 };
 
@@ -186,8 +188,8 @@ export const toggleStaffAccess = async (req: AuthRequest, res: Response): Promis
 
     await createAuditLog(req.user!.id, orgId, "UPDATE", "User", userId, `${updated.isActive ? "Restored" : "Restricted"} access for ${member.name}`, req);
     res.json({ message: `Access ${updated.isActive ? "restored" : "restricted"} for ${member.name}.`, user: updated });
-  } catch {
-    res.status(500).json({ error: "Failed to update staff access." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to update staff access.");
   }
 };
 
@@ -216,13 +218,13 @@ export const removeStaff = async (req: AuthRequest, res: Response): Promise<void
 
     const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { name: true } });
     if (member.email && org) {
-      sendEmail(member.email, `You have been removed from ${org.name}`, staffRemovedEmailTemplate(member.name || "there", org.name)).catch(() => {});
+      sendEmail(member.email, `You have been removed from ${org.name}`, staffRemovedEmailTemplate(member.name || "there", org.name)).catch(logAndIgnore("email"));
     }
 
     await createAuditLog(req.user!.id, orgId, "DELETE", "User", userId, `Removed ${member.name} from the organization`, req);
     res.json({ message: `${member.name} has been removed from the organization.` });
-  } catch {
-    res.status(500).json({ error: "Failed to remove staff member." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to remove staff member.");
   }
 };
 
@@ -240,8 +242,8 @@ export const cancelInvite = async (req: AuthRequest, res: Response): Promise<voi
     await prisma.staffInvite.delete({ where: { id: inviteId } });
     await createAuditLog(req.user!.id, orgId, "DELETE", "StaffInvite", inviteId, `Cancelled invitation for ${invite.email}`, req);
     res.json({ message: `Invitation for ${invite.email} has been cancelled.` });
-  } catch {
-    res.status(500).json({ error: "Failed to cancel invitation." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to cancel invitation.");
   }
 };
 
@@ -272,7 +274,7 @@ export const resetStaffPassword = async (req: AuthRequest, res: Response): Promi
 
     await createAuditLog(req.user!.id, orgId, "UPDATE", "User", userId, `Reset password for ${member.name}`, req);
     res.json({ message: `Password reset email sent to ${member.email}.` });
-  } catch {
-    res.status(500).json({ error: "Failed to reset password." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to reset password.");
   }
 };

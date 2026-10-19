@@ -1,3 +1,4 @@
+import { logAndIgnore } from "../config/logger";
 import { OrderStatus } from "@prisma/client";
 import { parsePagination } from "../utils/pagination";
 import { Response } from "express";
@@ -51,8 +52,8 @@ export const getOrders = async (req: AuthRequest, res: Response): Promise<void> 
     ]);
 
     res.json({ orders, total, page, limit });
-  } catch {
-    res.status(500).json({ error: "Failed to fetch orders." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to fetch orders.");
   }
 };
 
@@ -78,8 +79,8 @@ export const getOrder = async (req: AuthRequest, res: Response): Promise<void> =
     }
 
     res.json(order);
-  } catch {
-    res.status(500).json({ error: "Failed to fetch order." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to fetch order.");
   }
 };
 
@@ -130,7 +131,7 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
         orgOwner.email,
         `New order received: ${org?.name}`,
         newOrderEmailTemplate(org?.name || "", order.id, order.customer?.name || "Walk-in", order.totalAmount, emailItems, `${frontendUrl}/dashboard/${org?.slug || ""}/orders`)
-      ).catch((e) => console.error("[Email] New order notification failed:", e.message));
+      ).catch(logAndIgnore("New order notification"));
     }
     if (order.customer?.email) {
       sendEmail(
@@ -146,7 +147,7 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
           org?.logoUrl || null,
           paymentMethod || "TRANSFER"
         )
-      ).catch((e) => console.error("[Email] Customer order confirmation failed:", e.message));
+      ).catch(logAndIgnore("Customer order confirmation"));
     }
 
     res.status(201).json(order);
@@ -223,7 +224,7 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
           updated.customer.email,
           `Order ${updated.orderNumber} approved: ${updated.organization?.name}`,
           orderApprovedEmailTemplate(updated.customer.name, updated.orderNumber, updated.organization?.name || "", updated.totalAmount, items, updated.organization?.logoUrl || null, orgContact, updated.customer.email)
-        ).catch((e) => console.error("[Email] Order approved email failed:", e.message));
+        ).catch(logAndIgnore("Order approved email"));
       } else if (status === "COMPLETED") {
         // Buyers get signed links, never the file's address. Each click re-checks the order and mints a one minute URL.
         const downloadableItems = updated.orderItems
@@ -234,7 +235,7 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
           updated.customer.email,
           `Order ${updated.orderNumber} delivered: ${updated.organization?.name}`,
           orderCompletedEmailTemplate(updated.customer.name, updated.orderNumber, updated.organization?.name || "", updated.totalAmount, updated.organization?.logoUrl || null, orgContact, updated.customer.email, downloadableItems)
-        ).catch((e) => console.error("[Email] Order completed email failed:", e.message));
+        ).catch(logAndIgnore("Order completed email"));
       }
     }
 

@@ -1,3 +1,4 @@
+import { getLogger } from "../config/logger";
 import prisma from "../config/database";
 import { Request } from "express";
 
@@ -24,6 +25,6 @@ export const createAuditLog = async (
       },
     });
   } catch (err) {
-    console.error("Failed to create audit log:", err);
+    getLogger().warn({ err, action, entity }, "audit log could not be written");
   }
 };
