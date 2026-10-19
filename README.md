@@ -60,6 +60,10 @@ graph TB
         FE["Next.js 14 App Router<br/>TypeScript + Tailwind CSS<br/>Framer Motion + Recharts<br/>Axios with JWT interceptor"]
     end
 
+    subgraph FrontendProxy["Frontend Proxy (Vercel)"]
+        PROXY["Same-origin proxy<br/>Trusted client IP<br/>Cookie: Path=/api/auth"]
+    end
+
     subgraph Server["API Server (Express.js)"]
         MW["Helmet + Rate Limit<br/>JWT authenticate<br/>requireOrg + RBAC guards"]
         CTRL["Controllers<br/>auth, org, products, inventory<br/>orders, customers, staff<br/>reports, audit, store<br/>payments, reviews, newsletter"]
@@ -67,14 +71,15 @@ graph TB
     end
 
     PG[("PostgreSQL<br/>Supabase")]
-    S3[("Supabase Storage<br/>products + avatars buckets")]
+    S3[("Supabase Storage<br/>products + avatars + downloadables<br/>Signed direct uploads")]
     MAIL["Nodemailer<br/>Gmail SMTP<br/>Branded HTML templates"]
     GOAUTH["Google OAuth 2.0"]
     PAY["Paystack"]
 
-    FE -->|"REST JSON / Bearer JWT"| MW
+    FE -->|"Same-origin REST JSON"| PROXY
+    PROXY -->|"Bearer JWT + httpOnly cookie"| MW
     CTRL -->|"Prisma ORM"| PG
-    CTRL --> S3
+    CTRL -->|"Signed URLs"| S3
     CTRL --> MAIL
     FE -->|"OAuth redirect"| GOAUTH
     GOAUTH -->|"code callback"| MW
@@ -97,7 +102,7 @@ graph TB
 3. `GET /api/auth/oauth-exchange/:code` - frontend calls this once with the opaque code; server returns the access token, refresh token, and user; the code is deleted immediately after use
 
 **Token refresh:**
-The Axios client intercepts every 401 response, silently calls `POST /api/auth/refresh` with the stored refresh token, saves the new access token, and retries the original request. This is transparent to all callers.
+The Axios client intercepts every 401 response, silently calls `POST /api/auth/refresh` which uses the httpOnly refresh cookie, saves the new access token in memory, and retries the original request. This is transparent to all callers.
 
 See [Sequence Diagrams](#sequence-diagrams) below for step-by-step visual flows.
 
@@ -521,7 +526,7 @@ graph TB
 | Security | Helmet, rate-limit | Per-route rate limiting on auth endpoints |
 | Phone input | react-phone-number-input | International flag selector, default NG |
 | PDF generation | PDFKit | Landscape A4 report PDFs |
-| File upload | Multer (memoryStorage) | Images: JPG/PNG/WebP max 2 MB; downloadable files: any type max 4 MB |
+| File upload | Multer (memoryStorage) | Images: JPG/PNG/WebP max 5 MB; downloadable files: any type max 4 MB; signed direct uploads to Supabase Storage |
 | Font | Jost | Google Fonts |
 
 ---
@@ -545,8 +550,8 @@ Four roles with granular middleware enforcement:
 ### Authentication
 - Email + password with OTP email verification (6-digit, 10-minute expiry)
 - Google OAuth 2.0 via redirect flow (no third-party popups)
-- JWT access token (7-day default) + refresh token pair
-- Axios interceptor catches 401 and silently refreshes the token
+- JWT access token (15 minutes, kept in memory) + httpOnly refresh cookie (Secure, SameSite=Lax, Path=/api/auth)
+- Axios interceptor catches 401, refreshes through the cookie, and retries the request
 - Account lock by admin with notification email
 
 ### Products and Inventory
