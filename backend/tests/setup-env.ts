@@ -8,7 +8,6 @@ process.env.DIRECT_URL = url;
 process.env.JWT_SECRET = "test_only_not_a_secret_jwt";
 process.env.PAYSTACK_SECRET_KEY = "test_only_not_a_secret_paystack";
 process.env.FRONTEND_URL = "http://localhost:3000";
-process.env.API_URL = "http://localhost:5000";
 process.env.CRON_SECRET = "test_only_not_a_secret_cron";
 process.env.PROXY_SHARED_SECRET = "test_only_not_a_secret_proxy";
 process.env.GOOGLE_CLIENT_ID = "test_only_not_a_client_id";
