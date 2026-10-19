@@ -1,3 +1,4 @@
+import { hashToken } from "../utils/token-hash";
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
@@ -611,7 +612,7 @@ export const acceptInvite = async (req: Request, res: Response): Promise<void> =
 
     const { token, name, password } = parsed.data;
 
-    const invite = await prisma.staffInvite.findUnique({ where: { token } });
+    const invite = await prisma.staffInvite.findUnique({ where: { token: hashToken(token) } });
     if (!invite || invite.status !== "PENDING" || invite.expiresAt < new Date()) {
       res.status(400).json({ error: "This invitation is invalid or has expired." });
       return;
