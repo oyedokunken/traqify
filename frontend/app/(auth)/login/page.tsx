@@ -148,7 +148,7 @@ function LoginForm() {
               disabled={isGoogleLoading}
               onClick={() => {
                 setIsGoogleLoading(true);
-                window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/api/auth/google-redirect`;
+                window.location.href = "/api/auth/google-redirect";
               }}
             >
               <Image src="/google-logo.png" alt="Google" width={18} height={18} className="w-4.5 h-4.5 object-contain" />

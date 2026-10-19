@@ -88,7 +88,7 @@ export default function ContributingPage() {
               {
                 step: 3,
                 title: "Configure environment",
-                code: "# Backend\ncp backend/.env.example backend/.env\n# Fill in: DATABASE_URL, DIRECT_URL, JWT_SECRET,\n# SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY,\n# SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM,\n# GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,\n# PAYSTACK_SECRET_KEY, FRONTEND_URL\n# CRON_SECRET (any long random string for local testing)\n\n# Frontend\ncp frontend/.env.local.example frontend/.env.local\n# Fill in: NEXT_PUBLIC_API_URL"
+                code: "# Backend\ncp backend/.env.example backend/.env\n# Fill in: DATABASE_URL, DIRECT_URL, JWT_SECRET,\n# SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY,\n# SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM,\n# GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,\n# PAYSTACK_SECRET_KEY, FRONTEND_URL\n# CRON_SECRET (any long random string for local testing)\n\n# Frontend\ncp frontend/.env.local.example frontend/.env.local\n# Fill in: API_ORIGIN, PROXY_SHARED_SECRET"
               },
               {
                 step: 4,

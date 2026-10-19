@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Topbar } from "@/components/dashboard/topbar";
 import api from "@/lib/api";
+import { uploadFile } from "@/lib/uploads";
 import { useAuth } from "@/lib/auth-context";
 import { INDUSTRY_OPTIONS, ORG_SIZE_OPTIONS, cn } from "@/lib/utils";
 import { useForm } from "react-hook-form";
@@ -55,11 +56,10 @@ export default function SettingsPage({ params }: { params: { slug: string } }) {
     if (!file) return;
     setAvatarUploading(true);
     try {
-      const fd = new FormData(); fd.append("avatar", file);
-      await api.post("/api/auth/upload-avatar", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      await uploadFile("AVATAR", file);
       await refreshUser();
       flash("success", "Profile picture updated.");
-    } catch (err: any) { flash("error", err.response?.data?.error || "Upload failed."); }
+    } catch (err: any) { flash("error", err.response?.data?.error || err.message || "Upload failed."); }
     finally { setAvatarUploading(false); e.target.value = ""; }
   };
 

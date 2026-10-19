@@ -1,6 +1,5 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 const USER_KEY = "traqify_user";
 
 // The access token lives only in memory, so a script injected into the page cannot read it from storage.
@@ -8,7 +7,7 @@ const USER_KEY = "traqify_user";
 let accessToken: string | null = null;
 
 const api = axios.create({
-  baseURL: API_URL,
+  // Same-origin: every call goes to /api/* on this site and middleware.ts forwards it to the API.
   withCredentials: true,
   headers: { "Content-Type": "application/json" },
 });
@@ -50,7 +49,7 @@ async function requestRefresh(): Promise<string | null> {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const { data } = await axios.post(
-        `${API_URL}/api/auth/refresh`,
+        "/api/auth/refresh",
         {},
         // The custom header makes the browser run a CORS preflight, which the API only approves for this app.
         { withCredentials: true, headers: { "X-Requested-By": "traqify" } }
