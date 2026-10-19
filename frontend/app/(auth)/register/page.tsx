@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ErrorModal } from "@/components/shared/error-modal";
-import api from "@/lib/api";
+import api, { setAccessToken } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { INDUSTRY_OPTIONS, ORG_SIZE_OPTIONS } from "@/lib/utils";
 import PhoneInput from "react-phone-number-input";
@@ -123,11 +123,19 @@ function RegisterForm() {
       return;
     }
     try {
-      const res = await api.post("/api/auth/register", { ...data, email: emailData.email });
+      let emailVerificationToken: string | null = null;
+      try { emailVerificationToken = sessionStorage.getItem("traqify_email_proof"); } catch { /* storage unavailable */ }
+      if (!emailVerificationToken) {
+        setError("Please verify your email address before continuing.");
+        setStep(1);
+        return;
+      }
+      const res = await api.post("/api/auth/register", { ...data, email: emailData.email, emailVerificationToken });
+      try { sessionStorage.removeItem("traqify_email_proof"); } catch { /* storage unavailable */ }
       setStep2Data(data);
       if (res.data.token) {
         setPendingToken(res.data.token);
-        api.defaults.headers.common["Authorization"] = `Bearer ${res.data.token}`;
+        setAccessToken(res.data.token);
       }
       setStep(3);
     } catch (err: any) {
@@ -210,7 +218,7 @@ function RegisterForm() {
                     <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-gray-400">or</span></div>
                   </div>
 
-                  <Button type="button" variant="outline" className="w-full gap-3" onClick={() => { window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/api/auth/google-redirect`; }}>
+                  <Button type="button" variant="outline" className="w-full gap-3" onClick={() => { window.location.href = "/api/auth/google-redirect"; }}>
                     <Image src="/google-logo.png" alt="Google" width={18} height={18} className="w-4.5 h-4.5 object-contain" />
                     Continue with Google
                   </Button>

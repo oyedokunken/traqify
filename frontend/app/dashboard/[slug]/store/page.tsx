@@ -6,6 +6,7 @@ import { Globe, Copy, Eye, EyeOff, ExternalLink, CheckCircle, ImagePlus, Package
 import { Button } from "@/components/ui/button";
 import { Topbar } from "@/components/dashboard/topbar";
 import api from "@/lib/api";
+import { uploadFile } from "@/lib/uploads";
 import { useAuth } from "@/lib/auth-context";
 import { useRoleGuard } from "@/lib/use-role-guard";
 
@@ -73,13 +74,12 @@ export default function StorePage({ params }: { params: { slug: string } }) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!['image/jpeg','image/png','image/webp'].includes(file.type)) { setLogoError('Only JPG, PNG, or WebP allowed.'); return; }
-    if (file.size > 2 * 1024 * 1024) { setLogoError('Image must be under 2MB.'); return; }
+    if (file.size > 5 * 1024 * 1024) { setLogoError('Image must be under 5MB.'); return; }
     setLogoUploading(true); setLogoError("");
     try {
-      const fd = new FormData(); fd.append('logo', file);
-      const r = await api.post(`/api/organizations/${params.slug}/upload-logo`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
-      setStoreData((prev: any) => ({ ...prev, logoUrl: r.data.url }));
-    } catch { setLogoError('Failed to upload logo.'); }
+      const r = await uploadFile("ORG_LOGO", file);
+      setStoreData((prev: any) => ({ ...prev, logoUrl: r.url }));
+    } catch (err: any) { setLogoError(err.response?.data?.error || 'Failed to upload logo.'); }
     finally { setLogoUploading(false); e.target.value = ''; }
   };
 

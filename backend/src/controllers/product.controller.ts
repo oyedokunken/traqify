@@ -1,16 +1,27 @@
+import { parsePagination } from "../utils/pagination";
+import { isStorageReference, storagePathOf } from "../utils/downloads";
 import { Response } from "express";
 import prisma from "../config/database";
-import { productSchema } from "../utils/validators";
+import { Prisma } from "@prisma/client";
+import { productSchema, productUpdateSchema } from "../utils/validators";
 import { createAuditLog } from "../utils/audit";
 import { AuthRequest } from "../middleware/auth.middleware";
 import { generateSlug } from "../utils/slug";
 
+/** A "storage:" reference must point at a file this organization uploaded and the server accepted. */
+async function ownsStoredFile(organizationId: string, reference: string): Promise<boolean> {
+  const upload = await prisma.upload.findFirst({
+    where: { path: storagePathOf(reference), organizationId, purpose: "DOWNLOADABLE", status: "CONFIRMED" },
+    select: { id: true },
+  });
+  return upload !== null;
+}
+
 export const getProducts = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const orgId = req.user!.organizationId!;
-    const { search, categoryId, isActive, status, productType, page, limit } = req.query;
-    const take = parseInt((limit as string) || "50");
-    const skip = (parseInt((page as string) || "1") - 1) * take;
+    const { search, categoryId, isActive, status, productType } = req.query;
+    const { skip, take } = parsePagination(req.query, 50);
 
     const where: any = {
       organizationId: orgId,
@@ -82,7 +93,16 @@ export const createProduct = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
-    const { name, sku, description, price, comparePrice, categoryId, imageUrl, imageUrls, status, isActive, variants, initialStock, lowStockAlert } = parsed.data;
+    const { name, sku, description, price, comparePrice, categoryId, imageUrl, imageUrls, status, isActive, variants, initialStock, lowStockAlert, productType, downloadUrl } = parsed.data;
+
+    if (categoryId && !(await prisma.productCategory.findFirst({ where: { id: categoryId, organizationId: orgId }, select: { id: true } }))) {
+      res.status(400).json({ error: "Category not found." });
+      return;
+    }
+    if (downloadUrl && isStorageReference(downloadUrl) && !(await ownsStoredFile(orgId, downloadUrl))) {
+      res.status(400).json({ error: "File not found. Upload it again." });
+      return;
+    }
 
     const existing = await prisma.product.findUnique({ where: { sku_organizationId: { sku, organizationId: orgId } } });
     if (existing) {
@@ -103,6 +123,8 @@ export const createProduct = async (req: AuthRequest, res: Response): Promise<vo
     const product = await prisma.product.create({
       data: {
         name, sku, description, price, comparePrice,
+        productType,
+        downloadUrl: productType === "DOWNLOADABLE" ? downloadUrl ?? undefined : undefined,
         slug: productSlug,
         categoryId: categoryId || undefined,
         imageUrl: imageUrl || (imageUrls && imageUrls[0]) || undefined,
@@ -134,17 +156,36 @@ export const updateProduct = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
-    const { variants, initialStock, lowStockAlert, ...rest } = req.body;
+    const parsed = productUpdateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.errors[0].message });
+      return;
+    }
+    const data = parsed.data;
+
+    if (data.categoryId && !(await prisma.productCategory.findFirst({ where: { id: data.categoryId, organizationId: orgId }, select: { id: true } }))) {
+      res.status(400).json({ error: "Category not found." });
+      return;
+    }
+
+    if (data.downloadUrl && isStorageReference(data.downloadUrl) && !(await ownsStoredFile(orgId, data.downloadUrl))) {
+      res.status(400).json({ error: "File not found. Upload it again." });
+      return;
+    }
 
     const product = await prisma.product.update({
       where: { id },
-      data: rest,
+      data,
       include: { inventory: true, variants: true },
     });
 
     await createAuditLog(req.user!.id, orgId, "UPDATE", "Product", id, `Updated product: ${product.name}`, req);
     res.json(product);
-  } catch {
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      res.status(409).json({ error: "A product with this SKU already exists." });
+      return;
+    }
     res.status(500).json({ error: "Failed to update product." });
   }
 };

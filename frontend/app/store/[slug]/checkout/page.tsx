@@ -68,7 +68,7 @@ export default function CheckoutPage({ params }: { params: { slug: string } }) {
     } catch { router.replace(`/store/${params.slug}`); return; }
     api.get(`/api/organizations/${params.slug}/store`).then((r) => setOrg(r.data.org)).catch(() => {});
     const script = document.createElement("script");
-    script.src = "https://js.paystack.co/v1/inline.js";
+    script.src = "https://js.paystack.co/v2/inline.js";
     script.async = true;
     document.body.appendChild(script);
     return () => { document.body.removeChild(script); };
@@ -76,35 +76,52 @@ export default function CheckoutPage({ params }: { params: { slug: string } }) {
 
   const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
 
+  // The server prices the cart and issues the Paystack reference. The browser never chooses an amount or a reference.
   const completeOrder = async (reference: string) => {
     setLoading(true); setError("");
     try {
-      const items = cart.map((i) => ({ productId: i.id, quantity: i.qty }));
-      const res = await api.post(`/api/store/${params.slug}/checkout`, { name, email, phone, address, notes, items, paymentMethod: "PAYSTACK", paystackReference: reference });
+      const res = await api.post(`/api/store/${params.slug}/checkout`, { paymentMethod: "PAYSTACK", reference });
       localStorage.removeItem(`traqify_cart_${params.slug}`);
       setSuccess({ orderNumber: res.data.orderNumber, total: res.data.totalAmount, orderId: res.data.id });
     } catch (err: any) {
-      setError(err.response?.data?.error || "Payment verified but order creation failed. Contact support.");
+      setError(err.response?.data?.error || "We could not confirm your payment yet. If you were charged, contact the store with your payment reference.");
     } finally { setLoading(false); }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Returning from the hosted Paystack page (used when the popup is unavailable): finish the checkout it started.
+  useEffect(() => {
+    const reference = new URLSearchParams(window.location.search).get("reference");
+    if (reference) completeOrder(reference);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !email.trim()) { setError("Name and email are required."); return; }
     if (parseInt(captchaInput) !== captcha.answer) { setError("Incorrect security answer. Please try again."); setCaptcha(makeCaptcha()); setCaptchaInput(""); return; }
     setError("");
-    const handler = window.PaystackPop.setup({
-      key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "pk_test_97ea3775550f1bd74cdaa1818a57b6a280f177e8",
-      email,
-      amount: Math.round(total * 100),
-      currency: "NGN",
-      ref: `TRQ-${Date.now()}`,
-      metadata: { name, phone, slug: params.slug },
-      callback: (response: any) => { completeOrder(response.reference); },
-      onClose: () => { setError("Payment window closed. Your order was not placed."); },
-    });
-    handler.openIframe();
+    setLoading(true);
+    try {
+      const items = cart.map((i) => ({ productId: i.id, quantity: i.qty }));
+      const { data } = await api.post(`/api/store/${params.slug}/checkout/initialize`, { name, email, phone, address, notes, items });
+
+      if (typeof window.PaystackPop !== "function") {
+        // Popup script did not load: continue on Paystack's hosted page, which returns here with the reference.
+        window.location.href = data.authorizationUrl;
+        return;
+      }
+      const popup = new window.PaystackPop();
+      popup.resumeTransaction(data.accessCode, {
+        onSuccess: (transaction: { reference?: string }) => { completeOrder(transaction.reference || data.reference); },
+        onCancel: () => { setLoading(false); setError("Payment window closed. Your order was not placed."); },
+        onError: () => { setLoading(false); setError("The payment window could not be opened. Please try again."); },
+      });
+    } catch (err: any) {
+      setLoading(false);
+      setError(err.response?.data?.error || "We could not start your payment. Please try again.");
+    }
   };
+
 
   if (!cartReady && !success) return (
     <div className="min-h-screen flex items-center justify-center">

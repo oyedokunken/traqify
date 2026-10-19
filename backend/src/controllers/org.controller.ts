@@ -1,3 +1,4 @@
+import { MAX_UNPAGED_ROWS } from "../utils/pagination";
 import { Response } from "express";
 import prisma from "../config/database";
 import { createOrganizationSchema, updateOrgSchema } from "../utils/validators";
@@ -130,7 +131,7 @@ export const getPublicStore = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    const products = await prisma.product.findMany({
+    const products = await prisma.product.findMany({ take: MAX_UNPAGED_ROWS,
       where: { organizationId: org.id, isActive: true, status: "published" },
       include: {
         inventory: { select: { quantity: true } },
@@ -140,7 +141,7 @@ export const getPublicStore = async (req: Request, res: Response): Promise<void>
       orderBy: { createdAt: "desc" },
     });
 
-    const categories = await prisma.productCategory.findMany({
+    const categories = await prisma.productCategory.findMany({ take: MAX_UNPAGED_ROWS,
       where: { organizationId: org.id },
       select: { id: true, name: true, slug: true },
       orderBy: { name: "asc" },

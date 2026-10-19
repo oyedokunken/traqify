@@ -1,15 +1,15 @@
+import { parsePagination } from "../utils/pagination";
 import { Response } from "express";
 import prisma from "../config/database";
-import { customerSchema } from "../utils/validators";
+import { customerSchema, customerUpdateSchema } from "../utils/validators";
 import { createAuditLog } from "../utils/audit";
 import { AuthRequest } from "../middleware/auth.middleware";
 
 export const getCustomers = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const orgId = req.user!.organizationId!;
-    const { search, page = "1", limit = "25" } = req.query;
-    const take = parseInt(limit as string);
-    const skip = (parseInt(page as string) - 1) * take;
+    const { search } = req.query;
+    const { skip, take } = parsePagination(req.query, 25);
 
     const where: any = {
       organizationId: orgId,
@@ -91,7 +91,13 @@ export const updateCustomer = async (req: AuthRequest, res: Response): Promise<v
       return;
     }
 
-    const customer = await prisma.customer.update({ where: { id }, data: req.body });
+    const parsed = customerUpdateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.errors[0].message });
+      return;
+    }
+
+    const customer = await prisma.customer.update({ where: { id }, data: parsed.data });
     await createAuditLog(req.user!.id, orgId, "UPDATE", "Customer", id, `Updated customer: ${customer.name}`, req);
     res.json(customer);
   } catch {

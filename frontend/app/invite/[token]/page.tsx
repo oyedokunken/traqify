@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ErrorModal } from "@/components/shared/error-modal";
-import api, { setAuthTokens } from "@/lib/api";
+import api, { setSession } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { ROLE_LABELS } from "@/lib/utils";
 
@@ -59,7 +59,7 @@ export default function AcceptInvitePage({ params }: { params: { token: string }
         name: data.name,
         password: data.password,
       });
-      setAuthTokens(res.data.token, res.data.refreshToken, res.data.user);
+      setSession(res.data.token, res.data.user);
       setUser(res.data.user);
       setSuccess(true);
       setTimeout(() => router.push(`/dashboard/${res.data.orgSlug || ""}/overview`), 1500);

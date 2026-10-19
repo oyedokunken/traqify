@@ -1,3 +1,5 @@
+import { hashToken } from "../utils/token-hash";
+import { MAX_UNPAGED_ROWS } from "../utils/pagination";
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
@@ -8,11 +10,14 @@ import { staffInviteEmailTemplate, accountRestrictedEmailTemplate, passwordReset
 import { createAuditLog } from "../utils/audit";
 import { AuthRequest } from "../middleware/auth.middleware";
 
+/** Invitation columns that are safe to return. The token (stored as a hash) is never part of a response. */
+const INVITE_FIELDS = { id: true, email: true, role: true, status: true, expiresAt: true, organizationId: true, invitedById: true, createdAt: true, updatedAt: true } as const;
+
 export const getInviteDetails = async (req: Request, res: Response): Promise<void> => {
   try {
     const { token } = req.params;
     const invite = await prisma.staffInvite.findUnique({
-      where: { token },
+      where: { token: hashToken(token) },
       include: { organization: { select: { name: true, logoUrl: true } } },
     });
 
@@ -36,7 +41,7 @@ export const getStaff = async (req: AuthRequest, res: Response): Promise<void> =
   try {
     const orgId = req.user!.organizationId!;
 
-    const staff = await prisma.user.findMany({
+    const staff = await prisma.user.findMany({ take: MAX_UNPAGED_ROWS,
       where: { organizationId: orgId },
       select: {
         id: true,
@@ -64,8 +69,10 @@ export const getInvites = async (req: AuthRequest, res: Response): Promise<void>
     const orgId = req.user!.organizationId!;
 
     const invites = await prisma.staffInvite.findMany({
+      take: MAX_UNPAGED_ROWS,
       where: { organizationId: orgId },
       orderBy: { createdAt: "desc" },
+      select: INVITE_FIELDS,
     });
 
     const now = new Date();
@@ -110,7 +117,8 @@ export const inviteStaff = async (req: AuthRequest, res: Response): Promise<void
     const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000);
 
     const invite = await prisma.staffInvite.create({
-      data: { email, role, token, expiresAt, organizationId: orgId, invitedById: req.user!.id },
+      data: { email, role, token: hashToken(token), expiresAt, organizationId: orgId, invitedById: req.user!.id },
+      select: INVITE_FIELDS,
     });
 
     const org = await prisma.organization.findUnique({ where: { id: orgId } });

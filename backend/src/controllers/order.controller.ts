@@ -1,33 +1,41 @@
+import { OrderStatus } from "@prisma/client";
+import { parsePagination } from "../utils/pagination";
 import { Response } from "express";
 import prisma from "../config/database";
-import { orderSchema } from "../utils/validators";
+import { orderSchema, orderStatusSchema } from "../utils/validators";
 import { createAuditLog } from "../utils/audit";
 import { AuthRequest } from "../middleware/auth.middleware";
 import { sendEmail } from "../config/email";
 import { orderApprovedEmailTemplate, orderCompletedEmailTemplate, newOrderEmailTemplate, storeOrderConfirmationEmailTemplate } from "../emails/templates";
-import https from "https";
+import { placeOrder } from "../utils/order-placement";
+import { generateOrderNumber } from "../utils/order-number";
+import { buildDownloadLink } from "../utils/downloads";
+import { AppError, respondWithError } from "../middleware/error.middleware";
+import { canTransitionOrder } from "../utils/status-transitions";
 
-const generateOrderNumber = (): string => {
-  const timestamp = Date.now().toString(36).toUpperCase();
-  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-  return `ORD-${timestamp}-${random}`;
-};
 
 export const getOrders = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const orgId = req.user!.organizationId!;
-    const { status, customerId, page = "1", limit = "20" } = req.query;
+    const { status, customerId } = req.query;
+    const { page, limit, skip, take } = parsePagination(req.query, 20);
 
-    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+    if (status !== undefined && status !== "" && !orderStatusSchema.shape.status.safeParse(status).success) {
+      res.status(400).json({ error: "Invalid order status." });
+      return;
+    }
+
+    // The same filter drives the list and the total, so a cashier's count matches what they can see.
+    const where = {
+      organizationId: orgId,
+      ...(req.user!.role === "CASHIER" && { createdById: req.user!.id }),
+      ...(status && { status: status as OrderStatus }),
+      ...(typeof customerId === "string" && customerId && { customerId }),
+    };
 
     const [orders, total] = await Promise.all([
       prisma.order.findMany({
-        where: {
-          organizationId: orgId,
-          ...(req.user!.role === "CASHIER" && { createdById: req.user!.id }),
-          ...(status && { status: status as any }),
-          ...(customerId && { customerId: customerId as string }),
-        },
+        where,
         include: {
           customer: { select: { id: true, name: true, email: true } },
           createdBy: { select: { id: true, name: true } },
@@ -37,12 +45,12 @@ export const getOrders = async (req: AuthRequest, res: Response): Promise<void> 
         },
         orderBy: { createdAt: "desc" },
         skip,
-        take: parseInt(limit as string),
+        take,
       }),
-      prisma.order.count({ where: { organizationId: orgId, ...(status && { status: status as any }), ...(customerId && { customerId: customerId as string }) } }),
+      prisma.order.count({ where }),
     ]);
 
-    res.json({ orders, total, page: parseInt(page as string), limit: parseInt(limit as string) });
+    res.json({ orders, total, page, limit });
   } catch {
     res.status(500).json({ error: "Failed to fetch orders." });
   }
@@ -86,104 +94,25 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
 
     const { items, customerId: rawCustomerId, newCustomer, notes, paymentMethod } = parsed.data;
 
-    let resolvedCustomerId: string | undefined = rawCustomerId;
-
-    if (!resolvedCustomerId && newCustomer?.name) {
-      const email = newCustomer.email || null;
-      let customer = email
-        ? await prisma.customer.findFirst({ where: { email, organizationId: orgId } })
-        : null;
-      if (!customer) {
-        customer = await prisma.customer.create({
-          data: {
-            name: newCustomer.name,
-            email: email || undefined,
-            phone: newCustomer.phone || undefined,
-            address: newCustomer.address || undefined,
-            organizationId: orgId,
-            source: "MANUAL",
-          },
-        });
-        await createAuditLog(req.user!.id, orgId, "CREATE", "Customer", customer.id, `Customer ${customer.name} added via manual order`, req);
-      }
-      resolvedCustomerId = customer.id;
-    }
-
-    const products = await prisma.product.findMany({
-      where: {
-        id: { in: items.map((i) => i.productId) },
-        organizationId: orgId,
-        isActive: true,
-      },
-      include: { inventory: true },
+    const { order, customerCreated } = await placeOrder({
+      organizationId: orgId,
+      createdById: req.user!.id,
+      orderNumber: generateOrderNumber("ORD"),
+      lines: items,
+      customer: rawCustomerId
+        ? { kind: "existing", id: rawCustomerId }
+        : newCustomer?.name
+          ? { kind: "find-or-create", name: newCustomer.name, email: newCustomer.email || null, phone: newCustomer.phone, address: newCustomer.address, source: "MANUAL" }
+          : null,
+      status: "APPROVED",
+      paymentMethod: paymentMethod || "TRANSFER",
+      notes,
+      payment: { status: "COMPLETED" },
     });
 
-    if (products.length !== items.length) {
-      res.status(400).json({ error: "One or more products were not found or are inactive." });
-      return;
+    if (customerCreated && order.customer) {
+      await createAuditLog(req.user!.id, orgId, "CREATE", "Customer", order.customer.id, `Customer ${order.customer.name} added via manual order`, req);
     }
-
-    for (const item of items) {
-      const product = products.find((p) => p.id === item.productId)!;
-      if (!product.inventory || product.inventory.quantity < item.quantity) {
-        res.status(400).json({
-          error: `Insufficient stock for "${product.name}". Available: ${product.inventory?.quantity ?? 0}.`,
-        });
-        return;
-      }
-    }
-
-    const orderItems = items.map((item) => {
-      const product = products.find((p) => p.id === item.productId)!;
-      return {
-        productId: item.productId,
-        quantity: item.quantity,
-        unitPrice: product.price,
-        subtotal: product.price * item.quantity,
-      };
-    });
-
-    const totalAmount = orderItems.reduce((sum, i) => sum + i.subtotal, 0);
-
-    const order = await prisma.$transaction(async (tx) => {
-      const newOrder = await tx.order.create({
-        data: {
-          orderNumber: generateOrderNumber(),
-          organizationId: orgId,
-          createdById: req.user!.id,
-          customerId: resolvedCustomerId || undefined,
-          notes,
-          paymentMethod,
-          totalAmount,
-          status: "APPROVED",
-          orderItems: { create: orderItems },
-        },
-        include: {
-          orderItems: { include: { product: true } },
-          customer: true,
-        },
-      });
-
-      for (const item of items) {
-        await tx.inventory.update({
-          where: { productId: item.productId },
-          data: { quantity: { decrement: item.quantity } },
-        });
-      }
-
-      await tx.payment.create({
-        data: {
-          amount: totalAmount,
-          currency: "NGN",
-          status: "COMPLETED",
-          method: paymentMethod || "TRANSFER",
-          organizationId: orgId,
-          orderId: newOrder.id,
-        },
-      });
-
-      return newOrder;
-    });
 
     await createAuditLog(req.user!.id, orgId, "CREATE", "Order", order.id, `Created order ${order.orderNumber}`, req);
 
@@ -221,8 +150,8 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
     }
 
     res.status(201).json(order);
-  } catch {
-    res.status(500).json({ error: "Failed to create order." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to create order.");
   }
 };
 
@@ -230,12 +159,12 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
   try {
     const { id } = req.params;
     const orgId = req.user!.organizationId!;
-    const { status } = req.body;
-
-    if (!["PENDING", "APPROVED", "COMPLETED", "CANCELLED"].includes(status)) {
-      res.status(400).json({ error: "Invalid order status." });
+    const parsed = orderStatusSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.errors[0].message });
       return;
     }
+    const { status } = parsed.data;
 
     const order = await prisma.order.findFirst({ where: { id, organizationId: orgId } });
     if (!order) {
@@ -243,17 +172,40 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
       return;
     }
 
-    const updated = await prisma.order.update({
-      where: { id },
-      data: { status },
-      include: {
-        customer: true,
-        orderItems: { include: { product: { select: { name: true, productType: true, downloadUrl: true } } } },
-        organization: { select: { name: true, logoUrl: true, email: true, phone: true, address: true } },
-      },
+    const include = {
+      customer: true,
+      orderItems: { include: { product: { select: { name: true, productType: true, downloadUrl: true } } } },
+      organization: { select: { name: true, slug: true, logoUrl: true, email: true, phone: true, address: true } },
+    } as const;
+
+    if (order.status === status) {
+      // Repeating the current status is a no-op: no emails and no stock movement.
+      res.json(await prisma.order.findUniqueOrThrow({ where: { id }, include }));
+      return;
+    }
+    if (!canTransitionOrder(order.status, status)) {
+      res.status(409).json({ error: `An order that is ${order.status.toLowerCase()} cannot be changed to ${status.toLowerCase()}.` });
+      return;
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      // The old status is part of the condition, so two concurrent requests cannot both apply a transition.
+      const claimed = await tx.order.updateMany({ where: { id, organizationId: orgId, status: order.status }, data: { status } });
+      if (claimed.count === 0) {
+        throw new AppError("This order was changed by someone else. Refresh and try again.", 409);
+      }
+      if (status === "CANCELLED") {
+        // Stock was taken when the order was placed, so cancelling puts it back.
+        const items = await tx.orderItem.findMany({ where: { orderId: id }, select: { productId: true, quantity: true } });
+        for (const item of items) {
+          await tx.inventory.updateMany({ where: { productId: item.productId }, data: { quantity: { increment: item.quantity } } });
+        }
+        await tx.payment.updateMany({ where: { orderId: id, status: "PENDING" }, data: { status: "FAILED" } });
+      }
+      return tx.order.findUniqueOrThrow({ where: { id }, include });
     }) as any;
 
-    await createAuditLog(req.user!.id, orgId, "UPDATE", "Order", id, `Updated order ${order.orderNumber} status to ${status}`, req);
+    await createAuditLog(req.user!.id, orgId, "UPDATE", "Order", id, `Updated order ${order.orderNumber} status to ${status}${status === "CANCELLED" ? " (stock restored)" : ""}`, req);
 
     if (updated.customer?.email) {
       const items = updated.orderItems.map((i: any) => ({
@@ -273,47 +225,22 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
           orderApprovedEmailTemplate(updated.customer.name, updated.orderNumber, updated.organization?.name || "", updated.totalAmount, items, updated.organization?.logoUrl || null, orgContact, updated.customer.email)
         ).catch((e) => console.error("[Email] Order approved email failed:", e.message));
       } else if (status === "COMPLETED") {
+        // Buyers get signed links, never the file's address. Each click re-checks the order and mints a one minute URL.
         const downloadableItems = updated.orderItems
           .filter((i: any) => i.product?.productType === "DOWNLOADABLE" && i.product?.downloadUrl)
-          .map((i: any) => ({ name: i.product.name, downloadUrl: i.product.downloadUrl }));
-
-        const attachments: any[] = [];
-        for (const item of downloadableItems) {
-          let isAllowedHost = false;
-          try {
-            const parsed = new URL(item.downloadUrl);
-            isAllowedHost = parsed.hostname.endsWith(".supabase.co") || parsed.hostname.endsWith(".supabase.in");
-          } catch { /* malformed URL - skip */ }
-          if (isAllowedHost) {
-              try {
-                const fileBuffer = await new Promise<Buffer>((resolve, reject) => {
-                  https.get(item.downloadUrl, (res: any) => {
-                    const chunks: Buffer[] = [];
-                    res.on("data", (chunk: Buffer) => chunks.push(chunk));
-                    res.on("end", () => resolve(Buffer.concat(chunks)));
-                    res.on("error", reject);
-                  });
-                });
-                const filename = item.downloadUrl.split("/").pop() || "download.pdf";
-                attachments.push({ filename, content: fileBuffer });
-              } catch (err) {
-                console.error("[Email] Failed to fetch downloadable file:", err);
-              }
-          }
-        }
+          .map((i: any) => ({ name: i.product.name, downloadUrl: buildDownloadLink(updated.organization.slug, updated.id, i.productId) }));
 
         sendEmail(
           updated.customer.email,
           `Order ${updated.orderNumber} delivered: ${updated.organization?.name}`,
-          orderCompletedEmailTemplate(updated.customer.name, updated.orderNumber, updated.organization?.name || "", updated.totalAmount, updated.organization?.logoUrl || null, orgContact, updated.customer.email, downloadableItems),
-          attachments.length > 0 ? attachments : undefined
+          orderCompletedEmailTemplate(updated.customer.name, updated.orderNumber, updated.organization?.name || "", updated.totalAmount, updated.organization?.logoUrl || null, orgContact, updated.customer.email, downloadableItems)
         ).catch((e) => console.error("[Email] Order completed email failed:", e.message));
       }
     }
 
     res.json(updated);
-  } catch {
-    res.status(500).json({ error: "Failed to update order status." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to update order status.");
   }
 };
 
@@ -328,10 +255,33 @@ export const deleteOrder = async (req: AuthRequest, res: Response): Promise<void
       return;
     }
 
-    await prisma.order.delete({ where: { id } });
-    await createAuditLog(req.user!.id, orgId, "DELETE", "Order", id, `Deleted order ${order.orderNumber}`, req);
+    const restock = order.status === "PENDING" || order.status === "APPROVED";
+
+    await prisma.$transaction(async (tx) => {
+      const items = await tx.orderItem.findMany({ where: { orderId: id }, select: { productId: true, quantity: true } });
+      // Payments keep their row when the order goes away but lose the link, so they are updated first. If the
+      // delete below finds the order changed, this whole transaction rolls back with it.
+      if (restock) {
+        await tx.payment.updateMany({ where: { orderId: id, status: "PENDING" }, data: { status: "FAILED" } });
+      }
+      // The status is part of the delete condition: if a concurrent request cancelled or completed the order
+      // meanwhile, nothing is deleted and stock cannot be restored twice.
+      const claimed = await tx.order.deleteMany({ where: { id, organizationId: orgId, status: order.status } });
+      if (claimed.count === 0) {
+        throw new AppError("This order was changed by someone else. Refresh and try again.", 409);
+      }
+      // Stock was taken when the order was placed. Only orders that were never delivered (pending or approved)
+      // give it back; a completed order's goods have left, and a cancelled order was restocked when cancelled.
+      if (restock) {
+        for (const item of items) {
+          await tx.inventory.updateMany({ where: { productId: item.productId }, data: { quantity: { increment: item.quantity } } });
+        }
+      }
+    });
+
+    await createAuditLog(req.user!.id, orgId, "DELETE", "Order", id, `Deleted order ${order.orderNumber}${restock ? " (stock restored)" : ""}`, req);
     res.json({ message: "Order deleted successfully." });
-  } catch {
-    res.status(500).json({ error: "Failed to delete order." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to delete order.");
   }
 };

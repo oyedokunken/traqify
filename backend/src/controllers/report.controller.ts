@@ -1,3 +1,5 @@
+import { parsePagination } from "../utils/pagination";
+import { reportEmailSchema } from "../utils/validators";
 import { Response } from "express";
 import prisma from "../config/database";
 import { AuthRequest } from "../middleware/auth.middleware";
@@ -96,14 +98,14 @@ export const getSalesReport = async (req: AuthRequest, res: Response): Promise<v
 export const getTopProducts = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const orgId = req.user!.organizationId!;
-    const { limit = "10" } = req.query;
+    const { take } = parsePagination(req.query, 10);
 
     const topProducts = await prisma.orderItem.groupBy({
       by: ["productId"],
       where: { order: { organizationId: orgId, status: "COMPLETED" } },
       _sum: { quantity: true, subtotal: true },
       orderBy: { _sum: { subtotal: "desc" } },
-      take: parseInt(limit as string),
+      take,
     });
 
     const productIds = topProducts.map((p: any) => p.productId);
@@ -226,7 +228,7 @@ const REPORT_LABELS: Record<string, string> = {
 
 const DATE_RANGE_TYPES = ["revenue", "orders", "payments", "audit-logs"];
 
-async function buildReportData(type: string, orgId: string, from: Date, to: Date) {
+export async function buildReportData(type: string, orgId: string, from: Date, to: Date) {
   if (type === "revenue") {
     return prisma.order.findMany({ where: { organizationId: orgId, createdAt: { gte: from, lte: to } }, include: { customer: true, orderItems: { include: { product: true } } }, orderBy: { createdAt: "desc" } });
   } else if (type === "products") {
@@ -240,7 +242,7 @@ async function buildReportData(type: string, orgId: string, from: Date, to: Date
   } else if (type === "staff") {
     return prisma.user.findMany({ where: { organizationId: orgId }, orderBy: { createdAt: "asc" } });
   } else if (type === "newsletter") {
-    return prisma.newsletterSubscriber.findMany({ orderBy: { createdAt: "desc" } });
+    return prisma.newsletterSubscriber.findMany({ where: { organizationId: orgId }, orderBy: { createdAt: "desc" } });
   } else if (type === "payments") {
     return prisma.payment.findMany({ where: { organizationId: orgId, createdAt: { gte: from, lte: to } }, include: { order: { select: { id: true } } }, orderBy: { createdAt: "desc" } });
   } else if (type === "audit-logs") {
@@ -403,11 +405,12 @@ export const downloadReport = async (req: AuthRequest, res: Response): Promise<v
 export const emailReport = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { type } = req.params;
-    const { to, from, to_date } = req.body;
     const orgId = req.user!.organizationId!;
     const label = REPORT_LABELS[type];
     if (!label) { res.status(400).json({ error: "Invalid report type." }); return; }
-    if (!to) { res.status(400).json({ error: "Recipient email is required." }); return; }
+    const parsed = reportEmailSchema.safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({ error: parsed.error.errors[0].message }); return; }
+    const { to, from, to_date } = parsed.data;
 
     const today = new Date(); today.setHours(23, 59, 59, 999);
     const fromDate = from ? new Date(from) : new Date(Date.now() - 30 * 86400000);

@@ -1,3 +1,4 @@
+import { parsePagination } from "../utils/pagination";
 import { Request, Response } from "express";
 import prisma from "../config/database";
 import { AuthRequest } from "../middleware/auth.middleware";
@@ -86,8 +87,8 @@ export const getProductReviews = async (req: Request, res: Response): Promise<vo
 export const getDashboardReviews = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const orgId = req.user!.organizationId!;
-    const { status, page = "1", limit = "20" } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
+    const { status } = req.query;
+    const { page, limit, skip, take } = parsePagination(req.query, 20);
 
     const where: any = { organizationId: orgId };
     if (status) where.status = status;
@@ -96,7 +97,7 @@ export const getDashboardReviews = async (req: AuthRequest, res: Response): Prom
       prisma.review.findMany({
         where,
         skip,
-        take: Number(limit),
+        take,
         orderBy: { createdAt: "desc" },
         include: {
           product: { select: { id: true, name: true, imageUrl: true } },
@@ -106,7 +107,7 @@ export const getDashboardReviews = async (req: AuthRequest, res: Response): Prom
       prisma.review.count({ where }),
     ]);
 
-    res.json({ reviews, total, page: Number(page), limit: Number(limit) });
+    res.json({ reviews, total, page, limit });
   } catch (err) {
     console.error("[getDashboardReviews]", err);
     res.status(500).json({ error: "Failed to fetch reviews." });

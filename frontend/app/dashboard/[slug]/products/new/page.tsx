@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Topbar } from "@/components/dashboard/topbar";
 import api from "@/lib/api";
+import { uploadFile } from "@/lib/uploads";
 
 const productSchema = z.object({
   name: z.string().min(2, "Product name must be at least 2 characters"),
@@ -123,11 +124,10 @@ export default function NewProductPage({ params }: { params: { slug: string } })
       if (imageFiles.length > 0) {
         setUploadProgress(true);
         for (const file of imageFiles) {
-          if (file.size > 2 * 1024 * 1024) { setImageError(`"${file.name}" exceeds 2 MB.`); continue; }
-          const fd = new FormData(); fd.append("image", file);
+          if (file.size > 5 * 1024 * 1024) { setImageError(`"${file.name}" exceeds 5 MB.`); continue; }
           try {
-            const r = await api.post("/api/products/upload-image", fd, { headers: { "Content-Type": "multipart/form-data" } });
-            uploadedUrls.push(r.data.url);
+            const r = await uploadFile("PRODUCT_IMAGE", file);
+            if (r.url) uploadedUrls.push(r.url);
           } catch { setImageError("Some images failed to upload and were skipped."); }
         }
         setUploadProgress(false);
@@ -138,16 +138,15 @@ export default function NewProductPage({ params }: { params: { slug: string } })
 
       let downloadUrl = data.downloadUrl || undefined;
       if (data.productType === "DOWNLOADABLE" && downloadMode === "upload" && downloadFile) {
-        if (downloadFile.size > 4 * 1024 * 1024) {
-          showError("File too large", "Downloadable files must be under 4 MB. Please compress your file or host it externally and use a download URL instead.");
+        if (downloadFile.size > 25 * 1024 * 1024) {
+          showError("File too large", "Downloadable files must be under 25 MB. Please compress your file or host it externally and use a download URL instead.");
           setIsLoading(false); return;
         }
-        const fd = new FormData(); fd.append("file", downloadFile);
         try {
-          const r = await api.post("/api/products/upload-file", fd, { headers: { "Content-Type": "multipart/form-data" } });
-          downloadUrl = r.data.url;
+          const r = await uploadFile("DOWNLOADABLE", downloadFile);
+          downloadUrl = r.reference;
         } catch (err: any) {
-          showError("Upload failed", err.response?.data?.error || "Failed to upload the downloadable file. Please check your internet connection or try using a URL instead.");
+          showError("Upload failed", err.response?.data?.error || err.message || "Failed to upload the downloadable file. Please check your internet connection or try using a URL instead.");
           setIsLoading(false); return;
         }
       }
