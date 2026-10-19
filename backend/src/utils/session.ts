@@ -12,14 +12,14 @@ const USED_TOKEN_RETENTION_MS = 24 * 60 * 60 * 1000;
 const hashToken = (raw: string): string => crypto.createHash("sha256").update(raw).digest("hex");
 
 /**
- * The cookie is httpOnly (not readable by scripts) and scoped to the auth routes. The web app and
- * the API live on different sites, so production needs SameSite=None with Secure; override with
- * COOKIE_SAMESITE when both are served from one registrable domain.
+ * The cookie is httpOnly (not readable by scripts), Secure in production and scoped to the auth routes. The web app
+ * reaches the API through its own origin, so the cookie is first party and SameSite=Lax is enough. COOKIE_SAMESITE
+ * can override it; "none" forces Secure.
  */
 export function refreshCookieOptions(): CookieOptions {
   const production = process.env.NODE_ENV === "production";
   const configured = process.env.COOKIE_SAMESITE;
-  const sameSite = configured === "lax" || configured === "strict" || configured === "none" ? configured : production ? "none" : "lax";
+  const sameSite = configured === "strict" || configured === "none" ? configured : "lax";
   return { httpOnly: true, secure: production || sameSite === "none", sameSite, path: "/api/auth" };
 }
 

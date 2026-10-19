@@ -7,6 +7,7 @@ import cookieParser from "cookie-parser";
 
 import { errorHandler, notFound } from "./middleware/error.middleware";
 import { authLimiter, generalLimiter } from "./middleware/rate-limit";
+import { forwardedClientIp } from "./middleware/proxy-ip";
 import authRoutes from "./routes/auth.routes";
 import orgRoutes from "./routes/org.routes";
 import productRoutes from "./routes/product.routes";
@@ -27,6 +28,7 @@ import uploadRoutes from "./routes/upload.routes";
 const app = express();
 
 app.set("trust proxy", 1);
+app.use(forwardedClientIp);
 
 app.use(helmet());
 if (process.env.NODE_ENV !== "test") {

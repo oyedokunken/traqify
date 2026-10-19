@@ -273,6 +273,10 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
+// Google sends the browser back to the frontend origin; the proxy forwards it here. That keeps the whole sign in on
+// one origin, so the state cookie set when it starts is first party when the callback arrives.
+const googleRedirectUri = (): string => `${process.env.FRONTEND_URL || "http://localhost:3000"}/api/auth/google-callback`;
+
 const OAUTH_STATE_COOKIE = "oauth_state";
 
 const oauthStateCookieOptions = () => ({
@@ -296,7 +300,7 @@ export const googleRedirect = (_req: Request, res: Response): void => {
 
   const params = new URLSearchParams({
     client_id: process.env.GOOGLE_CLIENT_ID || "",
-    redirect_uri: `${process.env.API_URL || "http://localhost:5000"}/api/auth/google-callback`,
+    redirect_uri: googleRedirectUri(),
     response_type: "code",
     scope: "openid email profile",
     access_type: "offline",
@@ -324,7 +328,7 @@ export const googleCallback = async (req: Request, res: Response): Promise<void>
         code,
         client_id: process.env.GOOGLE_CLIENT_ID || "",
         client_secret: process.env.GOOGLE_CLIENT_SECRET || "",
-        redirect_uri: `${process.env.API_URL || "http://localhost:5000"}/api/auth/google-callback`,
+        redirect_uri: googleRedirectUri(),
         grant_type: "authorization_code",
       }),
     });
