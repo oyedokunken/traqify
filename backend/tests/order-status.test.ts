@@ -118,3 +118,52 @@ describe("cancelling an order restores stock", () => {
     expect(await stockOf(product.id)).toBe(7);
   });
 });
+
+describe("deleting an order", () => {
+  const remove = (user: Parameters<typeof authed>[0], id: string) => authed(user).delete(`/api/orders/${id}`);
+
+  it.each([["PENDING"], ["APPROVED"]] as const)("restores stock for a %s order and fails its pending payment", async (status) => {
+    const { owner, product, order } = await placeOrder(3, 10);
+    await prisma.order.update({ where: { id: order.id }, data: { status } });
+    await prisma.payment.updateMany({ where: { orderId: order.id }, data: { status: "PENDING" } });
+    expect(await stockOf(product.id)).toBe(7);
+
+    const res = await remove(owner, order.id);
+
+    expect(res.status).toBe(200);
+    expect(await stockOf(product.id)).toBe(10);
+    expect(await prisma.order.count()).toBe(0);
+    expect((await prisma.payment.findFirstOrThrow()).status).toBe("FAILED");
+  });
+
+  it("does not restock a delivered order", async () => {
+    const { owner, product, order } = await placeOrder(3, 10);
+    await setStatus(owner, order.id, "COMPLETED");
+    expect((await remove(owner, order.id)).status).toBe(200);
+    expect(await stockOf(product.id)).toBe(7);
+  });
+
+  it("does not restock twice for an order that was already cancelled", async () => {
+    const { owner, product, order } = await placeOrder(3, 10);
+    await setStatus(owner, order.id, "CANCELLED");
+    expect(await stockOf(product.id)).toBe(10);
+    expect((await remove(owner, order.id)).status).toBe(200);
+    expect(await stockOf(product.id)).toBe(10);
+  });
+
+  it("restores stock once when a delete races a cancellation", async () => {
+    const { owner, manager, product, order } = await placeOrder(3, 10);
+    const results = await Promise.all([remove(owner, order.id), setStatus(manager, order.id, "CANCELLED")]);
+    expect(results.every((r) => [200, 404, 409].includes(r.status))).toBe(true);
+    expect(await stockOf(product.id)).toBe(10);
+  });
+
+  it("is limited to owners and managers and scoped to the organization", async () => {
+    const { cashier, auditor, order } = await placeOrder();
+    const stranger = await createTenant();
+    expect((await remove(cashier, order.id)).status).toBe(403);
+    expect((await remove(auditor, order.id)).status).toBe(403);
+    expect((await remove(stranger.owner, order.id)).status).toBe(404);
+    expect(await prisma.order.count()).toBe(1);
+  });
+});
