@@ -280,10 +280,33 @@ export const deleteOrder = async (req: AuthRequest, res: Response): Promise<void
       return;
     }
 
-    await prisma.order.delete({ where: { id } });
-    await createAuditLog(req.user!.id, orgId, "DELETE", "Order", id, `Deleted order ${order.orderNumber}`, req);
+    const restock = order.status === "PENDING" || order.status === "APPROVED";
+
+    await prisma.$transaction(async (tx) => {
+      const items = await tx.orderItem.findMany({ where: { orderId: id }, select: { productId: true, quantity: true } });
+      // Payments keep their row when the order goes away but lose the link, so they are updated first. If the
+      // delete below finds the order changed, this whole transaction rolls back with it.
+      if (restock) {
+        await tx.payment.updateMany({ where: { orderId: id, status: "PENDING" }, data: { status: "FAILED" } });
+      }
+      // The status is part of the delete condition: if a concurrent request cancelled or completed the order
+      // meanwhile, nothing is deleted and stock cannot be restored twice.
+      const claimed = await tx.order.deleteMany({ where: { id, organizationId: orgId, status: order.status } });
+      if (claimed.count === 0) {
+        throw new AppError("This order was changed by someone else. Refresh and try again.", 409);
+      }
+      // Stock was taken when the order was placed. Only orders that were never delivered (pending or approved)
+      // give it back; a completed order's goods have left, and a cancelled order was restocked when cancelled.
+      if (restock) {
+        for (const item of items) {
+          await tx.inventory.updateMany({ where: { productId: item.productId }, data: { quantity: { increment: item.quantity } } });
+        }
+      }
+    });
+
+    await createAuditLog(req.user!.id, orgId, "DELETE", "Order", id, `Deleted order ${order.orderNumber}${restock ? " (stock restored)" : ""}`, req);
     res.json({ message: "Order deleted successfully." });
-  } catch {
-    res.status(500).json({ error: "Failed to delete order." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to delete order.");
   }
 };
