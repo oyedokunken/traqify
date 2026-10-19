@@ -82,6 +82,7 @@ model User {
   orders         Order[]
   auditLogs      AuditLog[]
   refreshTokens  RefreshToken[]
+  uploads        Upload[]
 
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
@@ -114,6 +115,7 @@ model Organization {
   reviews     Review[]
   payments    Payment[]
   checkoutSessions CheckoutSession[]
+  uploads     Upload[]
   newsletters NewsletterSubscriber[]
 
   createdAt   DateTime    @default(now())
@@ -482,4 +484,45 @@ model RefreshToken {
   @@index([userId])
   @@index([expiresAt])
   @@map("refresh_tokens")
+}
+
+enum UploadPurpose {
+  AVATAR
+  ORG_LOGO
+  PRODUCT_IMAGE
+  DOWNLOADABLE
+}
+
+enum UploadStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+}
+
+/// A file the browser uploads straight to storage with a signed URL. The server picks the path and limits
+/// when it signs, then inspects the stored bytes before the file counts as an upload at all.
+model Upload {
+  id             String        @id @default(cuid())
+  bucket         String
+  path           String        @unique
+  purpose        UploadPurpose
+  status         UploadStatus  @default(PENDING)
+  declaredType   String
+  detectedType   String?
+  maxBytes       Int
+  sizeBytes      Int?
+  expiresAt      DateTime
+
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([userId])
+  @@index([organizationId])
+  @@map("uploads")
 }

@@ -7,9 +7,9 @@ import { createAuditLog } from "../utils/audit";
 import { AuthRequest } from "../middleware/auth.middleware";
 import { sendEmail } from "../config/email";
 import { orderApprovedEmailTemplate, orderCompletedEmailTemplate, newOrderEmailTemplate, storeOrderConfirmationEmailTemplate } from "../emails/templates";
-import https from "https";
 import { placeOrder } from "../utils/order-placement";
 import { generateOrderNumber } from "../utils/order-number";
+import { buildDownloadLink } from "../utils/downloads";
 import { AppError, respondWithError } from "../middleware/error.middleware";
 import { canTransitionOrder } from "../utils/status-transitions";
 
@@ -175,7 +175,7 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
     const include = {
       customer: true,
       orderItems: { include: { product: { select: { name: true, productType: true, downloadUrl: true } } } },
-      organization: { select: { name: true, logoUrl: true, email: true, phone: true, address: true } },
+      organization: { select: { name: true, slug: true, logoUrl: true, email: true, phone: true, address: true } },
     } as const;
 
     if (order.status === status) {
@@ -225,40 +225,15 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
           orderApprovedEmailTemplate(updated.customer.name, updated.orderNumber, updated.organization?.name || "", updated.totalAmount, items, updated.organization?.logoUrl || null, orgContact, updated.customer.email)
         ).catch((e) => console.error("[Email] Order approved email failed:", e.message));
       } else if (status === "COMPLETED") {
+        // Buyers get signed links, never the file's address. Each click re-checks the order and mints a one minute URL.
         const downloadableItems = updated.orderItems
           .filter((i: any) => i.product?.productType === "DOWNLOADABLE" && i.product?.downloadUrl)
-          .map((i: any) => ({ name: i.product.name, downloadUrl: i.product.downloadUrl }));
-
-        const attachments: any[] = [];
-        for (const item of downloadableItems) {
-          let isAllowedHost = false;
-          try {
-            const parsed = new URL(item.downloadUrl);
-            isAllowedHost = parsed.hostname.endsWith(".supabase.co") || parsed.hostname.endsWith(".supabase.in");
-          } catch { /* malformed URL - skip */ }
-          if (isAllowedHost) {
-              try {
-                const fileBuffer = await new Promise<Buffer>((resolve, reject) => {
-                  https.get(item.downloadUrl, (res: any) => {
-                    const chunks: Buffer[] = [];
-                    res.on("data", (chunk: Buffer) => chunks.push(chunk));
-                    res.on("end", () => resolve(Buffer.concat(chunks)));
-                    res.on("error", reject);
-                  });
-                });
-                const filename = item.downloadUrl.split("/").pop() || "download.pdf";
-                attachments.push({ filename, content: fileBuffer });
-              } catch (err) {
-                console.error("[Email] Failed to fetch downloadable file:", err);
-              }
-          }
-        }
+          .map((i: any) => ({ name: i.product.name, downloadUrl: buildDownloadLink(updated.organization.slug, updated.id, i.productId) }));
 
         sendEmail(
           updated.customer.email,
           `Order ${updated.orderNumber} delivered: ${updated.organization?.name}`,
-          orderCompletedEmailTemplate(updated.customer.name, updated.orderNumber, updated.organization?.name || "", updated.totalAmount, updated.organization?.logoUrl || null, orgContact, updated.customer.email, downloadableItems),
-          attachments.length > 0 ? attachments : undefined
+          orderCompletedEmailTemplate(updated.customer.name, updated.orderNumber, updated.organization?.name || "", updated.totalAmount, updated.organization?.logoUrl || null, orgContact, updated.customer.email, downloadableItems)
         ).catch((e) => console.error("[Email] Order completed email failed:", e.message));
       }
     }

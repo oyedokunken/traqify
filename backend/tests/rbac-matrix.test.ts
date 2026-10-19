@@ -1,12 +1,15 @@
 import type { UserRole } from "@prisma/client";
 import prisma from "../src/config/database";
-import { uploadFile } from "../src/config/supabase";
 import { authed, createProduct, createTenant, createUser } from "./helpers/factories";
 
 // Storage is an external boundary: never upload anywhere from tests.
 jest.mock("../src/config/supabase", () => ({
-  uploadFile: jest.fn().mockResolvedValue("https://cdn.example.test/logo.png"),
-  deleteFile: jest.fn().mockResolvedValue(undefined),
+  createSignedUpload: jest.fn().mockResolvedValue({ signedUrl: "https://storage.example.test/upload", token: "test_only_not_a_token" }),
+  publicApiKey: jest.fn().mockReturnValue("test_only_not_a_key"),
+  readStoredObject: jest.fn().mockResolvedValue(null),
+  removeStoredObject: jest.fn().mockResolvedValue(undefined),
+  publicObjectUrl: jest.fn().mockReturnValue("https://cdn.example.test/file.png"),
+  createSignedDownloadUrl: jest.fn().mockResolvedValue("https://storage.example.test/signed"),
 }));
 
 type Method = "get" | "post" | "patch" | "delete";
@@ -21,8 +24,6 @@ interface RouteCase {
   allowed: UserRole[];
   /** Status the owner of a different organization must get for this route, when it targets an id. */
   crossTenant?: number;
-  /** Send a small image as multipart form data under this field name. */
-  attach?: string;
   /** Excluded from the "AUDITOR never writes" invariant because it only sends a report. */
   readOnlyAction?: boolean;
 }
@@ -67,7 +68,8 @@ const routes: RouteCase[] = [
   { method: "post", path: () => "/api/products", body: () => productBody, allowed: OM },
   { method: "patch", path: (i) => `/api/products/${i.product.id}`, body: () => ({ name: "Renamed" }), allowed: OM, crossTenant: 404 },
   { method: "delete", path: (i) => `/api/products/${i.product.id}`, allowed: OM, crossTenant: 404 },
-  { method: "post", path: () => "/api/products/upload-image", allowed: OM },
+  { method: "post", path: () => "/api/uploads/sign", body: () => ({ purpose: "PRODUCT_IMAGE", contentType: "image/png", size: 1000 }), allowed: OM },
+  { method: "get", path: (i) => `/api/products/${i.product.id}/download-url`, allowed: OM, crossTenant: 404 },
   // inventory
   { method: "get", path: () => "/api/inventory", allowed: ALL },
   { method: "get", path: () => "/api/inventory/low-stock", allowed: ALL },
@@ -126,14 +128,12 @@ const routes: RouteCase[] = [
   // organization
   { method: "get", path: (i) => `/api/organizations/${i.org.slug}`, allowed: ALL, crossTenant: 404 },
   { method: "patch", path: (i) => `/api/organizations/${i.org.slug}`, body: () => ({ description: "Updated" }), allowed: O, crossTenant: 404 },
-  { method: "post", path: (i) => `/api/organizations/${i.org.slug}/upload-logo`, attach: "logo", allowed: O, crossTenant: 404 },
 ];
 
 const label = (r: RouteCase) => `${r.method.toUpperCase()} ${r.path({ product: { id: ":id" }, order: { id: ":id" }, customer: { id: ":id" }, payment: { id: ":id" }, category: { id: ":id" }, review: { id: ":id" }, invite: { id: ":id" }, audit: { id: ":id" }, subscriber: { id: ":id" }, target: { id: ":userId" }, org: { slug: ":slug" } } as unknown as Ids)}`;
 
 function call(user: Parameters<typeof authed>[0], route: RouteCase, ids: Ids) {
   const req = authed(user)[route.method](route.path(ids));
-  if (route.attach) return req.attach(route.attach, Buffer.from("not-really-a-png"), { filename: "upload.png", contentType: "image/png" });
   return route.body ? req.send(route.body(ids)) : req;
 }
 
@@ -159,7 +159,7 @@ describe("role matrix", () => {
     // Guards against adding a route without adding it to the matrix: counts routes per path prefix.
     const prefixes = new Set(routes.map((r) => label(r).split(" ")[1].split("/").slice(0, 3).join("/")));
     expect([...prefixes].sort()).toEqual(
-      ["/api/audit", "/api/categories", "/api/customers", "/api/inventory", "/api/newsletter", "/api/orders", "/api/organizations", "/api/payments", "/api/products", "/api/reports", "/api/reviews", "/api/staff"].sort()
+      ["/api/audit", "/api/categories", "/api/customers", "/api/inventory", "/api/newsletter", "/api/orders", "/api/organizations", "/api/payments", "/api/products", "/api/reports", "/api/reviews", "/api/staff", "/api/uploads"].sort()
     );
   });
 });
@@ -253,30 +253,5 @@ describe("cross-tenant access", () => {
       const res = await request(app)[route.method](route.path({ product: { id: "x" }, order: { id: "x" }, customer: { id: "x" }, payment: { id: "x" }, category: { id: "x" }, review: { id: "x" }, invite: { id: "x" }, audit: { id: "x" }, subscriber: { id: "x" }, target: { id: "x" }, org: { slug: "x" } } as unknown as Ids));
       expect({ route: label(route), status: res.status }).toEqual({ route: label(route), status: 401 });
     }
-  });
-});
-
-describe("organization logo upload", () => {
-  it("never changes another organization's logo or uploads anything on their behalf", async () => {
-    const victim = await seed();
-    const outsider = await createTenant();
-    await prisma.organization.update({ where: { id: victim.org.id }, data: { logoUrl: "https://cdn.example.test/original.png" } });
-
-    const res = await authed(outsider.owner)
-      .post(`/api/organizations/${victim.org.slug}/upload-logo`)
-      .attach("logo", Buffer.from("not-really-a-png"), { filename: "evil.png", contentType: "image/png" });
-
-    expect(res.status).toBe(404);
-    expect(uploadFile).not.toHaveBeenCalled();
-    expect((await prisma.organization.findUniqueOrThrow({ where: { id: victim.org.id } })).logoUrl).toBe("https://cdn.example.test/original.png");
-  });
-
-  it("lets an owner change their own logo", async () => {
-    const own = await createTenant();
-    const res = await authed(own.owner)
-      .post(`/api/organizations/${own.org.slug}/upload-logo`)
-      .attach("logo", Buffer.from("not-really-a-png"), { filename: "logo.png", contentType: "image/png" });
-    expect(res.status).toBe(200);
-    expect((await prisma.organization.findUniqueOrThrow({ where: { id: own.org.id } })).logoUrl).toBe("https://cdn.example.test/logo.png");
   });
 });

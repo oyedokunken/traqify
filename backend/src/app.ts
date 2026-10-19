@@ -22,6 +22,7 @@ import categoryRoutes from "./routes/category.routes";
 import reviewRoutes from "./routes/review.routes";
 import paymentRoutes from "./routes/payment.routes";
 import cronRoutes from "./routes/cron.routes";
+import uploadRoutes from "./routes/upload.routes";
 
 const app = express();
 
@@ -72,6 +73,7 @@ app.use("/api/store", storeRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/cron", cronRoutes);
+app.use("/api/uploads", uploadRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
