@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import prisma from "../config/database";
+import { hashToken } from "./token-hash";
 
 export const generateOTP = (): string => {
   return crypto.randomInt(100000, 999999).toString();
@@ -11,7 +12,6 @@ const hashOTP = (otp: string): string =>
 const MAX_OTP_ATTEMPTS = 5;
 
 // Reset tokens are stored hashed, like OTPs, so a database leak does not hand out working reset links.
-const hashToken = (token: string): string => crypto.createHash("sha256").update(token).digest("hex");
 
 export const createOTP = async (email: string): Promise<string> => {
   await prisma.oTPVerification.deleteMany({ where: { email } });

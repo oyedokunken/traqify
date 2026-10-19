@@ -4,6 +4,7 @@ import prisma from "../src/config/database";
 import app from "../src/app";
 import { authed, createOrganization, createTenant, createUser } from "./helpers/factories";
 import { sentMail } from "./helpers/mail";
+import { hashToken } from "../src/utils/token-hash";
 import { cookiePair, refresh } from "./helpers/session";
 
 const PASSWORD = "Str0ng!Passw0rd";
@@ -222,18 +223,20 @@ describe("profile", () => {
 describe("accepting a staff invitation", () => {
   async function invite(overrides: Partial<{ email: string; role: "MANAGER" | "CASHIER" | "AUDITOR"; status: "PENDING" | "ACCEPTED" | "EXPIRED"; expiresAt: Date }> = {}) {
     const tenant = await createTenant();
+    const raw = `invite-${Math.random().toString(36).slice(2)}`;
     const row = await prisma.staffInvite.create({
       data: {
         email: overrides.email ?? "newhire@example.com",
         role: overrides.role ?? "CASHIER",
-        token: `invite-${Math.random().toString(36).slice(2)}`,
+        // Only the hash is stored; tests present the raw value, like an emailed link does.
+        token: hashToken(raw),
         status: overrides.status ?? "PENDING",
         expiresAt: overrides.expiresAt ?? new Date(Date.now() + 86_400_000),
         organizationId: tenant.org.id,
         invitedById: tenant.owner.id,
       },
     });
-    return { ...tenant, invite: row };
+    return { ...tenant, invite: { ...row, token: raw } };
   }
   const accept = (token: string, body: Record<string, unknown> = {}) =>
     request(app).post("/api/auth/accept-invite").send({ token, name: "New Hire", password: PASSWORD, ...body });
