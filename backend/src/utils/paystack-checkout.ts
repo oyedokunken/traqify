@@ -1,3 +1,4 @@
+import { logAndIgnore, getLogger } from "../config/logger";
 import crypto from "crypto";
 import { CheckoutSession, OrderStatus, PaymentStatus } from "@prisma/client";
 import prisma from "../config/database";
@@ -78,7 +79,7 @@ async function refundFailedCheckout(session: CheckoutSession, org: StoreOrg, rea
   });
 
   if (!refunded) {
-    console.error(`[checkout] refund failed for ${session.reference} (${session.amountKobo} kobo): ${reason}`);
+    getLogger().error({ reference: session.reference, amountKobo: session.amountKobo, reason }, "refund failed, the store owner must refund manually");
     const owner = await prisma.user.findFirst({ where: { organizationId: org.id, role: "OWNER" }, select: { email: true } });
     if (owner) {
       sendEmail(
@@ -89,7 +90,7 @@ async function refundFailedCheckout(session: CheckoutSession, org: StoreOrg, rea
           `<ul><li>Reference: ${escapeHtml(session.reference)}</li>` +
           `<li>Amount: NGN ${(session.amountKobo / 100).toFixed(2)}</li>` +
           `<li>Customer: ${escapeHtml(session.customerName)} (${escapeHtml(session.customerEmail)})</li></ul>`
-      ).catch((e) => console.error("[Email] Refund failure notice failed:", e.message));
+      ).catch(logAndIgnore("Refund failure notice"));
     }
   }
   return refunded;

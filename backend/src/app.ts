@@ -2,12 +2,12 @@ import express from "express";
 import cors from "cors";
 import path from "path";
 import helmet from "helmet";
-import morgan from "morgan";
 import cookieParser from "cookie-parser";
 
 import { errorHandler, notFound } from "./middleware/error.middleware";
 import { authLimiter, generalLimiter } from "./middleware/rate-limit";
 import { forwardedClientIp } from "./middleware/proxy-ip";
+import { requestLogger } from "./middleware/request-logger";
 import authRoutes from "./routes/auth.routes";
 import orgRoutes from "./routes/org.routes";
 import productRoutes from "./routes/product.routes";
@@ -31,9 +31,8 @@ app.set("trust proxy", 1);
 app.use(forwardedClientIp);
 
 app.use(helmet());
-if (process.env.NODE_ENV !== "test") {
-  app.use(morgan(process.env.NODE_ENV === "production" ? "short" : "dev"));
-}
+// First, so every request is logged (with a request id and a redacted URL) even when a later step rejects it.
+app.use(requestLogger);
 
 app.use(
   cors({

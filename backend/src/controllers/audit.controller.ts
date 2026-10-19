@@ -1,3 +1,4 @@
+import { respondWithError } from "../middleware/error.middleware";
 import { parsePagination } from "../utils/pagination";
 import { Response } from "express";
 import prisma from "../config/database";
@@ -33,8 +34,8 @@ export const getAuditLogs = async (req: AuthRequest, res: Response): Promise<voi
     ]);
 
     res.json({ logs, total, unreadCount, page, limit });
-  } catch {
-    res.status(500).json({ error: "Failed to fetch audit logs." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to fetch audit logs.");
   }
 };
 
@@ -43,8 +44,8 @@ export const getUnreadCount = async (req: AuthRequest, res: Response): Promise<v
     const orgId = req.user!.organizationId!;
     const count = await prisma.auditLog.count({ where: { organizationId: orgId, isRead: false } });
     res.json({ count });
-  } catch {
-    res.status(500).json({ error: "Failed to fetch unread count." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to fetch unread count.");
   }
 };
 
@@ -70,8 +71,8 @@ export const getAuditLogById = async (req: AuthRequest, res: Response): Promise<
     }
 
     res.json({ ...log, isRead: true });
-  } catch {
-    res.status(500).json({ error: "Failed to fetch audit log." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to fetch audit log.");
   }
 };
 
@@ -94,7 +95,7 @@ export const markLogsRead = async (req: AuthRequest, res: Response): Promise<voi
 
     const newUnread = await prisma.auditLog.count({ where: { organizationId: orgId, isRead: false } });
     res.json({ message: "Updated.", unreadCount: newUnread });
-  } catch {
-    res.status(500).json({ error: "Failed to update read status." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to update read status.");
   }
 };

@@ -1,3 +1,4 @@
+import { respondWithError } from "../middleware/error.middleware";
 import { parsePagination } from "../utils/pagination";
 import { isStorageReference, storagePathOf } from "../utils/downloads";
 import { Response } from "express";
@@ -58,8 +59,8 @@ export const getProducts = async (req: AuthRequest, res: Response): Promise<void
     });
 
     res.json({ products, total });
-  } catch {
-    res.status(500).json({ error: "Failed to fetch products." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to fetch products.");
   }
 };
 
@@ -79,8 +80,8 @@ export const getProduct = async (req: AuthRequest, res: Response): Promise<void>
     }
 
     res.json(product);
-  } catch {
-    res.status(500).json({ error: "Failed to fetch product." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to fetch product.");
   }
 };
 
@@ -140,8 +141,8 @@ export const createProduct = async (req: AuthRequest, res: Response): Promise<vo
 
     await createAuditLog(req.user!.id, orgId, "CREATE", "Product", product.id, `Created product: ${name}`, req);
     res.status(201).json(product);
-  } catch {
-    res.status(500).json({ error: "Failed to create product." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to create product.");
   }
 };
 
@@ -204,7 +205,7 @@ export const deleteProduct = async (req: AuthRequest, res: Response): Promise<vo
     await prisma.product.delete({ where: { id } });
     await createAuditLog(req.user!.id, orgId, "DELETE", "Product", id, `Deleted product: ${product.name}`, req);
     res.json({ message: "Product deleted successfully." });
-  } catch {
-    res.status(500).json({ error: "Failed to delete product." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to delete product.");
   }
 };

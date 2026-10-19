@@ -2,20 +2,22 @@ import request from "supertest";
 import app from "../src/app";
 import prisma from "../src/config/database";
 import { initializePaystackTransaction, refundPaystackTransaction, verifyPaystackTransaction } from "../src/utils/paystack";
+import { captureLogs } from "../src/config/logger";
 import { createProduct, createTenant } from "./helpers/factories";
 import { mockPaystack } from "./helpers/paystack";
 
 const KEY = "test_only_not_a_secret_paystack";
 const EMAIL = "private.customer@example.com";
 
-let errors: jest.SpyInstance;
+let capture: ReturnType<typeof captureLogs>;
 
 beforeEach(() => {
   process.env.PAYSTACK_SECRET_KEY = KEY;
-  errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
+  capture = captureLogs();
 });
 
 afterEach(() => {
+  capture.stop();
   jest.restoreAllMocks();
 });
 
@@ -24,14 +26,16 @@ function answer(http: number, body: unknown) {
   return jest.spyOn(global, "fetch").mockResolvedValue({ ok: http < 400, status: http, json: async () => body } as Response);
 }
 
-const logged = () => errors.mock.calls.map((call) => call.join(" ")).join("\n");
+const logged = () => capture.entries().map((entry) => String(entry.msg)).join("\n");
+/** Every byte written to the log, not just the message, so a secret in any field is caught. */
+const everything = () => capture.lines.join("\n");
 
 const initialize = () =>
   initializePaystackTransaction({ email: EMAIL, amountKobo: 10000, reference: "TRQ-abc", callbackUrl: "https://app.example.test/cb", metadata: { slug: "s" } });
 
 /** Nothing sensitive may reach a log line, whatever went wrong. */
 function expectNoSecrets() {
-  const text = logged();
+  const text = everything();
   expect(text).not.toContain(KEY);
   expect(text).not.toContain("Bearer");
   expect(text).not.toContain(EMAIL);
@@ -97,7 +101,7 @@ describe("initialize failures", () => {
   it("does not log anything on success", async () => {
     answer(200, { status: true, data: { authorization_url: "https://pay.example/x", access_code: "ac_1", reference: "TRQ-abc" } });
     await expect(initialize()).resolves.toMatchObject({ accessCode: "ac_1" });
-    expect(errors).not.toHaveBeenCalled();
+    expect(capture.lines).toHaveLength(0);
   });
 });
 
@@ -119,7 +123,7 @@ describe("message handling", () => {
     answer(500, { status: false });
     await expect(initialize()).rejects.toBeDefined();
     expect(logged()).toBe("[paystack] initialize failed, HTTP 500");
-    errors.mockClear();
+    capture.lines.length = 0;
     answer(500, { status: false, message: { nested: true } });
     await expect(initialize()).rejects.toBeDefined();
     expect(logged()).toContain('message "(no message)"');
@@ -130,7 +134,7 @@ describe("verify", () => {
   it("stays quiet for a reference Paystack does not know", async () => {
     answer(404, { status: false, message: "Transaction reference not found" });
     await expect(verifyPaystackTransaction("TRQ-x")).resolves.toBeNull();
-    expect(errors).not.toHaveBeenCalled();
+    expect(capture.lines).toHaveLength(0);
   });
 
   it.each([[401], [403], [429], [500], [503]])("logs HTTP %i, which means a configuration or availability problem", async (http) => {
@@ -155,7 +159,7 @@ describe("verify", () => {
   it("does not log a normal success", async () => {
     answer(200, { status: true, data: { status: "success", amount: 100, currency: "NGN", reference: "TRQ-x" } });
     await expect(verifyPaystackTransaction("TRQ-x")).resolves.toMatchObject({ amountKobo: 100 });
-    expect(errors).not.toHaveBeenCalled();
+    expect(capture.lines).toHaveLength(0);
   });
 });
 
@@ -170,14 +174,14 @@ describe("refund", () => {
   it("logs a network failure once and returns false", async () => {
     jest.spyOn(global, "fetch").mockRejectedValue(new TypeError("fetch failed"));
     await expect(refundPaystackTransaction("TRQ-x")).resolves.toBe(false);
-    expect(errors).toHaveBeenCalledTimes(1);
+    expect(capture.lines).toHaveLength(1);
     expect(logged()).toBe("[paystack] refund failed, network error (TypeError)");
   });
 
   it("does not log an accepted refund", async () => {
     answer(200, { status: true, message: "Refund has been queued for processing" });
     await expect(refundPaystackTransaction("TRQ-x")).resolves.toBe(true);
-    expect(errors).not.toHaveBeenCalled();
+    expect(capture.lines).toHaveLength(0);
   });
 });
 

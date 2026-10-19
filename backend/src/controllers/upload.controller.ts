@@ -1,3 +1,4 @@
+import { logAndIgnore } from "../config/logger";
 import crypto from "crypto";
 import { Response } from "express";
 import { z } from "zod";
@@ -109,7 +110,7 @@ export const confirmUpload = async (req: AuthRequest, res: Response): Promise<vo
 
     const reject = async (message: string): Promise<void> => {
       await prisma.upload.updateMany({ where: { id: upload.id, status: "PENDING" }, data: { status: "REJECTED" } });
-      await removeStoredObject(upload.bucket, upload.path).catch((e) => console.error("[uploads] could not remove a rejected object:", e.message));
+      await removeStoredObject(upload.bucket, upload.path).catch(logAndIgnore("could not remove a rejected object"));
       res.status(400).json({ error: message });
     };
 

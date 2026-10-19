@@ -1,3 +1,4 @@
+import { respondWithError } from "../middleware/error.middleware";
 import { parsePagination } from "../utils/pagination";
 import { Response } from "express";
 import prisma from "../config/database";
@@ -62,8 +63,8 @@ export const getPayments = async (req: AuthRequest, res: Response): Promise<void
         refunded: { count: refundedAgg._count, amount: refundedAgg._sum.amount ?? 0 },
       },
     });
-  } catch {
-    res.status(500).json({ error: "Failed to fetch payments." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to fetch payments.");
   }
 };
 
@@ -93,8 +94,8 @@ export const getPaymentById = async (req: AuthRequest, res: Response): Promise<v
     }
 
     res.json(payment);
-  } catch {
-    res.status(500).json({ error: "Failed to fetch payment." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to fetch payment.");
   }
 };
 
