@@ -5,7 +5,7 @@ import helmet from "helmet";
 import cookieParser from "cookie-parser";
 
 import { errorHandler, notFound } from "./middleware/error.middleware";
-import { authLimiter, generalLimiter } from "./middleware/rate-limit";
+import { generalLimiter } from "./middleware/rate-limit";
 import { forwardedClientIp } from "./middleware/proxy-ip";
 import { requestLogger } from "./middleware/request-logger";
 import authRoutes from "./routes/auth.routes";
@@ -57,7 +57,7 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString(), service: "Traqify API" });
 });
 
-app.use("/api/auth", authLimiter, authRoutes);
+app.use("/api/auth", authRoutes);
 app.use("/api/org", orgRoutes);
 app.use("/api/organizations", orgRoutes);
 app.use("/api/products", productRoutes);
