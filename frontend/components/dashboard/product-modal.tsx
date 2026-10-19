@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import api from "@/lib/api";
+import { uploadFile } from "@/lib/uploads";
 
 interface ProductModalProps { product?: any; onClose: () => void; onSaved: () => void; }
 
@@ -87,10 +88,9 @@ export function ProductModal({ product, onClose, onSaved }: ProductModalProps) {
       if (imageFiles.length > 0) {
         setUploadProgress(true);
         for (const file of imageFiles) {
-          const fd = new FormData(); fd.append("image", file);
           try {
-            const r = await api.post("/api/products/upload-image", fd, { headers: { "Content-Type": "multipart/form-data" } });
-            uploadedUrls.push(r.data.url);
+            const r = await uploadFile("PRODUCT_IMAGE", file);
+            if (r.url) uploadedUrls.push(r.url);
           } catch { setImageError("Some images failed to upload and were skipped."); }
         }
         setUploadProgress(false);

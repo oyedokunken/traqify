@@ -218,7 +218,7 @@ function RegisterForm() {
                     <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-gray-400">or</span></div>
                   </div>
 
-                  <Button type="button" variant="outline" className="w-full gap-3" onClick={() => { window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/api/auth/google-redirect`; }}>
+                  <Button type="button" variant="outline" className="w-full gap-3" onClick={() => { window.location.href = "/api/auth/google-redirect"; }}>
                     <Image src="/google-logo.png" alt="Google" width={18} height={18} className="w-4.5 h-4.5 object-contain" />
                     Continue with Google
                   </Button>
