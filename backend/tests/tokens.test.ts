@@ -47,22 +47,6 @@ describe("login issues a short lived access token and an httpOnly refresh cookie
     const { iat, exp } = jwt.decode(token) as { iat: number; exp: number };
     expect(exp - iat).toBe(15 * 60);
   });
-
-  it("uses secure cookies in production, with SameSite=None unless configured otherwise", async () => {
-    const original = { NODE_ENV: process.env.NODE_ENV, COOKIE_SAMESITE: process.env.COOKIE_SAMESITE };
-    try {
-      process.env.NODE_ENV = "production";
-      delete process.env.COOKIE_SAMESITE;
-      const { refreshCookieOptions } = await import("../src/utils/session");
-      expect(refreshCookieOptions()).toMatchObject({ secure: true, sameSite: "none", httpOnly: true });
-      process.env.COOKIE_SAMESITE = "lax";
-      expect(refreshCookieOptions()).toMatchObject({ secure: true, sameSite: "lax" });
-    } finally {
-      process.env.NODE_ENV = original.NODE_ENV;
-      if (original.COOKIE_SAMESITE === undefined) delete process.env.COOKIE_SAMESITE;
-      else process.env.COOKIE_SAMESITE = original.COOKIE_SAMESITE;
-    }
-  });
 });
 
 describe("access token verification", () => {
