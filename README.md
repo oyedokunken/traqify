@@ -99,7 +99,7 @@ graph TB
 **Google OAuth 2.0:**
 1. `GET /api/auth/google-redirect` - redirects the browser to the Google consent screen
 2. `GET /api/auth/google-callback?code=` - exchanges the code, fetches the user profile, upserts the user record, stores tokens in a short-lived `OAuthSession` record, and redirects the browser to `/auth-callback?code=<opaque>`
-3. `GET /api/auth/oauth-exchange/:code` - frontend calls this once with the opaque code; server returns the access token, refresh token, and user; the code is deleted immediately after use
+3. `POST /api/auth/oauth-exchange` - frontend calls this once with the opaque code in the body; server returns the access token, refresh token, and user; the code is deleted immediately after use
 
 **Token refresh:**
 The Axios client intercepts every 401 response, silently calls `POST /api/auth/refresh` which uses the httpOnly refresh cookie, saves the new access token in memory, and retries the original request. This is transparent to all callers.
@@ -162,7 +162,7 @@ sequenceDiagram
     API->>DB: Upsert User (create or update)
     API->>DB: INSERT OAuthSession (code, tokens, 2 min TTL)
     API-->>FE: 302 redirect to /auth-callback?code=<opaque>
-    FE->>API: GET /api/auth/oauth-exchange/:code
+    FE->>API: POST /api/auth/oauth-exchange {code}
     API->>DB: Read OAuthSession, delete record
     API-->>FE: access token + refresh token + user
     FE-->>User: Dashboard or create-organization page
@@ -263,7 +263,7 @@ sequenceDiagram
     end
     MAIL-->>NewStaff: Invitation email with token link
     NewStaff->>FE: Open /invite/token
-    FE->>API: GET /api/staff/invite/token
+    FE->>API: POST /api/staff/invite-details {token}
     API->>DB: Validate token (not expired, not accepted)
     API-->>FE: Invite details (org name, role)
     NewStaff->>FE: Set password and submit
@@ -1011,7 +1011,7 @@ All protected endpoints require `Authorization: Bearer <token>`.
 | POST | `/reset-password` | Public | Set new password via token |
 | GET  | `/google-redirect` | Public | Redirect to Google consent screen |
 | GET  | `/google-callback` | Public | Handle OAuth callback; stores tokens in OAuthSession; redirects with one-time code |
-| GET  | `/oauth-exchange/:code` | Public | Exchange one-time code for access token, refresh token, and user |
+| POST | `/oauth-exchange` | Public | Exchange one-time code for access token, refresh token, and user |
 | GET  | `/me` | Auth | Get current user profile |
 | PATCH | `/me` | Auth | Update name / avatarUrl |
 | POST | `/change-password` | Auth | Change password; increments tokenVersion |
@@ -1087,7 +1087,7 @@ All protected endpoints require `Authorization: Bearer <token>`.
 | GET | `/invites` | MANAGER+ | List all pending/expired invites |
 | POST | `/invite` | MANAGER+ | Send staff invitation (3-day token) |
 | DELETE | `/invites/:inviteId` | MANAGER+ | Cancel a pending invite |
-| GET | `/invite/:token` | Public | Fetch invite details (for accept page) |
+| POST | `/invite-details` | Public | Fetch invite details; the token is sent in the body (for accept page) |
 | PATCH | `/:userId/role` | OWNER only | Change a staff member's role |
 | PATCH | `/:userId/access` | MANAGER+ | Toggle account restriction |
 | DELETE | `/:userId` | OWNER only | Remove staff member from org |

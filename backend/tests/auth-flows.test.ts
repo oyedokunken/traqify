@@ -283,9 +283,9 @@ describe("accepting a staff invitation", () => {
 
   it("shows invitation details only for a valid invitation", async () => {
     const { invite: row, org } = await invite({ role: "AUDITOR" });
-    const ok = await request(app).get(`/api/staff/invite/${row.token}`);
+    const ok = await request(app).post("/api/staff/invite-details").send({ token: row.token });
     expect(ok.status).toBe(200);
     expect(ok.body).toMatchObject({ email: row.email, role: "AUDITOR", organizationName: org.name });
-    expect((await request(app).get("/api/staff/invite/unknown")).status).toBe(400);
+    expect((await request(app).post("/api/staff/invite-details").send({ token: "unknown" })).status).toBe(400);
   });
 });

@@ -120,7 +120,7 @@ describe("Google-issued sessions can be revoked", () => {
     const { state, cookie } = await startFlow();
     const res = await callback(`code=abc&state=${state}`, cookie);
     const code = new URL(res.headers.location).searchParams.get("code");
-    const exchange = await request(app).get(`/api/auth/oauth-exchange/${code}`);
+    const exchange = await request(app).post("/api/auth/oauth-exchange").send({ code });
     expect(exchange.status).toBe(200);
     // The refresh token travels only in an httpOnly cookie, never in the response body.
     expect(exchange.body.refreshToken).toBeUndefined();
@@ -150,7 +150,23 @@ describe("Google-issued sessions can be revoked", () => {
     const { state, cookie } = await startFlow();
     const res = await callback(`code=abc&state=${state}`, cookie);
     const code = new URL(res.headers.location).searchParams.get("code");
-    expect((await request(app).get(`/api/auth/oauth-exchange/${code}`)).status).toBe(200);
-    expect((await request(app).get(`/api/auth/oauth-exchange/${code}`)).status).toBe(400);
+    expect((await request(app).post("/api/auth/oauth-exchange").send({ code })).status).toBe(200);
+    expect((await request(app).post("/api/auth/oauth-exchange").send({ code })).status).toBe(400);
+  });
+});
+
+describe("secrets are not carried in URLs", () => {
+  it("takes the one-time code in the body and refuses it in the path or query string", async () => {
+    mockGoogle({ email: "body-only@example.com" });
+    const { state, cookie } = await startFlow();
+    const res = await callback(`code=abc&state=${state}`, cookie);
+    const code = new URL(res.headers.location).searchParams.get("code");
+
+    expect((await request(app).get(`/api/auth/oauth-exchange/${code}`)).status).toBe(404);
+    expect((await request(app).post(`/api/auth/oauth-exchange?code=${code}`)).status).toBe(400);
+    expect((await request(app).post("/api/auth/oauth-exchange").send({})).status).toBe(400);
+    expect((await request(app).post("/api/auth/oauth-exchange").send({ code: { $ne: "" } })).status).toBe(400);
+    // None of that used up the code.
+    expect((await request(app).post("/api/auth/oauth-exchange").send({ code })).status).toBe(200);
   });
 });

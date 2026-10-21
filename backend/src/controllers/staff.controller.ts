@@ -17,7 +17,12 @@ const INVITE_FIELDS = { id: true, email: true, role: true, status: true, expires
 
 export const getInviteDetails = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { token } = req.params;
+    // The token is a secret, so it arrives in the body and never appears in a URL, a log line or a referrer.
+    const token = req.body?.token;
+    if (typeof token !== "string" || token === "") {
+      res.status(400).json({ error: "This invitation is invalid or has expired." });
+      return;
+    }
     const invite = await prisma.staffInvite.findUnique({
       where: { token: hashToken(token) },
       include: { organization: { select: { name: true, logoUrl: true } } },

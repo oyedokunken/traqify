@@ -103,7 +103,7 @@ export default function SystemPage() {
     -> GET /google-callback?code= -> exchange code -> userinfo
     -> upsert user -> store tokens in OAuthSession (2 min TTL)
     -> redirect /auth-callback?code=<opaque>
-    -> GET /oauth-exchange/:code -> tokens returned, code deleted
+    -> POST /oauth-exchange {code} -> tokens returned, code deleted
 
   Token Refresh:
     Axios 401 interceptor -> POST /auth/refresh -> new access token

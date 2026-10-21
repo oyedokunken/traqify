@@ -29,7 +29,7 @@ router.post("/verify-email", verifyOtpIpLimiter, verifyOtpEmailLimiter, verifyEm
 router.post("/login", authLimiter, loginEmailLimiter, login);
 router.get("/google-redirect", googleRedirect);
 router.get("/google-callback", authLimiter, googleCallback);
-router.get("/oauth-exchange/:code", authLimiter, exchangeOAuthCode);
+router.post("/oauth-exchange", authLimiter, exchangeOAuthCode);
 router.post("/forgot-password", forgotPasswordIpLimiter, forgotPasswordEmailLimiter, forgotPassword);
 router.post("/reset-password", authLimiter, resetPassword);
 router.post("/refresh", requireTrustedOrigin, refreshToken);
