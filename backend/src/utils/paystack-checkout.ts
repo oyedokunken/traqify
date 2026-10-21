@@ -121,7 +121,8 @@ export async function completeCheckout(org: StoreOrg, reference: string, orgOwne
   if (session.status === "COMPLETED") {
     return { kind: "existing", order: await existingOrder(session) };
   }
-  if (session.status !== "PENDING") {
+  // An expired checkout is one nobody had paid when it was last checked; a payment that arrives later still counts.
+  if (session.status !== "PENDING" && session.status !== "EXPIRED") {
     throw new AppError("This checkout was cancelled and the payment refunded or is being refunded. Please contact the store.", 409);
   }
 
@@ -154,7 +155,7 @@ export async function completeCheckout(org: StoreOrg, reference: string, orgOwne
       verifiedAmountKobo: session.amountKobo,
       onPlaced: async (tx, placed) => {
         const claimed = await tx.checkoutSession.updateMany({
-          where: { id: session.id, status: "PENDING" },
+          where: { id: session.id, status: { in: ["PENDING", "EXPIRED"] } },
           data: { status: "COMPLETED", orderId: placed.id },
         });
         if (claimed.count === 0) throw new AppError("This checkout has already been processed.", 409);

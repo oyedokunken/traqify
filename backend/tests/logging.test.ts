@@ -133,14 +133,24 @@ describe("unexpected errors", () => {
     expect(JSON.stringify(failure)).toContain("secret internal detail");
   });
 
-  it("does not expose error detail from the cron endpoint", async () => {
-    jest.spyOn(prisma, "$queryRaw").mockRejectedValue(new Error("secret database detail"));
-    const res = await request(app).get("/api/cron/ping").set("Authorization", `Bearer ${process.env.CRON_SECRET}`);
-    expect(res.status).toBe(500);
-    expect(res.body).toMatchObject({ error: "DB ping failed" });
-    expect(res.body.detail).toBeUndefined();
-    expect(JSON.stringify(res.body)).not.toContain("secret database detail");
-    expect(capture.lines.join("\n")).toContain("secret database detail");
+  it("does not expose error detail from the cron endpoints, but logs it", async () => {
+    jest.spyOn(prisma.oTPVerification, "deleteMany").mockRejectedValue(new Error("secret database detail"));
+    jest.spyOn(prisma.wishlist, "deleteMany").mockRejectedValue(new Error("secret wishlist detail"));
+    const auth = { Authorization: `Bearer ${process.env.CRON_SECRET}` };
+
+    const housekeeping = await request(app).get("/api/cron/housekeeping").set(auth);
+    expect(housekeeping.status).toBe(500);
+    expect(Object.keys(housekeeping.body).sort()).toEqual(["checkouts", "deleted", "invitesExpired", "uploadsRemoved"]);
+    expect(JSON.stringify(housekeeping.body)).not.toContain("secret database detail");
+
+    const reminders = await request(app).get("/api/cron/wishlist-reminders").set(auth);
+    expect(reminders.status).toBe(500);
+    expect(reminders.body).toMatchObject({ error: "Wishlist reminders failed." });
+    expect(JSON.stringify(reminders.body)).not.toContain("secret wishlist detail");
+
+    const logged = capture.lines.join("\n");
+    expect(logged).toContain("secret database detail");
+    expect(logged).toContain("secret wishlist detail");
   });
 
   it("answers 400, not 500, for malformed JSON and does not log the body", async () => {

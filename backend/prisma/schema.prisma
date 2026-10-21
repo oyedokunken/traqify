@@ -432,6 +432,7 @@ enum CheckoutSessionStatus {
   COMPLETED
   REFUNDED
   REFUND_FAILED
+  EXPIRED
 }
 
 /// A storefront Paystack checkout created by the server. The cart, customer and
