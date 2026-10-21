@@ -12,6 +12,7 @@ import {
   forgotPassword,
   resetPassword,
   getMe,
+  markWelcomeSeen,
   updateProfile,
   acceptInvite,
   refreshToken,
@@ -37,6 +38,7 @@ router.post("/refresh", requireTrustedOrigin, refreshToken);
 router.post("/accept-invite", authLimiter, acceptInvite);
 router.get("/me", authenticate, getMe);
 router.patch("/me", authenticate, updateProfile);
+router.post("/welcome-seen", authenticate, markWelcomeSeen);
 router.post("/change-password", authenticate, changePassword);
 router.post("/logout", requireTrustedOrigin, optionalAuthenticate, logout);
 

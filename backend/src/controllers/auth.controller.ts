@@ -88,6 +88,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         avatarUrl: user.avatarUrl,
         emailVerified: user.emailVerified,
         signInMethod: "EMAIL",
+        welcomeSeen: user.welcomeSeenAt !== null,
       },
     });
   } catch (err) {
@@ -267,6 +268,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         orgSlug: user.organization?.slug || null,
         avatarUrl: user.avatarUrl,
         signInMethod: user.signInMethod || "EMAIL",
+        welcomeSeen: user.welcomeSeenAt !== null,
       },
     });
   } catch (err) {
@@ -544,6 +546,16 @@ export const refreshToken = async (req: Request, res: Response): Promise<void> =
   }
 };
 
+/** Records that the signed in user has seen the welcome screen. Keeps the first time if called again. */
+export const markWelcomeSeen = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    await prisma.user.updateMany({ where: { id: req.user!.id, welcomeSeenAt: null }, data: { welcomeSeenAt: new Date() } });
+    res.json({ welcomeSeen: true });
+  } catch (err) {
+    respondWithError(res, err, "Could not save that.");
+  }
+};
+
 export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const user = await prisma.user.findUnique({
@@ -577,6 +589,7 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
       signInMethod: user.signInMethod,
       organizationId: user.organizationId,
       organization: user.organization,
+      welcomeSeen: user.welcomeSeenAt !== null,
       lastLoginAt: user.lastLoginAt,
     });
   } catch (err) {
@@ -676,6 +689,7 @@ export const acceptInvite = async (req: Request, res: Response): Promise<void> =
         name: user.name,
         role: user.role,
         organizationId: user.organizationId,
+        welcomeSeen: user.welcomeSeenAt !== null,
       },
       orgSlug: org?.slug,
     });
@@ -724,6 +738,7 @@ export const exchangeOAuthCode = async (req: Request, res: Response): Promise<vo
         organizationId: user.organizationId,
         avatarUrl: user.avatarUrl,
         organization: user.organization || null,
+        welcomeSeen: user.welcomeSeenAt !== null,
       },
     });
   } catch (err) {
