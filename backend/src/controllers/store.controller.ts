@@ -10,7 +10,6 @@ import { AppError, respondWithError } from "../middleware/error.middleware";
 import { storeInitializeSchema, storePaystackCompleteSchema, storeTransferCheckoutSchema } from "../utils/validators";
 import { placeOrder } from "../utils/order-placement";
 import { completeCheckout, initializeCheckout } from "../utils/paystack-checkout";
-import { generateOrderNumber } from "../utils/order-number";
 
 export const getStoreProducts = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -203,7 +202,7 @@ export const storeCheckout = async (req: Request, res: Response): Promise<void> 
     const { order } = await placeOrder({
       organizationId: org.id,
       createdById: owner.id,
-      orderNumber: generateOrderNumber("STR"),
+      orderNumberPrefix: "STR",
       lines: items,
       customer: { kind: "find-or-create", name, email, phone, address, source: "PURCHASE" },
       status: OrderStatus.PENDING,

@@ -9,7 +9,6 @@ import { AuthRequest } from "../middleware/auth.middleware";
 import { sendEmail } from "../config/email";
 import { orderApprovedEmailTemplate, orderCompletedEmailTemplate, newOrderEmailTemplate, storeOrderConfirmationEmailTemplate } from "../emails/templates";
 import { placeOrder } from "../utils/order-placement";
-import { generateOrderNumber } from "../utils/order-number";
 import { buildDownloadLink } from "../utils/downloads";
 import { AppError, respondWithError } from "../middleware/error.middleware";
 import { canTransitionOrder } from "../utils/status-transitions";
@@ -98,7 +97,7 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
     const { order, customerCreated } = await placeOrder({
       organizationId: orgId,
       createdById: req.user!.id,
-      orderNumber: generateOrderNumber("ORD"),
+      orderNumberPrefix: "ORD",
       lines: items,
       customer: rawCustomerId
         ? { kind: "existing", id: rawCustomerId }
