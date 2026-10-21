@@ -263,7 +263,6 @@ Base URL: `https://traqify-api.vercel.app`
 | POST | `/api/auth/send-otp` | public | Send a 6-digit OTP to an email address |
 | POST | `/api/auth/verify-email` | public | Verify OTP and mark email as verified |
 | POST | `/api/auth/register` | public | Create account (email must be pre-verified) |
-| POST | `/api/auth/check-email` | public | Check if an email is already registered |
 | POST | `/api/auth/login` | public | Authenticate and receive access + refresh tokens |
 | GET | `/api/auth/google-redirect` | public | Initiate Google OAuth 2.0 flow |
 | GET | `/api/auth/google-callback` | public | Google OAuth callback; stores tokens in OAuthSession |

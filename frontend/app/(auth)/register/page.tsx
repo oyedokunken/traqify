@@ -90,19 +90,7 @@ function RegisterForm() {
 
   const handleEmailStep = async (data: EmailData) => {
     try {
-      const checkRes = await api.post("/api/auth/check-email", { email: data.email });
-      if (checkRes.data.isInvited && !checkRes.data.exists) {
-        setError("This email has been invited to join an organization. You can only belong to one organization at a time. Please use the invitation link sent to your email to get started.");
-        return;
-      }
-      if (checkRes.data.exists) {
-        if (checkRes.data.isInvited) {
-          setError("This email already belongs to an organization. You can only belong to one organization at a time. Please sign in instead.");
-          return;
-        }
-        router.push(`/login?email=${encodeURIComponent(data.email)}&hint=exists`);
-        return;
-      }
+      // The answer is the same whether or not the address has an account. Existing owners are told by email.
       await api.post("/api/auth/send-otp", { email: data.email });
       setEmailData(data);
       router.push(`/verify-email?email=${encodeURIComponent(data.email)}&returnTo=register`);

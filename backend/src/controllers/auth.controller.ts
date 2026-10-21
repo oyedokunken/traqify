@@ -9,7 +9,7 @@ import { signToken, signEmailVerificationToken, verifyEmailVerificationToken } f
 import { REFRESH_COOKIE, clearRefreshCookie, endSession, rotateSession, startSession } from "../utils/session";
 import { createOTP, verifyOTP, generatePasswordResetToken, verifyPasswordResetToken, markPasswordResetTokenUsed } from "../utils/otp";
 import { sendEmail } from "../config/email";
-import { otpEmailTemplate, passwordResetEmailTemplate, passwordChangedEmailTemplate, newStaffJoinedEmailTemplate } from "../emails/templates";
+import { accountExistsEmailTemplate, otpEmailTemplate, passwordResetEmailTemplate, passwordChangedEmailTemplate, newStaffJoinedEmailTemplate } from "../emails/templates";
 import {
   registerStep1Schema,
   sendOTPSchema,
@@ -96,43 +96,6 @@ export const register = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
-export const checkEmail = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { email } = req.body;
-    if (!email || typeof email !== "string") {
-      res.status(400).json({ error: "Email is required." });
-      return;
-    }
-    const user = await prisma.user.findUnique({
-      where: { email },
-      include: { organization: { select: { slug: true } } },
-    });
-
-    // Check if this email has a pending or accepted staff invite
-    const invite = await prisma.staffInvite.findFirst({
-      where: { email, status: { in: ["PENDING", "ACCEPTED"] } },
-    });
-
-    if (!user) {
-      if (invite) {
-        res.json({ exists: false, isInvited: true });
-        return;
-      }
-      res.json({ exists: false });
-      return;
-    }
-    res.json({
-      exists: true,
-      signInMethod: user.signInMethod || "EMAIL",
-      hasOrg: !!user.organizationId,
-      orgSlug: user.organization?.slug || null,
-      isInvited: !!invite,
-    });
-  } catch (err) {
-    respondWithError(res, err, "Failed to check email.");
-  }
-};
-
 export const sendOTP = async (req: Request, res: Response): Promise<void> => {
   try {
     const parsed = sendOTPSchema.safeParse(req.body);
@@ -147,6 +110,8 @@ export const sendOTP = async (req: Request, res: Response): Promise<void> => {
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (user?.emailVerified) {
+      // The page cannot say so without revealing who has an account, so the owner of the mailbox is told instead.
+      await sendEmail(email, "You already have a Traqify account", accountExistsEmailTemplate(user.name || "there", `${process.env.FRONTEND_URL}/login`, email));
       res.json(response);
       return;
     }

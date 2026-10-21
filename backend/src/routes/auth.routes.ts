@@ -1,7 +1,6 @@
 import { Router } from "express";
 import {
   register,
-  checkEmail,
   sendOTP,
   verifyEmail,
   login,
@@ -25,7 +24,6 @@ import { authLimiter, forgotPasswordEmailLimiter, loginEmailLimiter, forgotPassw
 const router = Router();
 
 router.post("/register", authLimiter, register);
-router.post("/check-email", checkEmail);
 router.post("/send-otp", sendOtpIpLimiter, sendOtpEmailLimiter, sendOTP);
 router.post("/verify-email", verifyOtpIpLimiter, verifyOtpEmailLimiter, verifyEmail);
 router.post("/login", authLimiter, loginEmailLimiter, login);

@@ -15,7 +15,6 @@ const NO_REFRESH_PATHS = [
   "/api/auth/logout",
   "/api/auth/verify-email",
   "/api/auth/send-otp",
-  "/api/auth/check-email",
   "/api/auth/forgot-password",
   "/api/auth/reset-password",
   "/api/auth/accept-invite",
