@@ -397,7 +397,9 @@ export const changePassword = async (req: Request, res: Response): Promise<void>
     const hash = await bcrypt.hash(newPassword, 12);
     // Increment tokenVersion to invalidate all existing sessions
     await prisma.user.update({ where: { id: user.id }, data: { password: hash, passwordChangedAt: new Date(), tokenVersion: { increment: 1 } } });
-    await createAuditLog(user.id, user.organizationId || "", "UPDATE", "USER", user.id, "Changed account password");
+    if (user.organizationId) {
+      await createAuditLog(user.id, user.organizationId, "UPDATE", "USER", user.id, "Changed account password", req);
+    }
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
     await sendEmail(user.email, "Your Traqify password was changed", passwordChangedEmailTemplate(user.name || "there", `${frontendUrl}/login`)).catch(logAndIgnore("email"));
     res.json({ message: "Password updated successfully." });
@@ -624,7 +626,7 @@ export const acceptInvite = async (req: Request, res: Response): Promise<void> =
     });
 
     await prisma.staffInvite.update({ where: { id: invite.id }, data: { status: "ACCEPTED" } });
-    await createAuditLog(user.id, invite.organizationId, "CREATE", "User", user.id, `${name} accepted invitation and joined as ${invite.role}`);
+    await createAuditLog(user.id, invite.organizationId, "CREATE", "User", user.id, `${name} accepted invitation and joined as ${invite.role}`, req);
 
     const owner = await prisma.user.findFirst({ where: { organizationId: invite.organizationId, role: "OWNER" }, select: { email: true, name: true } });
     if (owner && org) {
@@ -688,6 +690,9 @@ export const exchangeOAuthCode = async (req: Request, res: Response): Promise<vo
     }
 
     await startSession(res, user);
+    if (user.organizationId) {
+      createAuditLog(user.id, user.organizationId, "LOGIN", "User", user.id, "Logged in with Google", req).catch(logAndIgnore("audit log"));
+    }
     res.json({
       token: signToken({
         userId: user.id,
