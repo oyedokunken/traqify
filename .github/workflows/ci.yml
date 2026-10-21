@@ -33,6 +33,20 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      # Transaction-mode pooler in front of the test database, like the Supabase pooler production uses.
+      pgbouncer:
+        image: edoburu/pgbouncer:latest
+        env:
+          DB_HOST: postgres
+          DB_USER: test_user
+          DB_PASSWORD: test_only_not_a_secret
+          DB_NAME: traqify_test
+          POOL_MODE: transaction
+          AUTH_TYPE: scram-sha-256
+          DEFAULT_POOL_SIZE: "6"
+          MAX_PREPARED_STATEMENTS: "0"
+        ports:
+          - 6433:5432
     env:
       # Throwaway service-container credentials. The test suite refuses to run
       # unless the database name ends in _test.
@@ -50,6 +64,10 @@ jobs:
       - run: npm run lint
       - run: npm run build
       - run: npm run test:coverage
+      - name: Money paths through a transaction-mode pooler
+        env:
+          DATABASE_URL_TEST_POOLED: postgresql://test_user:test_only_not_a_secret@localhost:6433/traqify_test?pgbouncer=true&connection_limit=3
+        run: npx jest tests/checkout.test.ts tests/paystack-checkout.test.ts tests/payments.test.ts tests/order-status.test.ts tests/downloads.test.ts tests/reports.test.ts
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
       - name: Audit all dependencies
