@@ -13,6 +13,8 @@ export interface AuthUser {
   avatarUrl: string | null;
   phone?: string | null;
   signInMethod?: "EMAIL" | "GOOGLE";
+  /** Whether the server has already shown this user the welcome screen. Absent in profiles cached by older builds. */
+  welcomeSeen?: boolean;
   organization?: {
     id: string;
     name: string;
@@ -27,6 +29,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
+  markWelcomeSeen: () => Promise<void>;
   setUser: (user: AuthUser | null) => void;
 }
 
@@ -58,6 +61,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  const markWelcomeSeen = async () => {
+    await api.post("/api/auth/welcome-seen");
+    if (!user) return;
+    const next = { ...user, welcomeSeen: true };
+    setUser(next);
+    try { localStorage.setItem("traqify_user", JSON.stringify(next)); } catch { /* storage unavailable */ }
+  };
+
   const login = async (email: string, password: string) => {
     const { data } = await api.post("/api/auth/login", { email, password });
     setSession(data.token, data.user);
@@ -73,7 +84,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout, refreshUser, setUser }}>
+    <AuthContext.Provider value={{ user, isLoading, login, logout, refreshUser, markWelcomeSeen, setUser }}>
       {children}
     </AuthContext.Provider>
   );

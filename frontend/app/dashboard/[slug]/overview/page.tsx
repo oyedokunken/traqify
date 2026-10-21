@@ -24,6 +24,7 @@ import api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { formatCurrency } from "@/lib/utils";
 import { isOlderThan } from "@/lib/refetch";
+import { needsWelcome } from "@/lib/welcome";
 import { AnimatePresence } from "framer-motion";
 import {
   AreaChart, Area,
@@ -59,7 +60,7 @@ const fmtChartDate = (raw: string) => {
 };
 
 export default function OverviewPage({ params }: { params: { slug: string } }) {
-  const { user } = useAuth();
+  const { user, markWelcomeSeen } = useAuth();
   const [data, setData] = useState<OverviewData | null>(null);
   const [revChart, setRevChart] = useState<ChartPoint[]>([]);
   const [ordChart, setOrdChart] = useState<ChartPoint[]>([]);
@@ -82,19 +83,19 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
     return () => clearInterval(t);
   }, []);
 
-  // First-time welcome: shown once ever (localStorage)
+  // First-time welcome: shown once per user, remembered by the server so it follows them to any browser or device.
   // Welcome back: shown once per login session (sessionStorage)
   useEffect(() => {
     if (!user?.organizationId) return;
-    const firstKey = `traqify_welcomed_${params.slug}`;
     const sessionKey = `traqify_session_${params.slug}`;
-    if (!localStorage.getItem(firstKey)) {
+    if (needsWelcome(user)) {
       setShowWelcome(true);
-      localStorage.setItem(firstKey, "1");
+      markWelcomeSeen().catch(() => {});
     } else if (!sessionStorage.getItem(sessionKey)) {
       setShowWelcomeBack(true);
       sessionStorage.setItem(sessionKey, "1");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.slug, user?.organizationId]);
 
   const lastLoadedAt = useRef(Date.now());
