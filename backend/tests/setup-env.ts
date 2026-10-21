@@ -1,9 +1,9 @@
-import { getTestDatabaseUrl } from "./helpers/test-db";
+import { getAppDatabaseUrl, getTestDatabaseUrl } from "./helpers/test-db";
 
 const url = getTestDatabaseUrl();
 
 process.env.NODE_ENV = "test";
-process.env.DATABASE_URL = url;
+process.env.DATABASE_URL = getAppDatabaseUrl();
 process.env.DIRECT_URL = url;
 process.env.JWT_SECRET = "test_only_not_a_secret_jwt";
 process.env.PAYSTACK_SECRET_KEY = "test_only_not_a_secret_paystack";
