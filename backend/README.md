@@ -117,7 +117,7 @@ backend/
       audit.controller.ts  Paginated audit log queries and mark-read
       auth.controller.ts   Registration, OTP, login, OAuth, tokens, password
       category.controller.ts Product category CRUD
-      cron.controller.ts   Keep-alive ping for Supabase
+      cron.controller.ts   Daily housekeeping and wishlist reminders
       customer.controller.ts Customer CRUD
       inventory.controller.ts Stock levels and low-stock alerts
       newsletter.controller.ts Subscribe and org-scoped subscriber management
@@ -410,7 +410,8 @@ Base URL: `https://traqify-api.vercel.app`
 
 | Method | Path | Guard | Description |
 |--------|------|-------|-------------|
-| GET | `/api/cron/ping` | CRON_SECRET bearer | Keep the Supabase database active |
+| GET | `/api/cron/housekeeping` | CRON_SECRET bearer | Purge expired codes and sessions, expire old invitations, remove abandoned uploads, settle abandoned checkouts with Paystack (also keeps the database active) |
+| GET | `/api/cron/wishlist-reminders` | CRON_SECRET bearer | Send the next due wishlist reminder per shopper and delete wishlists older than four days |
 
 ---
 
@@ -576,7 +577,7 @@ The backend deploys as a Vercel serverless function.
 
 - The function entry point at `dist/index.js`
 - Route rewrites to capture all paths under `/api/*`
-- A daily cron job at `0 6 * * *` (UTC) targeting `GET /api/cron/ping`
+- Two daily cron jobs (the Hobby plan allows one run per day each): `0 3 * * *` for `GET /api/cron/housekeeping` and `0 9 * * *` for `GET /api/cron/wishlist-reminders`. Vercel sends `CRON_SECRET` as a bearer token. Nothing runs on an in-process timer, because serverless instances do not stay alive.
 
 Required Vercel environment variables mirror `.env.example`. Set them in Vercel project settings under Environment Variables. The `CRON_SECRET` must not contain leading or trailing whitespace.
 

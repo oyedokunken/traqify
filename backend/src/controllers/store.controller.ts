@@ -1,10 +1,10 @@
-import { logAndIgnore, getLogger } from "../config/logger";
+import { logAndIgnore } from "../config/logger";
 import { MAX_UNPAGED_ROWS } from "../utils/pagination";
 import { Request, Response } from "express";
 import { OrderStatus, PaymentStatus } from "@prisma/client";
 import prisma from "../config/database";
 import { sendEmail } from "../config/email";
-import { wishlistReminderTemplate, newOrderEmailTemplate, storeOrderConfirmationEmailTemplate } from "../emails/templates";
+import { newOrderEmailTemplate, storeOrderConfirmationEmailTemplate } from "../emails/templates";
 import { createAuditLog } from "../utils/audit";
 import { AppError, respondWithError } from "../middleware/error.middleware";
 import { storeInitializeSchema, storePaystackCompleteSchema, storeTransferCheckoutSchema } from "../utils/validators";
@@ -247,54 +247,4 @@ export const saveWishlist = async (req: Request, res: Response): Promise<void> =
   } catch (err) {
     respondWithError(res, err, "Failed to save wishlist.");
   }
-};
-
-export const processWishlistEmails = async (): Promise<void> => {
-  const now = new Date();
-  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
-
-  const schedules = [
-    { field: "sent30min" as const, label: "30 minutes ago", minMs: 30 * 60 * 1000, maxMs: 45 * 60 * 1000 },
-    { field: "sent2hr"   as const, label: "a couple of hours ago", minMs: 2 * 3600 * 1000, maxMs: 3 * 3600 * 1000 },
-    { field: "sentDay1"  as const, label: "yesterday", minMs: 24 * 3600 * 1000, maxMs: 26 * 3600 * 1000 },
-    { field: "sentDay3"  as const, label: "3 days ago", minMs: 72 * 3600 * 1000, maxMs: 80 * 3600 * 1000 },
-  ];
-
-  for (const schedule of schedules) {
-    const minDate = new Date(now.getTime() - schedule.maxMs);
-    const maxDate = new Date(now.getTime() - schedule.minMs);
-
-    const wishlists = await prisma.wishlist.findMany({
-      where: {
-        email: { not: null },
-        [schedule.field]: false,
-        createdAt: { gte: minDate, lte: maxDate },
-      },
-      include: { organization: { select: { name: true, logoUrl: true } } },
-    });
-
-    for (const wl of wishlists) {
-      try {
-        const products = await prisma.product.findMany({
-          where: { id: { in: wl.productIds }, organizationId: wl.organizationId },
-          select: { name: true },
-        });
-        if (products.length === 0) continue;
-        const storeUrl = `${frontendUrl}/store/${wl.slug}`;
-        const html = wishlistReminderTemplate(
-          wl.organization.name, wl.organization.logoUrl,
-          storeUrl, products.map((p) => p.name), schedule.label
-        );
-        await sendEmail(wl.email!, `Your wishlist at ${wl.organization.name} is waiting`, html);
-        await prisma.wishlist.update({ where: { id: wl.id }, data: { [schedule.field]: true } });
-      } catch (err) {
-        getLogger().warn({ err, wishlistId: wl.id }, "wishlist reminder failed");
-      }
-    }
-  }
-
-  // Delete wishlists older than 4 days
-  await prisma.wishlist.deleteMany({
-    where: { createdAt: { lt: new Date(now.getTime() - 4 * 24 * 3600 * 1000) } },
-  });
 };

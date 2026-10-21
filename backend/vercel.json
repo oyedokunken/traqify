@@ -15,8 +15,12 @@
   ],
   "crons": [
     {
-      "path": "/api/cron/ping",
-      "schedule": "0 6 * * *"
+      "path": "/api/cron/housekeeping",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/wishlist-reminders",
+      "schedule": "0 9 * * *"
     }
   ]
 }
