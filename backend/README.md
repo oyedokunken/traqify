@@ -266,7 +266,7 @@ Base URL: `https://traqify-api.vercel.app`
 | POST | `/api/auth/login` | public | Authenticate and receive access + refresh tokens |
 | GET | `/api/auth/google-redirect` | public | Initiate Google OAuth 2.0 flow |
 | GET | `/api/auth/google-callback` | public | Google OAuth callback; stores tokens in OAuthSession |
-| GET | `/api/auth/oauth-exchange/:code` | public | Exchange a one-time OAuth code for tokens |
+| POST | `/api/auth/oauth-exchange` | public | Exchange a one-time OAuth code (sent in the body) for tokens |
 | POST | `/api/auth/forgot-password` | public | Request a password reset link by email |
 | POST | `/api/auth/reset-password` | public | Complete password reset with token |
 | POST | `/api/auth/refresh` | public | Get a new access token using a refresh token |
@@ -340,7 +340,7 @@ Base URL: `https://traqify-api.vercel.app`
 
 | Method | Path | Guard | Description |
 |--------|------|-------|-------------|
-| GET | `/api/staff/invite/:token` | public | Validate a staff invite token |
+| POST | `/api/staff/invite-details` | public | Validate a staff invite token (sent in the body) |
 | GET | `/api/staff` | isAtLeastAuditor | List all staff members |
 | GET | `/api/staff/invites` | isOwnerOrManager | List pending invitations |
 | DELETE | `/api/staff/invites/:inviteId` | isOwnerOrManager | Cancel a pending invite |

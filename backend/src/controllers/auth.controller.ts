@@ -665,8 +665,9 @@ export const acceptInvite = async (req: Request, res: Response): Promise<void> =
 
 export const exchangeOAuthCode = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { code } = req.params;
-    if (!code) { res.status(400).json({ error: "Code is required." }); return; }
+    // The code is a one-time secret, so it arrives in the body and never appears in a URL or a log line.
+    const code = req.body?.code;
+    if (typeof code !== "string" || code === "") { res.status(400).json({ error: "Code is required." }); return; }
 
     const session = await prisma.oAuthSession.findUnique({ where: { code } });
     if (!session || !session.userId || session.expiresAt < new Date()) {

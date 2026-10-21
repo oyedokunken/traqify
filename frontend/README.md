@@ -322,7 +322,7 @@ sequenceDiagram
     API->>API: Create/update user in DB
     API->>API: Store tokens in OAuthSession (2 min TTL)
     API-->>FE: Redirect /auth-callback?code=<opaque>
-    FE->>API: GET /api/auth/oauth-exchange/:code
+    FE->>API: POST /api/auth/oauth-exchange {code}
     API-->>FE: tokens + user (code deleted)
     FE->>FE: setAuthTokens (localStorage)
     FE->>U: Redirect to /dashboard or /create-organization

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, Suspense } from "react";
+import { useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import api, { setSession } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -9,8 +9,12 @@ function AuthCallbackContent() {
   const router = useRouter();
   const params = useSearchParams();
   const { setUser } = useAuth();
+  const started = useRef(false);
 
   useEffect(() => {
+    // The code works once. React runs effects twice in development, and a second try would burn it.
+    if (started.current) return;
+    started.current = true;
     const code = params.get("code");
     if (!code) {
       router.push("/login?error=oauth_failed");
@@ -19,7 +23,7 @@ function AuthCallbackContent() {
 
     // Exchange the one-time code for a session. Tokens are never placed in the URL, and the
     // refresh token arrives only as an httpOnly cookie.
-    api.get(`/api/auth/oauth-exchange/${code}`)
+    api.post("/api/auth/oauth-exchange", { code })
       .then(({ data }) => {
         if (!data.token || !data.user) throw new Error("Invalid response");
         setSession(data.token, data.user);
