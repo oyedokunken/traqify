@@ -5,7 +5,6 @@ import prisma from "../config/database";
 import { sendEmail } from "../config/email";
 import { AppError } from "../middleware/error.middleware";
 import { toMinor } from "./money";
-import { generateOrderNumber } from "./order-number";
 import { OrderLine, placeOrder, quoteOrder } from "./order-placement";
 import { initializePaystackTransaction, refundPaystackTransaction, verifyPaystackTransaction } from "./paystack";
 
@@ -138,7 +137,7 @@ export async function completeCheckout(org: StoreOrg, reference: string, orgOwne
     const { order } = await placeOrder({
       organizationId: org.id,
       createdById: orgOwnerId,
-      orderNumber: generateOrderNumber("STR"),
+      orderNumberPrefix: "STR",
       lines: session.items as unknown as OrderLine[],
       customer: {
         kind: "find-or-create",

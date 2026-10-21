@@ -2,6 +2,7 @@ import { OrderStatus, PaymentStatus, Prisma } from "@prisma/client";
 import prisma from "../config/database";
 import { AppError } from "../middleware/error.middleware";
 import { lineTotal, sumMoney, toMinor } from "./money";
+import { generateOrderNumber } from "./order-number";
 
 export interface OrderLine {
   productId: string;
@@ -15,7 +16,8 @@ export type CustomerInput =
 export interface PlaceOrderInput {
   organizationId: string;
   createdById: string;
-  orderNumber: string;
+  /** Order numbers are generated here, so a clash with an existing number can be retried with a fresh one. */
+  orderNumberPrefix: string;
   lines: OrderLine[];
   customer: CustomerInput | null;
   status: OrderStatus;
@@ -100,11 +102,13 @@ async function resolveCustomer(
   return { id: created.id, created: true };
 }
 
-function isReferenceConflict(err: unknown): boolean {
+function isUniqueConflictOn(err: unknown, column: string): boolean {
   if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== "P2002") return false;
   const target = err.meta?.target;
-  return Array.isArray(target) ? target.includes("reference") : String(target ?? "").includes("reference");
+  return Array.isArray(target) ? target.includes(column) : String(target ?? "").includes(column);
 }
+
+const ORDER_NUMBER_ATTEMPTS = 5;
 
 /**
  * Places an order atomically: price from the database, decrement stock with a
@@ -112,75 +116,86 @@ function isReferenceConflict(err: unknown): boolean {
  * back every write, including the stock decrement.
  */
 export async function placeOrder(input: PlaceOrderInput) {
-  try {
-    return await prisma.$transaction(async (tx) => {
-      const { priced, total } = await priceLines(tx, input.organizationId, input.lines);
-
-      if (input.verifiedAmountKobo !== undefined && toMinor(total) !== input.verifiedAmountKobo) {
-        throw new AppError("Payment amount does not match order total. Please contact support.", 402);
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await placeOrderOnce(input, generateOrderNumber(input.orderNumberPrefix));
+    } catch (err) {
+      if (isUniqueConflictOn(err, "reference")) {
+        throw new AppError("This payment reference has already been used.", 409);
       }
-
-      for (const line of priced) {
-        const result = await tx.inventory.updateMany({
-          where: {
-            productId: line.productId,
-            quantity: { gte: line.quantity },
-            product: { organizationId: input.organizationId },
-          },
-          data: { quantity: { decrement: line.quantity } },
-        });
-        if (result.count === 0) {
-          throw new AppError(`Insufficient stock for "${line.name}".`, 400);
-        }
+      // A clash on the number rolled the whole transaction back, stock included, so trying again is safe.
+      if (isUniqueConflictOn(err, "orderNumber")) {
+        if (attempt < ORDER_NUMBER_ATTEMPTS) continue;
+        throw new AppError("The order could not be placed right now. Please try again.", 503);
       }
-
-      const customer = await resolveCustomer(tx, input.organizationId, input.customer);
-
-      const order = await tx.order.create({
-        data: {
-          orderNumber: input.orderNumber,
-          organizationId: input.organizationId,
-          createdById: input.createdById,
-          customerId: customer.id,
-          notes: input.notes || null,
-          paymentMethod: input.paymentMethod,
-          totalAmount: total,
-          status: input.status,
-          orderItems: {
-            create: priced.map((p) => ({
-              productId: p.productId,
-              quantity: p.quantity,
-              unitPrice: p.unitPrice,
-              subtotal: p.subtotal,
-            })),
-          },
-        },
-        include: {
-          orderItems: { include: { product: true } },
-          customer: true,
-        },
-      });
-
-      await tx.payment.create({
-        data: {
-          amount: total,
-          currency: "NGN",
-          status: input.payment.status,
-          method: input.paymentMethod,
-          reference: input.payment.reference || null,
-          organizationId: input.organizationId,
-          orderId: order.id,
-        },
-      });
-
-      if (input.onPlaced) await input.onPlaced(tx, order);
-
-      return { order, customerCreated: customer.created };
-    });
-  } catch (err) {
-    if (isReferenceConflict(err)) {
-      throw new AppError("This payment reference has already been used.", 409);
+      throw err;
     }
-    throw err;
   }
+}
+
+async function placeOrderOnce(input: PlaceOrderInput, orderNumber: string) {
+  return await prisma.$transaction(async (tx) => {
+    const { priced, total } = await priceLines(tx, input.organizationId, input.lines);
+
+    if (input.verifiedAmountKobo !== undefined && toMinor(total) !== input.verifiedAmountKobo) {
+      throw new AppError("Payment amount does not match order total. Please contact support.", 402);
+    }
+
+    for (const line of priced) {
+      const result = await tx.inventory.updateMany({
+        where: {
+          productId: line.productId,
+          quantity: { gte: line.quantity },
+          product: { organizationId: input.organizationId },
+        },
+        data: { quantity: { decrement: line.quantity } },
+      });
+      if (result.count === 0) {
+        throw new AppError(`Insufficient stock for "${line.name}".`, 400);
+      }
+    }
+
+    const customer = await resolveCustomer(tx, input.organizationId, input.customer);
+
+    const order = await tx.order.create({
+      data: {
+        orderNumber,
+        organizationId: input.organizationId,
+        createdById: input.createdById,
+        customerId: customer.id,
+        notes: input.notes || null,
+        paymentMethod: input.paymentMethod,
+        totalAmount: total,
+        status: input.status,
+        orderItems: {
+          create: priced.map((p) => ({
+            productId: p.productId,
+            quantity: p.quantity,
+            unitPrice: p.unitPrice,
+            subtotal: p.subtotal,
+          })),
+        },
+      },
+      include: {
+        orderItems: { include: { product: true } },
+        customer: true,
+      },
+    });
+
+    await tx.payment.create({
+      data: {
+        amount: total,
+        currency: "NGN",
+        status: input.payment.status,
+        method: input.paymentMethod,
+        reference: input.payment.reference || null,
+        organizationId: input.organizationId,
+        orderId: order.id,
+      },
+    });
+
+    if (input.onPlaced) await input.onPlaced(tx, order);
+
+    return { order, customerCreated: customer.created };
+  });
 }
