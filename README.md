@@ -27,7 +27,7 @@ Traqify is a **production-deployed, multi-tenant enterprise store management pla
 
 It is a full-stack TypeScript monorepo (a Next.js 14 App Router frontend + RESTful Express.js backend covering the complete retail lifecycle: product catalogue, POS order creation, inventory control, customer records, payment tracking, staff access management, public storefronts with Paystack checkout, financial reports, and a real-time analytics dashboard.
 
-The system is live at **[https://traqify.vercel.app](https://traqify.vercel.app)** and its API at **[https://traqify-api.vercel.app](https://traqify-api.vercel.app)**.
+The system is live at **[https://traqify.oyedokun.dev](https://traqify.oyedokun.dev)** and its API at **[https://traqify-api.vercel.app](https://traqify-api.vercel.app)**. The earlier address, `traqify.oyedokun.dev`, redirects permanently to the same path on the new domain.
 
 ---
 
@@ -472,7 +472,7 @@ graph TB
     end
 
     subgraph Vercel["Vercel Edge Network"]
-        subgraph FE_DEPLOY["traqify.vercel.app"]
+        subgraph FE_DEPLOY["traqify.oyedokun.dev"]
             NEXT_SRV["Next.js 14<br/>Serverless Functions<br/>+ CDN Static Assets"]
         end
         subgraph BE_DEPLOY["traqify-api.vercel.app"]
@@ -1362,7 +1362,7 @@ Start the frontend:
 npm run dev
 ```
 
-The app will be available at **http://localhost:3000** (local) or **https://traqify.vercel.app/** (production).
+The app will be available at **http://localhost:3000** (local) or **https://traqify.oyedokun.dev/** (production).
 
 ---
 
@@ -1382,15 +1382,15 @@ The app will be available at **http://localhost:3000** (local) or **https://traq
 
 | URL | Description |
 |-----|-------------|
-| https://traqify.vercel.app | Landing page (production) |
-| https://traqify.vercel.app/register | Create an account |
-| https://traqify.vercel.app/login | Sign in |
-| https://traqify.vercel.app/create-organization | Org setup (post-registration) |
-| https://traqify.vercel.app/dashboard/[slug]/overview | Dashboard home |
-| https://traqify.vercel.app/dashboard/[slug]/products | Products |
-| https://traqify.vercel.app/dashboard/[slug]/orders | Orders |
-| https://traqify.vercel.app/dashboard/[slug]/staff | Staff management |
-| https://traqify.vercel.app/store/[slug] | Public store page |
+| https://traqify.oyedokun.dev | Landing page (production) |
+| https://traqify.oyedokun.dev/register | Create an account |
+| https://traqify.oyedokun.dev/login | Sign in |
+| https://traqify.oyedokun.dev/create-organization | Org setup (post-registration) |
+| https://traqify.oyedokun.dev/dashboard/[slug]/overview | Dashboard home |
+| https://traqify.oyedokun.dev/dashboard/[slug]/products | Products |
+| https://traqify.oyedokun.dev/dashboard/[slug]/orders | Orders |
+| https://traqify.oyedokun.dev/dashboard/[slug]/staff | Staff management |
+| https://traqify.oyedokun.dev/store/[slug] | Public store page |
 | http://localhost:3000 | Landing page (local) |
 
 ---
@@ -1406,7 +1406,7 @@ The app will be available at **http://localhost:3000** (local) or **https://traq
 | `PORT` | No | API port (default: 5000) |
 | `NODE_ENV` | Yes | `development` or `production` |
 | `API_URL` | Yes | Full base URL of this API server |
-| `FRONTEND_URL` | Yes | Full base URL of the frontend (for CORS + email links) |
+| `FRONTEND_URL` | Yes | Exact origin of the web app, e.g. `https://traqify.oyedokun.dev` (for CORS, the refresh/logout origin check, email links and the Google redirect URI). `https://traqify.oyedokun.dev` is always allowed as well |
 | `JWT_SECRET` | Yes | Long random string for signing access tokens |
 | `JWT_REFRESH_SECRET` | Yes | Different long random string for refresh tokens |
 | `JWT_EXPIRES_IN` | No | Access token lifetime (default: `7d`) |
@@ -1451,15 +1451,15 @@ http://localhost:3000
 5. Under **Authorized Redirect URIs**, add:
 
 ```
-https://traqify-api.vercel.app/api/auth/google-callback
+http://localhost:3000/api/auth/google-callback
 ```
 
 6. Save and copy the **Client ID** and **Client Secret** into `backend/.env`
 7. Wait up to 5 minutes for changes to propagate
 
 For production, also add:
-- `https://traqify.vercel.app` to JavaScript Origins
-- `https://traqify-api.vercel.app/api/auth/google-callback` to Redirect URIs
+- `https://traqify.oyedokun.dev` to JavaScript Origins
+- `https://traqify.oyedokun.dev/api/auth/google-callback` to Redirect URIs (the callback is on the web app's own origin, which proxies it to the API)
 
 ---
 

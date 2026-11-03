@@ -30,7 +30,7 @@ You will receive an acknowledgement within 48 hours and a full response within 7
 
 ### Same-Origin Session Enforcement
 
-- Frontend API calls go through the site's own origin (e.g., `https://traqify.vercel.app/api/...`) instead of a separate API domain.
+- Frontend API calls go through the site's own origin (e.g., `https://traqify.oyedokun.dev/api/...`) instead of a separate API domain.
 - Refresh cookies are scoped to `Path=/api/auth` and set with `SameSite=Lax`, ensuring they are only sent to refresh endpoints.
 - The API validates the `X-Forwarded-For` header and accepts refresh cookies only from trusted client IPs behind the proxy.
 

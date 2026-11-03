@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [Unreleased]
+
+### Changed
+- **New domain** - The web app now lives at https://traqify.oyedokun.dev. Every path on the old address, https://traqify.vercel.app, redirects permanently (308) to the same path and query on the new one, API paths included.
+- **CORS and origin check** - The API allows the configured `FRONTEND_URL` and https://traqify.oyedokun.dev, through one shared list used by both CORS and the refresh/logout origin check.
+- **Sign in again** - Browser sessions are tied to the address they were created on, so everyone signs in once on the new domain.
+
+---
+
 ## [v1.24.0] - 2026-10-19
 
 ### Added
