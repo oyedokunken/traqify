@@ -24,6 +24,7 @@ import reviewRoutes from "./routes/review.routes";
 import paymentRoutes from "./routes/payment.routes";
 import cronRoutes from "./routes/cron.routes";
 import uploadRoutes from "./routes/upload.routes";
+import { allowedOrigins } from "./config/origins";
 
 const app = express();
 
@@ -36,7 +37,8 @@ app.use(requestLogger);
 
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    // Only browsers send an Origin, and only the web app's own origins are answered.
+    origin: (origin, callback) => callback(null, origin !== undefined && allowedOrigins().includes(origin)),
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-By"],
