@@ -520,7 +520,7 @@ Copy `.env.example` to `.env` and fill in every value before starting the server
 | `PORT` | HTTP port (default: 5000) |
 | `NODE_ENV` | `development` or `production` |
 | `API_URL` | This server's base URL |
-| `FRONTEND_URL` | Frontend origin for CORS and email links |
+| `FRONTEND_URL` | Exact origin of the web app (`https://traqify.oyedokun.dev` in production). Used for CORS, the refresh/logout origin check, email links and the Google redirect URI. `https://traqify.oyedokun.dev` is always allowed in addition, so a mismatched value cannot lock the site out |
 | `JWT_SECRET` | Access token signing secret (generate: `openssl rand -base64 64`) |
 | `JWT_REFRESH_SECRET` | Refresh token signing secret |
 | `JWT_EXPIRES_IN` | Access token TTL (default: `7d`) |
