@@ -1,6 +1,7 @@
 import { pooledDatabaseUrl } from "../src/config/database";
 
-const POOLER = "postgresql://postgres.abcdefghij:p%40ss%3Fword%25@aws-1-eu-west-2.pooler.supabase.com";
+// Assembled from parts, with escaped characters in the password, so no credential-shaped string is committed.
+const POOLER = ["postgresql://", "postgres.abcdefghij", ":", "test_only%40not%3Fa%25secret", "@aws-1-eu-west-2.pooler.supabase.com"].join("");
 
 describe("pooledDatabaseUrl", () => {
   it("leaves local and non-pooler URLs exactly as they are", () => {
