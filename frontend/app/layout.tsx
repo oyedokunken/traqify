@@ -4,11 +4,12 @@ import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 import { Toaster } from "@/components/ui/toaster";
 import { ScrollToTop } from "@/components/shared/scroll-to-top";
+import { SITE_URL } from "@/lib/site";
 
 const jost = Jost({ subsets: ["latin"], display: "swap", variable: "--font-jost" });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://traqify.vercel.app"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || SITE_URL),
   title: "Traqify | Store Management Platform",
   description:
     "Traqify is a multi-tenant store management platform built for modern retail teams. Manage products, inventory, orders, and your entire team from one dashboard.",
