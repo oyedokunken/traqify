@@ -107,7 +107,7 @@ export const createPayment = async (req: AuthRequest, res: Response): Promise<vo
     const orgId = req.user!.organizationId!;
     const parsed = createPaymentSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.errors[0].message });
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
     const { amount, currency, status, method, reference, notes, orderId } = parsed.data;
@@ -141,7 +141,7 @@ export const updatePayment = async (req: AuthRequest, res: Response): Promise<vo
     const { id } = req.params;
     const parsed = updatePaymentSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.errors[0].message });
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
     const { status, method, reference, notes } = parsed.data;

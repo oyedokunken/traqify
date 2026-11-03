@@ -15,7 +15,7 @@ export const createOrganization = async (req: AuthRequest, res: Response): Promi
   try {
     const parsed = createOrganizationSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.errors[0].message });
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
 
@@ -77,7 +77,7 @@ export const updateOrganization = async (req: AuthRequest, res: Response): Promi
     const { slug } = req.params;
     const parsed = updateOrgSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.errors[0].message });
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
 

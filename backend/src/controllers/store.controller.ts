@@ -145,7 +145,7 @@ export const storeInitializeCheckout = async (req: Request, res: Response): Prom
   try {
     const parsed = storeInitializeSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.errors[0].message });
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
     const { org } = await loadPublishedStore(req.params.slug);
@@ -169,7 +169,7 @@ export const storeCheckout = async (req: Request, res: Response): Promise<void> 
     if (method === "PAYSTACK") {
       const parsed = storePaystackCompleteSchema.safeParse(req.body);
       if (!parsed.success) {
-        res.status(400).json({ error: parsed.error.errors[0].message });
+        res.status(400).json({ error: parsed.error.issues[0].message });
         return;
       }
       const { org, owner } = await loadPublishedStore(slug);
@@ -193,7 +193,7 @@ export const storeCheckout = async (req: Request, res: Response): Promise<void> 
 
     const parsed = storeTransferCheckoutSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.errors[0].message });
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
     const { name, email, phone, address, notes, items } = parsed.data;
