@@ -416,7 +416,7 @@ export const emailReport = async (req: AuthRequest, res: Response): Promise<void
     const label = REPORT_LABELS[type];
     if (!label) { res.status(400).json({ error: "Invalid report type." }); return; }
     const parsed = reportEmailSchema.safeParse(req.body);
-    if (!parsed.success) { res.status(400).json({ error: parsed.error.errors[0].message }); return; }
+    if (!parsed.success) { res.status(400).json({ error: parsed.error.issues[0].message }); return; }
     const { to, from, to_date } = parsed.data;
 
     const today = new Date(); today.setHours(23, 59, 59, 999);

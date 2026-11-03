@@ -90,7 +90,7 @@ export const createProduct = async (req: AuthRequest, res: Response): Promise<vo
     const orgId = req.user!.organizationId!;
     const parsed = productSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.errors[0].message });
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
 
@@ -159,7 +159,7 @@ export const updateProduct = async (req: AuthRequest, res: Response): Promise<vo
 
     const parsed = productUpdateSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.errors[0].message });
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
     const data = parsed.data;

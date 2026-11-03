@@ -28,7 +28,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
   try {
     const parsed = registerStep1Schema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.errors[0].message });
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
 
@@ -100,7 +100,7 @@ export const sendOTP = async (req: Request, res: Response): Promise<void> => {
   try {
     const parsed = sendOTPSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.errors[0].message });
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
     const { email } = parsed.data;
@@ -129,7 +129,7 @@ export const verifyEmail = async (req: Request, res: Response): Promise<void> =>
   try {
     const parsed = verifyOTPSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.errors[0].message });
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
 
@@ -166,7 +166,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   try {
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.errors[0].message });
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
 
@@ -384,7 +384,7 @@ export const changePassword = async (req: Request, res: Response): Promise<void>
     }
     const parsed = changePasswordSchema.safeParse({ newPassword });
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.errors[0].message });
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
     const user = await prisma.user.findUnique({ where: { id: authReq.user.id } });
@@ -426,7 +426,7 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
   try {
     const parsed = forgotPasswordSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.errors[0].message });
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
 
@@ -450,7 +450,7 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
   try {
     const parsed = resetPasswordSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.errors[0].message });
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
 
@@ -568,7 +568,7 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<vo
   try {
     const parsed = updateUserSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.errors[0].message });
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
 
@@ -592,7 +592,7 @@ export const acceptInvite = async (req: Request, res: Response): Promise<void> =
   try {
     const parsed = acceptInviteSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.errors[0].message });
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
 
