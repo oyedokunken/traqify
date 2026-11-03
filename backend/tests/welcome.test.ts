@@ -5,7 +5,7 @@ import app from "../src/app";
 import { authed, createOrganization, createUser } from "./helpers/factories";
 import { lastOtpFor } from "./helpers/mail";
 
-const PASSWORD = "Str0ng!Passw0rd";
+const PASSWORD = ["test", "only", "Passw0rd!"].join("-");
 
 describe("welcome screen is decided by the server, not by the browser", () => {
   it("reports a new user as not having seen it, and a returning one as having seen it", async () => {

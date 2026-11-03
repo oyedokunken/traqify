@@ -6,8 +6,9 @@ import { captureLogs } from "../src/config/logger";
 import { redactUrl } from "../src/utils/redact";
 import { authed, createProduct, createTenant } from "./helpers/factories";
 
-const INVITE_TOKEN = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2";
-const OAUTH_CODE = "0123456789abcdef0123456789abcdef0123456789abcdef";
+// Made up values shaped like real tokens (long, URL safe) so the redaction has something to find.
+const INVITE_TOKEN = `test_only_not_a_secret_${"i".repeat(40)}`;
+const OAUTH_CODE = `test_only_not_a_secret_${"o".repeat(30)}`;
 const GOOGLE_STATE = "f".repeat(64);
 
 describe("redactUrl", () => {

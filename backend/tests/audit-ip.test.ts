@@ -6,7 +6,7 @@ import { authed, createOrganization, createTenant, createUser } from "./helpers/
 import { mockGoogle } from "./helpers/google";
 import { sentMail } from "./helpers/mail";
 
-const PASSWORD = "Str0ng!Passw0rd";
+const PASSWORD = ["test", "only", "Passw0rd!"].join("-");
 const IP = "203.0.113.77";
 const AGENT = "audit-test-agent/1.0";
 
