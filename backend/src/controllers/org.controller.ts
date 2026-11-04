@@ -1,3 +1,5 @@
+import { logAndIgnore } from "../config/logger";
+import { respondWithError } from "../middleware/error.middleware";
 import { MAX_UNPAGED_ROWS } from "../utils/pagination";
 import { Response } from "express";
 import prisma from "../config/database";
@@ -13,7 +15,7 @@ export const createOrganization = async (req: AuthRequest, res: Response): Promi
   try {
     const parsed = createOrganizationSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.errors[0].message });
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
 
@@ -44,8 +46,8 @@ export const createOrganization = async (req: AuthRequest, res: Response): Promi
     }
 
     res.status(201).json({ organization: org, slug });
-  } catch {
-    res.status(500).json({ error: "Failed to create organization." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to create organization.");
   }
 };
 
@@ -65,8 +67,8 @@ export const getOrganization = async (req: AuthRequest, res: Response): Promise<
     }
 
     res.json(org);
-  } catch {
-    res.status(500).json({ error: "Failed to fetch organization." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to fetch organization.");
   }
 };
 
@@ -75,7 +77,7 @@ export const updateOrganization = async (req: AuthRequest, res: Response): Promi
     const { slug } = req.params;
     const parsed = updateOrgSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.errors[0].message });
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
 
@@ -92,13 +94,13 @@ export const updateOrganization = async (req: AuthRequest, res: Response): Promi
     });
 
     if (parsed.data.storePublished !== undefined && parsed.data.storePublished !== wasPublished) {
-      await createAuditLog(req.user!.id, org.id, "UPDATE", "Organization", org.id, `Store ${parsed.data.storePublished ? "published" : "taken offline"}`, req).catch(() => {});
+      await createAuditLog(req.user!.id, org.id, "UPDATE", "Organization", org.id, `Store ${parsed.data.storePublished ? "published" : "taken offline"}`, req).catch(logAndIgnore("audit log"));
       const owner = await prisma.user.findFirst({ where: { organizationId: org.id, role: "OWNER" } });
       if (owner) {
         const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
         const storeUrl = `${frontendUrl}/store/${org.slug}`;
         const dashboardUrl = `${frontendUrl}/dashboard/${org.slug}/store`;
-        await sendEmail(owner.email, `Your store is now ${parsed.data.storePublished ? "live" : "offline"}`, storeStatusEmailTemplate(org.name, parsed.data.storePublished, storeUrl, dashboardUrl)).catch(() => {});
+        await sendEmail(owner.email, `Your store is now ${parsed.data.storePublished ? "live" : "offline"}`, storeStatusEmailTemplate(org.name, parsed.data.storePublished, storeUrl, dashboardUrl)).catch(logAndIgnore("email"));
       }
     }
 
@@ -108,8 +110,8 @@ export const updateOrganization = async (req: AuthRequest, res: Response): Promi
       : "Updated organization settings";
     await createAuditLog(req.user!.id, org.id, storeToggled ? "UPDATE" : "UPDATE", "Organization", org.id, details, req);
     res.json(updated);
-  } catch {
-    res.status(500).json({ error: "Failed to update organization." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to update organization.");
   }
 };
 
@@ -148,7 +150,7 @@ export const getPublicStore = async (req: Request, res: Response): Promise<void>
     });
 
     res.json({ org, products, categories });
-  } catch {
-    res.status(500).json({ error: "Failed to fetch store." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to fetch store.");
   }
 };

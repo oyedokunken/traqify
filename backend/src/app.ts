@@ -2,12 +2,12 @@ import express from "express";
 import cors from "cors";
 import path from "path";
 import helmet from "helmet";
-import morgan from "morgan";
 import cookieParser from "cookie-parser";
 
 import { errorHandler, notFound } from "./middleware/error.middleware";
-import { authLimiter, generalLimiter } from "./middleware/rate-limit";
+import { generalLimiter } from "./middleware/rate-limit";
 import { forwardedClientIp } from "./middleware/proxy-ip";
+import { requestLogger } from "./middleware/request-logger";
 import authRoutes from "./routes/auth.routes";
 import orgRoutes from "./routes/org.routes";
 import productRoutes from "./routes/product.routes";
@@ -24,6 +24,7 @@ import reviewRoutes from "./routes/review.routes";
 import paymentRoutes from "./routes/payment.routes";
 import cronRoutes from "./routes/cron.routes";
 import uploadRoutes from "./routes/upload.routes";
+import { allowedOrigins } from "./config/origins";
 
 const app = express();
 
@@ -31,13 +32,13 @@ app.set("trust proxy", 1);
 app.use(forwardedClientIp);
 
 app.use(helmet());
-if (process.env.NODE_ENV !== "test") {
-  app.use(morgan(process.env.NODE_ENV === "production" ? "short" : "dev"));
-}
+// First, so every request is logged (with a request id and a redacted URL) even when a later step rejects it.
+app.use(requestLogger);
 
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    // Only browsers send an Origin, and only the web app's own origins are answered.
+    origin: (origin, callback) => callback(null, origin !== undefined && allowedOrigins().includes(origin)),
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-By"],
@@ -58,7 +59,7 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString(), service: "Traqify API" });
 });
 
-app.use("/api/auth", authLimiter, authRoutes);
+app.use("/api/auth", authRoutes);
 app.use("/api/org", orgRoutes);
 app.use("/api/organizations", orgRoutes);
 app.use("/api/products", productRoutes);

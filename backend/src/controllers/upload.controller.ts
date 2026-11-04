@@ -1,3 +1,4 @@
+import { logAndIgnore } from "../config/logger";
 import crypto from "crypto";
 import { Response } from "express";
 import { z } from "zod";
@@ -14,7 +15,7 @@ const SIGNED_URL_LIFETIME_MS = 15 * 60 * 1000;
 const signSchema = z.object({
   purpose: z.nativeEnum(UploadPurpose),
   contentType: z.string().min(1).max(100),
-  size: z.number({ invalid_type_error: "Size must be a number." }).int().min(1, "The file is empty."),
+  size: z.number({ error: "Size must be a number." }).int().min(1, "The file is empty."),
 });
 
 /** What the client needs once an upload is confirmed. Private files are only ever identified by a reference. */
@@ -34,7 +35,7 @@ export const signUpload = async (req: AuthRequest, res: Response): Promise<void>
   try {
     const parsed = signSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.errors[0].message });
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
     const { purpose, contentType, size } = parsed.data;
@@ -109,7 +110,7 @@ export const confirmUpload = async (req: AuthRequest, res: Response): Promise<vo
 
     const reject = async (message: string): Promise<void> => {
       await prisma.upload.updateMany({ where: { id: upload.id, status: "PENDING" }, data: { status: "REJECTED" } });
-      await removeStoredObject(upload.bucket, upload.path).catch((e) => console.error("[uploads] could not remove a rejected object:", e.message));
+      await removeStoredObject(upload.bucket, upload.path).catch(logAndIgnore("could not remove a rejected object"));
       res.status(400).json({ error: message });
     };
 

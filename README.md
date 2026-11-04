@@ -27,7 +27,7 @@ Traqify is a **production-deployed, multi-tenant enterprise store management pla
 
 It is a full-stack TypeScript monorepo (a Next.js 14 App Router frontend + RESTful Express.js backend covering the complete retail lifecycle: product catalogue, POS order creation, inventory control, customer records, payment tracking, staff access management, public storefronts with Paystack checkout, financial reports, and a real-time analytics dashboard.
 
-The system is live at **[https://traqify.vercel.app](https://traqify.vercel.app)** and its API at **[https://traqify-api.vercel.app](https://traqify-api.vercel.app)**.
+The system is live at **[https://traqify.oyedokun.dev](https://traqify.oyedokun.dev)** and its API at **[https://traqify-api.vercel.app](https://traqify-api.vercel.app)**. The earlier address, `traqify.oyedokun.dev`, redirects permanently to the same path on the new domain.
 
 ---
 
@@ -60,6 +60,10 @@ graph TB
         FE["Next.js 14 App Router<br/>TypeScript + Tailwind CSS<br/>Framer Motion + Recharts<br/>Axios with JWT interceptor"]
     end
 
+    subgraph FrontendProxy["Frontend Proxy (Vercel)"]
+        PROXY["Same-origin proxy<br/>Trusted client IP<br/>Cookie: Path=/api/auth"]
+    end
+
     subgraph Server["API Server (Express.js)"]
         MW["Helmet + Rate Limit<br/>JWT authenticate<br/>requireOrg + RBAC guards"]
         CTRL["Controllers<br/>auth, org, products, inventory<br/>orders, customers, staff<br/>reports, audit, store<br/>payments, reviews, newsletter"]
@@ -67,14 +71,15 @@ graph TB
     end
 
     PG[("PostgreSQL<br/>Supabase")]
-    S3[("Supabase Storage<br/>products + avatars buckets")]
+    S3[("Supabase Storage<br/>products + avatars + downloadables<br/>Signed direct uploads")]
     MAIL["Nodemailer<br/>Gmail SMTP<br/>Branded HTML templates"]
     GOAUTH["Google OAuth 2.0"]
     PAY["Paystack"]
 
-    FE -->|"REST JSON / Bearer JWT"| MW
+    FE -->|"Same-origin REST JSON"| PROXY
+    PROXY -->|"Bearer JWT + httpOnly cookie"| MW
     CTRL -->|"Prisma ORM"| PG
-    CTRL --> S3
+    CTRL -->|"Signed URLs"| S3
     CTRL --> MAIL
     FE -->|"OAuth redirect"| GOAUTH
     GOAUTH -->|"code callback"| MW
@@ -94,10 +99,10 @@ graph TB
 **Google OAuth 2.0:**
 1. `GET /api/auth/google-redirect` - redirects the browser to the Google consent screen
 2. `GET /api/auth/google-callback?code=` - exchanges the code, fetches the user profile, upserts the user record, stores tokens in a short-lived `OAuthSession` record, and redirects the browser to `/auth-callback?code=<opaque>`
-3. `GET /api/auth/oauth-exchange/:code` - frontend calls this once with the opaque code; server returns the access token, refresh token, and user; the code is deleted immediately after use
+3. `POST /api/auth/oauth-exchange` - frontend calls this once with the opaque code in the body; server returns the access token, refresh token, and user; the code is deleted immediately after use
 
 **Token refresh:**
-The Axios client intercepts every 401 response, silently calls `POST /api/auth/refresh` with the stored refresh token, saves the new access token, and retries the original request. This is transparent to all callers.
+The Axios client intercepts every 401 response, silently calls `POST /api/auth/refresh` which uses the httpOnly refresh cookie, saves the new access token in memory, and retries the original request. This is transparent to all callers.
 
 See [Sequence Diagrams](#sequence-diagrams) below for step-by-step visual flows.
 
@@ -157,7 +162,7 @@ sequenceDiagram
     API->>DB: Upsert User (create or update)
     API->>DB: INSERT OAuthSession (code, tokens, 2 min TTL)
     API-->>FE: 302 redirect to /auth-callback?code=<opaque>
-    FE->>API: GET /api/auth/oauth-exchange/:code
+    FE->>API: POST /api/auth/oauth-exchange {code}
     API->>DB: Read OAuthSession, delete record
     API-->>FE: access token + refresh token + user
     FE-->>User: Dashboard or create-organization page
@@ -258,7 +263,7 @@ sequenceDiagram
     end
     MAIL-->>NewStaff: Invitation email with token link
     NewStaff->>FE: Open /invite/token
-    FE->>API: GET /api/staff/invite/token
+    FE->>API: POST /api/staff/invite-details {token}
     API->>DB: Validate token (not expired, not accepted)
     API-->>FE: Invite details (org name, role)
     NewStaff->>FE: Set password and submit
@@ -467,7 +472,7 @@ graph TB
     end
 
     subgraph Vercel["Vercel Edge Network"]
-        subgraph FE_DEPLOY["traqify.vercel.app"]
+        subgraph FE_DEPLOY["traqify.oyedokun.dev"]
             NEXT_SRV["Next.js 14<br/>Serverless Functions<br/>+ CDN Static Assets"]
         end
         subgraph BE_DEPLOY["traqify-api.vercel.app"]
@@ -521,7 +526,7 @@ graph TB
 | Security | Helmet, rate-limit | Per-route rate limiting on auth endpoints |
 | Phone input | react-phone-number-input | International flag selector, default NG |
 | PDF generation | PDFKit | Landscape A4 report PDFs |
-| File upload | Multer (memoryStorage) | Images: JPG/PNG/WebP max 2 MB; downloadable files: any type max 4 MB |
+| File upload | Multer (memoryStorage) | Images: JPG/PNG/WebP max 5 MB; downloadable files: any type max 4 MB; signed direct uploads to Supabase Storage |
 | Font | Jost | Google Fonts |
 
 ---
@@ -545,8 +550,8 @@ Four roles with granular middleware enforcement:
 ### Authentication
 - Email + password with OTP email verification (6-digit, 10-minute expiry)
 - Google OAuth 2.0 via redirect flow (no third-party popups)
-- JWT access token (7-day default) + refresh token pair
-- Axios interceptor catches 401 and silently refreshes the token
+- JWT access token (15 minutes, kept in memory) + httpOnly refresh cookie (Secure, SameSite=Lax, Path=/api/auth)
+- Axios interceptor catches 401, refreshes through the cookie, and retries the request
 - Account lock by admin with notification email
 
 ### Products and Inventory
@@ -1006,7 +1011,7 @@ All protected endpoints require `Authorization: Bearer <token>`.
 | POST | `/reset-password` | Public | Set new password via token |
 | GET  | `/google-redirect` | Public | Redirect to Google consent screen |
 | GET  | `/google-callback` | Public | Handle OAuth callback; stores tokens in OAuthSession; redirects with one-time code |
-| GET  | `/oauth-exchange/:code` | Public | Exchange one-time code for access token, refresh token, and user |
+| POST | `/oauth-exchange` | Public | Exchange one-time code for access token, refresh token, and user |
 | GET  | `/me` | Auth | Get current user profile |
 | PATCH | `/me` | Auth | Update name / avatarUrl |
 | POST | `/change-password` | Auth | Change password; increments tokenVersion |
@@ -1082,7 +1087,7 @@ All protected endpoints require `Authorization: Bearer <token>`.
 | GET | `/invites` | MANAGER+ | List all pending/expired invites |
 | POST | `/invite` | MANAGER+ | Send staff invitation (3-day token) |
 | DELETE | `/invites/:inviteId` | MANAGER+ | Cancel a pending invite |
-| GET | `/invite/:token` | Public | Fetch invite details (for accept page) |
+| POST | `/invite-details` | Public | Fetch invite details; the token is sent in the body (for accept page) |
 | PATCH | `/:userId/role` | OWNER only | Change a staff member's role |
 | PATCH | `/:userId/access` | MANAGER+ | Toggle account restriction |
 | DELETE | `/:userId` | OWNER only | Remove staff member from org |
@@ -1357,7 +1362,7 @@ Start the frontend:
 npm run dev
 ```
 
-The app will be available at **http://localhost:3000** (local) or **https://traqify.vercel.app/** (production).
+The app will be available at **http://localhost:3000** (local) or **https://traqify.oyedokun.dev/** (production).
 
 ---
 
@@ -1377,15 +1382,15 @@ The app will be available at **http://localhost:3000** (local) or **https://traq
 
 | URL | Description |
 |-----|-------------|
-| https://traqify.vercel.app | Landing page (production) |
-| https://traqify.vercel.app/register | Create an account |
-| https://traqify.vercel.app/login | Sign in |
-| https://traqify.vercel.app/create-organization | Org setup (post-registration) |
-| https://traqify.vercel.app/dashboard/[slug]/overview | Dashboard home |
-| https://traqify.vercel.app/dashboard/[slug]/products | Products |
-| https://traqify.vercel.app/dashboard/[slug]/orders | Orders |
-| https://traqify.vercel.app/dashboard/[slug]/staff | Staff management |
-| https://traqify.vercel.app/store/[slug] | Public store page |
+| https://traqify.oyedokun.dev | Landing page (production) |
+| https://traqify.oyedokun.dev/register | Create an account |
+| https://traqify.oyedokun.dev/login | Sign in |
+| https://traqify.oyedokun.dev/create-organization | Org setup (post-registration) |
+| https://traqify.oyedokun.dev/dashboard/[slug]/overview | Dashboard home |
+| https://traqify.oyedokun.dev/dashboard/[slug]/products | Products |
+| https://traqify.oyedokun.dev/dashboard/[slug]/orders | Orders |
+| https://traqify.oyedokun.dev/dashboard/[slug]/staff | Staff management |
+| https://traqify.oyedokun.dev/store/[slug] | Public store page |
 | http://localhost:3000 | Landing page (local) |
 
 ---
@@ -1401,7 +1406,7 @@ The app will be available at **http://localhost:3000** (local) or **https://traq
 | `PORT` | No | API port (default: 5000) |
 | `NODE_ENV` | Yes | `development` or `production` |
 | `API_URL` | Yes | Full base URL of this API server |
-| `FRONTEND_URL` | Yes | Full base URL of the frontend (for CORS + email links) |
+| `FRONTEND_URL` | Yes | Exact origin of the web app, e.g. `https://traqify.oyedokun.dev` (for CORS, the refresh/logout origin check, email links and the Google redirect URI). `https://traqify.oyedokun.dev` is always allowed as well |
 | `JWT_SECRET` | Yes | Long random string for signing access tokens |
 | `JWT_REFRESH_SECRET` | Yes | Different long random string for refresh tokens |
 | `JWT_EXPIRES_IN` | No | Access token lifetime (default: `7d`) |
@@ -1446,15 +1451,15 @@ http://localhost:3000
 5. Under **Authorized Redirect URIs**, add:
 
 ```
-https://traqify-api.vercel.app/api/auth/google-callback
+http://localhost:3000/api/auth/google-callback
 ```
 
 6. Save and copy the **Client ID** and **Client Secret** into `backend/.env`
 7. Wait up to 5 minutes for changes to propagate
 
 For production, also add:
-- `https://traqify.vercel.app` to JavaScript Origins
-- `https://traqify-api.vercel.app/api/auth/google-callback` to Redirect URIs
+- `https://traqify.oyedokun.dev` to JavaScript Origins
+- `https://traqify.oyedokun.dev/api/auth/google-callback` to Redirect URIs (the callback is on the web app's own origin, which proxies it to the API)
 
 ---
 

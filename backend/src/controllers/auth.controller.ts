@@ -1,3 +1,5 @@
+import { logAndIgnore, getLogger } from "../config/logger";
+import { respondWithError } from "../middleware/error.middleware";
 import { hashToken } from "../utils/token-hash";
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
@@ -7,7 +9,7 @@ import { signToken, signEmailVerificationToken, verifyEmailVerificationToken } f
 import { REFRESH_COOKIE, clearRefreshCookie, endSession, rotateSession, startSession } from "../utils/session";
 import { createOTP, verifyOTP, generatePasswordResetToken, verifyPasswordResetToken, markPasswordResetTokenUsed } from "../utils/otp";
 import { sendEmail } from "../config/email";
-import { otpEmailTemplate, passwordResetEmailTemplate, passwordChangedEmailTemplate, newStaffJoinedEmailTemplate } from "../emails/templates";
+import { accountExistsEmailTemplate, otpEmailTemplate, passwordResetEmailTemplate, passwordChangedEmailTemplate, newStaffJoinedEmailTemplate } from "../emails/templates";
 import {
   registerStep1Schema,
   sendOTPSchema,
@@ -26,7 +28,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
   try {
     const parsed = registerStep1Schema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.errors[0].message });
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
 
@@ -61,7 +63,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     // Create audit log for user registration
     if (user.organizationId) {
-      createAuditLog(user.id, user.organizationId, "CREATE", "User", user.id, `Registered account: ${user.name}`, req).catch(() => {});
+      createAuditLog(user.id, user.organizationId, "CREATE", "User", user.id, `Registered account: ${user.name}`, req).catch(logAndIgnore("audit log"));
     }
 
     // Return tokens for automatic login (email is pre-verified in new flow)
@@ -86,48 +88,11 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         avatarUrl: user.avatarUrl,
         emailVerified: user.emailVerified,
         signInMethod: "EMAIL",
+        welcomeSeen: user.welcomeSeenAt !== null,
       },
     });
   } catch (err) {
-    console.error("Register error:", err);
-    res.status(500).json({ error: "Something went wrong during registration." });
-  }
-};
-
-export const checkEmail = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { email } = req.body;
-    if (!email || typeof email !== "string") {
-      res.status(400).json({ error: "Email is required." });
-      return;
-    }
-    const user = await prisma.user.findUnique({
-      where: { email },
-      include: { organization: { select: { slug: true } } },
-    });
-
-    // Check if this email has a pending or accepted staff invite
-    const invite = await prisma.staffInvite.findFirst({
-      where: { email, status: { in: ["PENDING", "ACCEPTED"] } },
-    });
-
-    if (!user) {
-      if (invite) {
-        res.json({ exists: false, isInvited: true });
-        return;
-      }
-      res.json({ exists: false });
-      return;
-    }
-    res.json({
-      exists: true,
-      signInMethod: user.signInMethod || "EMAIL",
-      hasOrg: !!user.organizationId,
-      orgSlug: user.organization?.slug || null,
-      isInvited: !!invite,
-    });
-  } catch {
-    res.status(500).json({ error: "Failed to check email." });
+    respondWithError(res, err, "Something went wrong during registration.");
   }
 };
 
@@ -135,7 +100,7 @@ export const sendOTP = async (req: Request, res: Response): Promise<void> => {
   try {
     const parsed = sendOTPSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.errors[0].message });
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
     const { email } = parsed.data;
@@ -145,6 +110,8 @@ export const sendOTP = async (req: Request, res: Response): Promise<void> => {
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (user?.emailVerified) {
+      // The page cannot say so without revealing who has an account, so the owner of the mailbox is told instead.
+      await sendEmail(email, "You already have a Traqify account", accountExistsEmailTemplate(user.name || "there", `${process.env.FRONTEND_URL}/login`, email));
       res.json(response);
       return;
     }
@@ -153,8 +120,8 @@ export const sendOTP = async (req: Request, res: Response): Promise<void> => {
     await sendEmail(email, "Your Traqify verification code", otpEmailTemplate(user?.name || "there", otp));
 
     res.json(response);
-  } catch {
-    res.status(500).json({ error: "Failed to send verification code." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to send verification code.");
   }
 };
 
@@ -162,7 +129,7 @@ export const verifyEmail = async (req: Request, res: Response): Promise<void> =>
   try {
     const parsed = verifyOTPSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.errors[0].message });
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
 
@@ -190,8 +157,8 @@ export const verifyEmail = async (req: Request, res: Response): Promise<void> =>
       await prisma.user.update({ where: { email }, data: { emailVerified: true } });
     }
     res.json({ message: "Email verified successfully." });
-  } catch {
-    res.status(500).json({ error: "Email verification failed." });
+  } catch (err) {
+    respondWithError(res, err, "Email verification failed.");
   }
 };
 
@@ -199,7 +166,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   try {
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.errors[0].message });
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
 
@@ -243,7 +210,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
 
     if (user.organizationId) {
-      createAuditLog(user.id, user.organizationId, "LOGIN", "User", user.id, "Logged in", req).catch(() => {});
+      createAuditLog(user.id, user.organizationId, "LOGIN", "User", user.id, "Logged in", req).catch(logAndIgnore("audit log"));
     }
 
     const token = signToken({
@@ -266,10 +233,11 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         orgSlug: user.organization?.slug || null,
         avatarUrl: user.avatarUrl,
         signInMethod: user.signInMethod || "EMAIL",
+        welcomeSeen: user.welcomeSeenAt !== null,
       },
     });
-  } catch {
-    res.status(500).json({ error: "Login failed. Please try again." });
+  } catch (err) {
+    respondWithError(res, err, "Login failed. Please try again.");
   }
 };
 
@@ -399,7 +367,8 @@ export const googleCallback = async (req: Request, res: Response): Promise<void>
     });
 
     res.redirect(`${frontendUrl}/auth-callback?code=${oauthCode}`);
-  } catch {
+  } catch (err) {
+    getLogger().warn({ err }, "google sign in failed");
     res.redirect(`${frontendUrl}/login?error=oauth_failed`);
   }
 };
@@ -415,7 +384,7 @@ export const changePassword = async (req: Request, res: Response): Promise<void>
     }
     const parsed = changePasswordSchema.safeParse({ newPassword });
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.errors[0].message });
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
     const user = await prisma.user.findUnique({ where: { id: authReq.user.id } });
@@ -428,12 +397,14 @@ export const changePassword = async (req: Request, res: Response): Promise<void>
     const hash = await bcrypt.hash(newPassword, 12);
     // Increment tokenVersion to invalidate all existing sessions
     await prisma.user.update({ where: { id: user.id }, data: { password: hash, passwordChangedAt: new Date(), tokenVersion: { increment: 1 } } });
-    await createAuditLog(user.id, user.organizationId || "", "UPDATE", "USER", user.id, "Changed account password");
+    if (user.organizationId) {
+      await createAuditLog(user.id, user.organizationId, "UPDATE", "USER", user.id, "Changed account password", req);
+    }
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
-    await sendEmail(user.email, "Your Traqify password was changed", passwordChangedEmailTemplate(user.name || "there", `${frontendUrl}/login`)).catch(() => {});
+    await sendEmail(user.email, "Your Traqify password was changed", passwordChangedEmailTemplate(user.name || "there", `${frontendUrl}/login`)).catch(logAndIgnore("email"));
     res.json({ message: "Password updated successfully." });
-  } catch {
-    res.status(500).json({ error: "Failed to change password." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to change password.");
   }
 };
 
@@ -446,8 +417,8 @@ export const logout = async (req: AuthRequest, res: Response): Promise<void> => 
       await prisma.user.update({ where: { id: req.user.id }, data: { tokenVersion: { increment: 1 } } });
     }
     res.json({ message: "Logged out successfully." });
-  } catch {
-    res.status(500).json({ error: "Logout failed." });
+  } catch (err) {
+    respondWithError(res, err, "Logout failed.");
   }
 };
 
@@ -455,7 +426,7 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
   try {
     const parsed = forgotPasswordSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.errors[0].message });
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
 
@@ -470,8 +441,8 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
     }
 
     res.json({ message: "If an account exists for that email, a reset link has been sent." });
-  } catch {
-    res.status(500).json({ error: "Failed to process password reset request." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to process password reset request.");
   }
 };
 
@@ -479,7 +450,7 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
   try {
     const parsed = resetPasswordSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.errors[0].message });
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
 
@@ -499,8 +470,8 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
     await markPasswordResetTokenUsed(token);
 
     res.json({ message: "Your password has been reset successfully." });
-  } catch {
-    res.status(500).json({ error: "Failed to reset password." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to reset password.");
   }
 };
 
@@ -537,8 +508,18 @@ export const refreshToken = async (req: Request, res: Response): Promise<void> =
         tokenVersion: user.tokenVersion,
       }),
     });
-  } catch {
-    res.status(500).json({ error: "Could not refresh the session." });
+  } catch (err) {
+    respondWithError(res, err, "Could not refresh the session.");
+  }
+};
+
+/** Records that the signed in user has seen the welcome screen. Keeps the first time if called again. */
+export const markWelcomeSeen = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    await prisma.user.updateMany({ where: { id: req.user!.id, welcomeSeenAt: null }, data: { welcomeSeenAt: new Date() } });
+    res.json({ welcomeSeen: true });
+  } catch (err) {
+    respondWithError(res, err, "Could not save that.");
   }
 };
 
@@ -575,10 +556,11 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
       signInMethod: user.signInMethod,
       organizationId: user.organizationId,
       organization: user.organization,
+      welcomeSeen: user.welcomeSeenAt !== null,
       lastLoginAt: user.lastLoginAt,
     });
-  } catch {
-    res.status(500).json({ error: "Failed to fetch profile." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to fetch profile.");
   }
 };
 
@@ -586,7 +568,7 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<vo
   try {
     const parsed = updateUserSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.errors[0].message });
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
 
@@ -601,8 +583,8 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<vo
     }
 
     res.json(updated);
-  } catch {
-    res.status(500).json({ error: "Failed to update profile." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to update profile.");
   }
 };
 
@@ -610,7 +592,7 @@ export const acceptInvite = async (req: Request, res: Response): Promise<void> =
   try {
     const parsed = acceptInviteSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.errors[0].message });
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
 
@@ -644,7 +626,7 @@ export const acceptInvite = async (req: Request, res: Response): Promise<void> =
     });
 
     await prisma.staffInvite.update({ where: { id: invite.id }, data: { status: "ACCEPTED" } });
-    await createAuditLog(user.id, invite.organizationId, "CREATE", "User", user.id, `${name} accepted invitation and joined as ${invite.role}`);
+    await createAuditLog(user.id, invite.organizationId, "CREATE", "User", user.id, `${name} accepted invitation and joined as ${invite.role}`, req);
 
     const owner = await prisma.user.findFirst({ where: { organizationId: invite.organizationId, role: "OWNER" }, select: { email: true, name: true } });
     if (owner && org) {
@@ -653,7 +635,7 @@ export const acceptInvite = async (req: Request, res: Response): Promise<void> =
         owner.email,
         `New team member joined: ${name} (${org.name})`,
         newStaffJoinedEmailTemplate(owner.name || "there", name, invite.email, invite.role, org.name, `${frontendUrl}/dashboard/${org.slug}/staff`)
-      ).catch(() => {});
+      ).catch(logAndIgnore("background task"));
     }
 
     const authToken = signToken({
@@ -674,18 +656,20 @@ export const acceptInvite = async (req: Request, res: Response): Promise<void> =
         name: user.name,
         role: user.role,
         organizationId: user.organizationId,
+        welcomeSeen: user.welcomeSeenAt !== null,
       },
       orgSlug: org?.slug,
     });
-  } catch {
-    res.status(500).json({ error: "Failed to accept invitation." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to accept invitation.");
   }
 };
 
 export const exchangeOAuthCode = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { code } = req.params;
-    if (!code) { res.status(400).json({ error: "Code is required." }); return; }
+    // The code is a one-time secret, so it arrives in the body and never appears in a URL or a log line.
+    const code = req.body?.code;
+    if (typeof code !== "string" || code === "") { res.status(400).json({ error: "Code is required." }); return; }
 
     const session = await prisma.oAuthSession.findUnique({ where: { code } });
     if (!session || !session.userId || session.expiresAt < new Date()) {
@@ -706,6 +690,9 @@ export const exchangeOAuthCode = async (req: Request, res: Response): Promise<vo
     }
 
     await startSession(res, user);
+    if (user.organizationId) {
+      createAuditLog(user.id, user.organizationId, "LOGIN", "User", user.id, "Logged in with Google", req).catch(logAndIgnore("audit log"));
+    }
     res.json({
       token: signToken({
         userId: user.id,
@@ -722,9 +709,10 @@ export const exchangeOAuthCode = async (req: Request, res: Response): Promise<vo
         organizationId: user.organizationId,
         avatarUrl: user.avatarUrl,
         organization: user.organization || null,
+        welcomeSeen: user.welcomeSeenAt !== null,
       },
     });
-  } catch {
-    res.status(500).json({ error: "OAuth code exchange failed." });
+  } catch (err) {
+    respondWithError(res, err, "OAuth code exchange failed.");
   }
 };

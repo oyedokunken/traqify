@@ -15,7 +15,7 @@ import { isOwnerOrManager, isOwnerOnly, isAtLeastAuditor } from "../middleware/r
 
 const router = Router();
 
-router.get("/invite/:token", getInviteDetails);
+router.post("/invite-details", getInviteDetails);
 
 router.use(authenticate, requireOrg);
 

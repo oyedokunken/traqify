@@ -1,6 +1,9 @@
+import { logAndIgnore } from "../config/logger";
+import { respondWithError } from "../middleware/error.middleware";
 import { parsePagination } from "../utils/pagination";
 import { reportEmailSchema } from "../utils/validators";
 import { Response } from "express";
+import { Prisma } from "@prisma/client";
 import prisma from "../config/database";
 import { AuthRequest } from "../middleware/auth.middleware";
 import { createAuditLog } from "../utils/audit";
@@ -8,6 +11,23 @@ import PDFDocument from "pdfkit";
 import { sendEmail } from "../config/email";
 import { reportEmailTemplate } from "../emails/templates";
 
+interface OverviewRow {
+  totalRevenue: number;
+  monthRevenue: number;
+  lastMonthRevenue: number;
+  totalOrders: number;
+  monthOrders: number;
+  totalProducts: number;
+  totalCustomers: number;
+  lowStockCount: number;
+  slug: string;
+  storePublished: boolean;
+}
+
+/**
+ * One query, one round trip. The dashboard loads this on every visit, and each round trip to a database in another
+ * region is slow, so the counts, sums and the low stock figure are computed together in the database.
+ */
 export const getOverview = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const orgId = req.user!.organizationId!;
@@ -16,52 +36,43 @@ export const getOverview = async (req: AuthRequest, res: Response): Promise<void
     const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
-    const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { slug: true, storePublished: true } });
+    const [row] = await prisma.$queryRaw<OverviewRow[]>(Prisma.sql`
+      SELECT
+        (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE "organizationId" = ${orgId} AND status = 'COMPLETED')::float8 AS "totalRevenue",
+        (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE "organizationId" = ${orgId} AND status = 'COMPLETED' AND "createdAt" >= ${startOfMonth})::float8 AS "monthRevenue",
+        (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE "organizationId" = ${orgId} AND status = 'COMPLETED' AND "createdAt" >= ${startOfLastMonth} AND "createdAt" <= ${endOfLastMonth})::float8 AS "lastMonthRevenue",
+        (SELECT COUNT(*) FROM orders WHERE "organizationId" = ${orgId})::int AS "totalOrders",
+        (SELECT COUNT(*) FROM orders WHERE "organizationId" = ${orgId} AND "createdAt" >= ${startOfMonth})::int AS "monthOrders",
+        (SELECT COUNT(*) FROM products WHERE "organizationId" = ${orgId} AND "isActive")::int AS "totalProducts",
+        (SELECT COUNT(*) FROM customers WHERE "organizationId" = ${orgId})::int AS "totalCustomers",
+        (SELECT COUNT(*) FROM inventory i JOIN products p ON p.id = i."productId"
+           WHERE p."organizationId" = ${orgId} AND p."isActive" AND i.quantity <= i."lowStockAlert")::int AS "lowStockCount",
+        o.slug,
+        o."storePublished"
+      FROM organizations o
+      WHERE o.id = ${orgId}
+    `);
 
-    const [
-      totalRevenue,
-      monthRevenue,
-      lastMonthRevenue,
-      totalOrders,
-      monthOrders,
-      totalProducts,
-      totalCustomers,
-    ] = await Promise.all([
-      prisma.payment.aggregate({ where: { organizationId: orgId, status: "COMPLETED" }, _sum: { amount: true } }),
-      prisma.payment.aggregate({ where: { organizationId: orgId, status: "COMPLETED", createdAt: { gte: startOfMonth } }, _sum: { amount: true } }),
-      prisma.payment.aggregate({ where: { organizationId: orgId, status: "COMPLETED", createdAt: { gte: startOfLastMonth, lte: endOfLastMonth } }, _sum: { amount: true } }),
-      prisma.order.count({ where: { organizationId: orgId } }),
-      prisma.order.count({ where: { organizationId: orgId, createdAt: { gte: startOfMonth } } }),
-      prisma.product.count({ where: { organizationId: orgId, isActive: true } }),
-      prisma.customer.count({ where: { organizationId: orgId } }),
-    ]);
-
-    const allInventory = await prisma.inventory.findMany({
-      where: { product: { organizationId: orgId, isActive: true } },
-      select: { quantity: true, lowStockAlert: true },
-    });
-    const lowStockCount = allInventory.filter((i) => i.quantity <= i.lowStockAlert).length;
-
-    const monthRev = monthRevenue._sum.amount || 0;
-    const lastMonthRev = lastMonthRevenue._sum.amount || 0;
+    const monthRev = row?.monthRevenue ?? 0;
+    const lastMonthRev = row?.lastMonthRevenue ?? 0;
     const revenueGrowth = lastMonthRev > 0
       ? Math.round(((monthRev - lastMonthRev) / lastMonthRev) * 100 * 10) / 10
       : (monthRev > 0 ? null : 0);
 
     res.json({
-      totalRevenue: totalRevenue._sum.amount || 0,
+      totalRevenue: row?.totalRevenue ?? 0,
       monthRevenue: monthRev,
       revenueGrowth,
-      totalOrders,
-      monthOrders,
-      totalProducts,
-      totalCustomers,
-      lowStockCount,
-      storePublished: org?.storePublished || false,
-      orgSlug: org?.slug || "",
+      totalOrders: row?.totalOrders ?? 0,
+      monthOrders: row?.monthOrders ?? 0,
+      totalProducts: row?.totalProducts ?? 0,
+      totalCustomers: row?.totalCustomers ?? 0,
+      lowStockCount: row?.lowStockCount ?? 0,
+      storePublished: row?.storePublished ?? false,
+      orgSlug: row?.slug ?? "",
     });
-  } catch {
-    res.status(500).json({ error: "Failed to fetch overview data." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to fetch overview data.");
   }
 };
 
@@ -90,8 +101,8 @@ export const getSalesReport = async (req: AuthRequest, res: Response): Promise<v
     const totalItems = orders.reduce((sum: number, o: any) => sum + o.orderItems.reduce((s: number, i: any) => s + i.quantity, 0), 0);
 
     res.json({ orders, totalRevenue, totalItems, orderCount: orders.length });
-  } catch {
-    res.status(500).json({ error: "Failed to generate sales report." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to generate sales report.");
   }
 };
 
@@ -120,45 +131,51 @@ export const getTopProducts = async (req: AuthRequest, res: Response): Promise<v
     }));
 
     res.json(result);
-  } catch {
-    res.status(500).json({ error: "Failed to fetch top products." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to fetch top products.");
   }
 };
+
+/** The chart window in days: a whole number from 1 to 365, otherwise 30. Never trusts the query string to size a loop. */
+const chartDays = (period: unknown): number => {
+  const n = typeof period === "string" && period.trim() !== "" ? Number(period) : Number.NaN;
+  return Number.isInteger(n) && n >= 1 && n <= 365 ? n : 30;
+};
+
+/** The first instant of the window and the last day of it, in UTC. */
+function chartWindow(days: number) {
+  const todayUTC = new Date();
+  todayUTC.setUTCHours(23, 59, 59, 999);
+  const startDate = new Date(todayUTC);
+  startDate.setUTCDate(startDate.getUTCDate() - (days - 1));
+  startDate.setUTCHours(0, 0, 0, 0);
+  return { todayUTC, startDate };
+}
 
 export const getRevenueChart = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const orgId = req.user!.organizationId!;
-    const { period = "30" } = req.query;
-    const days = parseInt(period as string);
+    const days = chartDays(req.query.period);
+    const { todayUTC, startDate } = chartWindow(days);
 
-    const todayUTC = new Date();
-    todayUTC.setUTCHours(23, 59, 59, 999);
-    const startDate = new Date(todayUTC);
-    startDate.setUTCDate(startDate.getUTCDate() - (days - 1));
-    startDate.setUTCHours(0, 0, 0, 0);
-
-    const [paymentsRaw, ordersRaw] = await Promise.all([
-      prisma.payment.findMany({
-        where: { organizationId: orgId, status: "COMPLETED", createdAt: { gte: startDate } },
-        select: { createdAt: true, amount: true },
-      }),
-      prisma.order.findMany({
-        where: { organizationId: orgId, createdAt: { gte: startDate } },
-        select: { createdAt: true },
-      }),
-    ]);
-
-    const dataMap = new Map<string, { revenue: number; orders: number }>();
-    for (const p of paymentsRaw) {
-      const key = p.createdAt.toISOString().substring(0, 10);
-      const existing = dataMap.get(key) || { revenue: 0, orders: 0 };
-      dataMap.set(key, { ...existing, revenue: existing.revenue + p.amount });
-    }
-    for (const o of ordersRaw) {
-      const key = o.createdAt.toISOString().substring(0, 10);
-      const existing = dataMap.get(key) || { revenue: 0, orders: 0 };
-      dataMap.set(key, { ...existing, orders: existing.orders + 1 });
-    }
+    // Revenue per day and orders per day come back together, grouped in the database.
+    const rows = await prisma.$queryRaw<{ date: string; revenue: number; orders: number }[]>(Prisma.sql`
+      WITH paid AS (
+        SELECT to_char("createdAt", 'YYYY-MM-DD') AS d, SUM(amount)::float8 AS revenue
+        FROM payments
+        WHERE "organizationId" = ${orgId} AND status = 'COMPLETED' AND "createdAt" >= ${startDate}
+        GROUP BY 1
+      ),
+      placed AS (
+        SELECT to_char("createdAt", 'YYYY-MM-DD') AS d, COUNT(*)::int AS orders
+        FROM orders
+        WHERE "organizationId" = ${orgId} AND "createdAt" >= ${startDate}
+        GROUP BY 1
+      )
+      SELECT COALESCE(paid.d, placed.d) AS date, COALESCE(paid.revenue, 0)::float8 AS revenue, COALESCE(placed.orders, 0)::int AS orders
+      FROM paid FULL JOIN placed ON placed.d = paid.d
+    `);
+    const dataMap = new Map(rows.map((r) => [r.date, { revenue: r.revenue, orders: r.orders }]));
 
     const result = [];
     for (let i = days - 1; i >= 0; i--) {
@@ -170,38 +187,28 @@ export const getRevenueChart = async (req: AuthRequest, res: Response): Promise<
     }
 
     res.json(result);
-  } catch {
-    res.status(500).json({ error: "Failed to fetch revenue chart data." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to fetch revenue chart data.");
   }
 };
 
 export const getCustomerChart = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const orgId = req.user!.organizationId!;
-    const { period = "30" } = req.query;
-    const days = parseInt(period as string);
+    const days = chartDays(req.query.period);
+    const { todayUTC, startDate } = chartWindow(days);
 
-    const todayUTC = new Date();
-    todayUTC.setUTCHours(23, 59, 59, 999);
-    const startDate = new Date(todayUTC);
-    startDate.setUTCDate(startDate.getUTCDate() - (days - 1));
-    startDate.setUTCHours(0, 0, 0, 0);
-
-    const [customersRaw, prePeriodCount] = await Promise.all([
-      prisma.customer.findMany({
-        where: { organizationId: orgId, createdAt: { gte: startDate } },
-        select: { createdAt: true },
-      }),
-      prisma.customer.count({
-        where: { organizationId: orgId, createdAt: { lt: startDate } },
-      }),
-    ]);
-
-    const dataMap = new Map<string, number>();
-    for (const c of customersRaw) {
-      const key = c.createdAt.toISOString().substring(0, 10);
-      dataMap.set(key, (dataMap.get(key) || 0) + 1);
-    }
+    // One row per day in the window, plus one row holding everyone who joined before it.
+    const rows = await prisma.$queryRaw<{ day: string; n: number }[]>(Prisma.sql`
+      SELECT 'before' AS day, COUNT(*)::int AS n
+      FROM customers WHERE "organizationId" = ${orgId} AND "createdAt" < ${startDate}
+      UNION ALL
+      SELECT to_char("createdAt", 'YYYY-MM-DD') AS day, COUNT(*)::int AS n
+      FROM customers WHERE "organizationId" = ${orgId} AND "createdAt" >= ${startDate}
+      GROUP BY 1
+    `);
+    const prePeriodCount = rows.find((r) => r.day === "before")?.n ?? 0;
+    const dataMap = new Map(rows.filter((r) => r.day !== "before").map((r) => [r.day, r.n]));
 
     let cumulative = prePeriodCount;
     const result = [];
@@ -214,8 +221,8 @@ export const getCustomerChart = async (req: AuthRequest, res: Response): Promise
     }
 
     res.json(result);
-  } catch {
-    res.status(500).json({ error: "Failed to fetch customer chart data." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to fetch customer chart data.");
   }
 };
 
@@ -395,10 +402,10 @@ export const downloadReport = async (req: AuthRequest, res: Response): Promise<v
     const rows = await buildReportData(type, orgId, fromDate, toDate);
     const pdf = await buildPDF(type, label, org, from || "", to || "", rows as any[]);
     res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${type}-report.pdf"` });
-    createAuditLog(req.user!.id, orgId, "EXPORT", "Report", undefined, `Downloaded ${label}`, req).catch(() => {});
+    createAuditLog(req.user!.id, orgId, "EXPORT", "Report", undefined, `Downloaded ${label}`, req).catch(logAndIgnore("audit log"));
     res.send(pdf);
-  } catch {
-    res.status(500).json({ error: "Failed to generate PDF." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to generate PDF.");
   }
 };
 
@@ -409,7 +416,7 @@ export const emailReport = async (req: AuthRequest, res: Response): Promise<void
     const label = REPORT_LABELS[type];
     if (!label) { res.status(400).json({ error: "Invalid report type." }); return; }
     const parsed = reportEmailSchema.safeParse(req.body);
-    if (!parsed.success) { res.status(400).json({ error: parsed.error.errors[0].message }); return; }
+    if (!parsed.success) { res.status(400).json({ error: parsed.error.issues[0].message }); return; }
     const { to, from, to_date } = parsed.data;
 
     const today = new Date(); today.setHours(23, 59, 59, 999);
@@ -424,9 +431,9 @@ export const emailReport = async (req: AuthRequest, res: Response): Promise<void
     const html = reportEmailTemplate(org?.name || "", label, from || fmt(fromDate), to_date || fmt(toDate), `${frontendUrl}/dashboard/${org?.slug || ""}/reports`);
 
     await sendEmail(to, `${label} - ${org?.name}`, html, [{ filename: `${type}-report.pdf`, content: pdf, contentType: "application/pdf" }]);
-    createAuditLog(req.user!.id, orgId, "EXPORT", "Report", undefined, `Emailed ${label} to ${to}`, req).catch(() => {});
+    createAuditLog(req.user!.id, orgId, "EXPORT", "Report", undefined, `Emailed ${label} to ${to}`, req).catch(logAndIgnore("audit log"));
     res.json({ message: `Report sent to ${to}.` });
-  } catch {
-    res.status(500).json({ error: "Failed to send report email." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to send report email.");
   }
 };

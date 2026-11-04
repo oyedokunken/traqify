@@ -25,17 +25,20 @@ You will receive an acknowledgement within 48 hours and a full response within 7
 
 - All traffic in production runs over HTTPS (enforced by Vercel).
 - The backend uses [Helmet](https://helmetjs.github.io/) to set security-relevant HTTP response headers on every request, including `X-Content-Type-Options`, `X-Frame-Options`, `Strict-Transport-Security`, and `Content-Security-Policy`.
-- CORS is configured with an explicit origin allowlist tied to `FRONTEND_URL`. Requests from any other origin are rejected.
+- The frontend calls the API through its own origin via a Vercel proxy; all requests are same-origin with the site's domain, eliminating cross-origin request concerns.
 - The `Authorization` header and `Content-Type` are the only allowed headers.
 
-```ts
-app.use(cors({
-  origin: process.env.FRONTEND_URL,
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-}));
-```
+### Same-Origin Session Enforcement
+
+- Frontend API calls go through the site's own origin (e.g., `https://traqify.oyedokun.dev/api/...`) instead of a separate API domain.
+- Refresh cookies are scoped to `Path=/api/auth` and set with `SameSite=Lax`, ensuring they are only sent to refresh endpoints.
+- The API validates the `X-Forwarded-For` header and accepts refresh cookies only from trusted client IPs behind the proxy.
+
+### Staff Invitation Tokens
+
+- Staff invitation tokens are generated with `crypto.randomBytes(32)` (256 bits of entropy).
+- Tokens are hashed with SHA-256 before storage in the database. Only the hash is persisted.
+- The plain token is delivered by email only and never stored or logged.
 
 ---
 
@@ -92,7 +95,7 @@ When the versions do not match the request is rejected with a 401. This guarante
 
 ### Token Storage
 
-Access tokens and refresh tokens are stored in `localStorage` on the frontend. This is a pragmatic trade-off for a client-rendered SPA. The consequence is that a successful XSS attack could read the tokens. Migrating to `httpOnly` Secure `SameSite=Strict` cookies would eliminate this risk entirely and is the recommended direction for a future hardening cycle.
+Access tokens are stored in memory (JavaScript variable) and expire after 15 minutes. Refresh tokens are stored in httpOnly Secure cookies with SameSite=Lax and Path=/api/auth. The frontend cannot read the refresh cookie directly; the server receives it automatically on refresh requests. This eliminates XSS-based token theft of refresh tokens.
 
 ---
 
@@ -182,6 +185,7 @@ Files that do not match the allowlist are rejected before being read into memory
 - Paystack payment status is always verified server-side by calling the Paystack Verify API with the `paystackReference` provided by the client.
 - The server independently recalculates the order total from stored product prices. The `verifiedAmount` returned by Paystack must match the server-computed `totalAmount` within 1 kobo. A mismatch rejects the order with a 402 before any inventory change or order record is created.
 - Payment amounts, statuses, and references submitted by clients for internal payment records (`POST /api/payments`) can only be created or updated by `OWNER` or `MANAGER` roles.
+- Paystack API failures (initialize, verify, refund) are logged with the operation type, HTTP status, and Paystack's error message for security audit trail. The secret key, request bodies, and response data are never logged.
 
 ---
 
@@ -236,7 +240,6 @@ See `backend/.env.example` for the full list of variables including Supabase, Go
 
 ## Known Limitations and Accepted Trade-offs
 
-- **localStorage token storage**: Tokens remain accessible to JavaScript running on the page. A future migration to `httpOnly` Secure cookies would eliminate XSS-based token theft.
 - **No per-user session list**: Users cannot see or revoke individual device sessions. The `tokenVersion` mechanism invalidates all sessions simultaneously on logout or password change but does not support selective revocation.
 - **Supabase Free-tier pausing**: The cron job runs at most once per day (Vercel Hobby limit). If the database is paused manually or by Supabase, it must be resumed from the Supabase dashboard before the API can accept requests.
 - **Public review submission**: Product reviews can be submitted by anyone who has a valid `orderId` and `productId` combination. There is no authenticated customer identity check. This is intentional for a guest checkout flow but may allow reviews from guessed order IDs (UUIDs mitigate this in practice).

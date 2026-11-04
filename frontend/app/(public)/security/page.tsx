@@ -46,6 +46,10 @@ export default function SecurityPage() {
                 </thead>
                 <tbody>
                   <tr className="border-b border-gray-100">
+                    <td className="px-4 py-3 text-sm text-gray-600">1.24.x</td>
+                    <td className="px-4 py-3 text-sm"><CheckCircle2 className="w-4 h-4 text-green-600 inline" /></td>
+                  </tr>
+                  <tr className="border-b border-gray-100">
                     <td className="px-4 py-3 text-sm text-gray-600">1.23.x</td>
                     <td className="px-4 py-3 text-sm"><CheckCircle2 className="w-4 h-4 text-green-600 inline" /></td>
                   </tr>

@@ -139,6 +139,14 @@ export const otpEmailTemplate = (name: string, otp: string, recipientEmail = "")
     <p style="${bodyStyle}">If you did not create a Traqify account, you can safely ignore this email. No action is required on your part.</p>
   `, recipientEmail);
 
+export const accountExistsEmailTemplate = (name: string, loginUrl: string, recipientEmail = ""): string =>
+  wrapEmail(`
+    <h1 style="${headingStyle}">You already have a Traqify account</h1>
+    <p style="${bodyStyle}">Hi ${name}, someone tried to create a Traqify account with this email address, but you already have one. You can sign in, or reset your password if you have forgotten it.</p>
+    <a href="${loginUrl}" style="${buttonStyle}">Sign in</a>
+    <p style="${bodyStyle}">If this was not you, you can safely ignore this email. Your account has not been changed.</p>
+  `, recipientEmail);
+
 export const passwordResetEmailTemplate = (name: string, resetUrl: string, recipientEmail = ""): string =>
   wrapEmail(`
     <h1 style="${headingStyle}">Reset your password</h1>

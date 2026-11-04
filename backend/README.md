@@ -117,7 +117,7 @@ backend/
       audit.controller.ts  Paginated audit log queries and mark-read
       auth.controller.ts   Registration, OTP, login, OAuth, tokens, password
       category.controller.ts Product category CRUD
-      cron.controller.ts   Keep-alive ping for Supabase
+      cron.controller.ts   Daily housekeeping and wishlist reminders
       customer.controller.ts Customer CRUD
       inventory.controller.ts Stock levels and low-stock alerts
       newsletter.controller.ts Subscribe and org-scoped subscriber management
@@ -263,11 +263,10 @@ Base URL: `https://traqify-api.vercel.app`
 | POST | `/api/auth/send-otp` | public | Send a 6-digit OTP to an email address |
 | POST | `/api/auth/verify-email` | public | Verify OTP and mark email as verified |
 | POST | `/api/auth/register` | public | Create account (email must be pre-verified) |
-| POST | `/api/auth/check-email` | public | Check if an email is already registered |
 | POST | `/api/auth/login` | public | Authenticate and receive access + refresh tokens |
 | GET | `/api/auth/google-redirect` | public | Initiate Google OAuth 2.0 flow |
 | GET | `/api/auth/google-callback` | public | Google OAuth callback; stores tokens in OAuthSession |
-| GET | `/api/auth/oauth-exchange/:code` | public | Exchange a one-time OAuth code for tokens |
+| POST | `/api/auth/oauth-exchange` | public | Exchange a one-time OAuth code (sent in the body) for tokens |
 | POST | `/api/auth/forgot-password` | public | Request a password reset link by email |
 | POST | `/api/auth/reset-password` | public | Complete password reset with token |
 | POST | `/api/auth/refresh` | public | Get a new access token using a refresh token |
@@ -341,7 +340,7 @@ Base URL: `https://traqify-api.vercel.app`
 
 | Method | Path | Guard | Description |
 |--------|------|-------|-------------|
-| GET | `/api/staff/invite/:token` | public | Validate a staff invite token |
+| POST | `/api/staff/invite-details` | public | Validate a staff invite token (sent in the body) |
 | GET | `/api/staff` | isAtLeastAuditor | List all staff members |
 | GET | `/api/staff/invites` | isOwnerOrManager | List pending invitations |
 | DELETE | `/api/staff/invites/:inviteId` | isOwnerOrManager | Cancel a pending invite |
@@ -411,7 +410,8 @@ Base URL: `https://traqify-api.vercel.app`
 
 | Method | Path | Guard | Description |
 |--------|------|-------|-------------|
-| GET | `/api/cron/ping` | CRON_SECRET bearer | Keep the Supabase database active |
+| GET | `/api/cron/housekeeping` | CRON_SECRET bearer | Purge expired codes and sessions, expire old invitations, remove abandoned uploads, settle abandoned checkouts with Paystack (also keeps the database active) |
+| GET | `/api/cron/wishlist-reminders` | CRON_SECRET bearer | Send the next due wishlist reminder per shopper and delete wishlists older than four days |
 
 ---
 
@@ -520,7 +520,7 @@ Copy `.env.example` to `.env` and fill in every value before starting the server
 | `PORT` | HTTP port (default: 5000) |
 | `NODE_ENV` | `development` or `production` |
 | `API_URL` | This server's base URL |
-| `FRONTEND_URL` | Frontend origin for CORS and email links |
+| `FRONTEND_URL` | Exact origin of the web app (`https://traqify.oyedokun.dev` in production). Used for CORS, the refresh/logout origin check, email links and the Google redirect URI. `https://traqify.oyedokun.dev` is always allowed in addition, so a mismatched value cannot lock the site out |
 | `JWT_SECRET` | Access token signing secret (generate: `openssl rand -base64 64`) |
 | `JWT_REFRESH_SECRET` | Refresh token signing secret |
 | `JWT_EXPIRES_IN` | Access token TTL (default: `7d`) |
@@ -577,7 +577,7 @@ The backend deploys as a Vercel serverless function.
 
 - The function entry point at `dist/index.js`
 - Route rewrites to capture all paths under `/api/*`
-- A daily cron job at `0 6 * * *` (UTC) targeting `GET /api/cron/ping`
+- Two daily cron jobs (the Hobby plan allows one run per day each): `0 3 * * *` for `GET /api/cron/housekeeping` and `0 9 * * *` for `GET /api/cron/wishlist-reminders`. Vercel sends `CRON_SECRET` as a bearer token. Nothing runs on an in-process timer, because serverless instances do not stay alive.
 
 Required Vercel environment variables mirror `.env.example`. Set them in Vercel project settings under Environment Variables. The `CRON_SECRET` must not contain leading or trailing whitespace.
 

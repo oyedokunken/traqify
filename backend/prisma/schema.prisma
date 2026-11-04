@@ -70,6 +70,7 @@ model User {
   lastLoginAt    DateTime?
   tokenVersion   Int          @default(0)
   passwordChangedAt DateTime?
+  welcomeSeenAt  DateTime?
 
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
@@ -431,6 +432,7 @@ enum CheckoutSessionStatus {
   COMPLETED
   REFUNDED
   REFUND_FAILED
+  EXPIRED
 }
 
 /// A storefront Paystack checkout created by the server. The cart, customer and

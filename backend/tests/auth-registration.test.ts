@@ -124,14 +124,27 @@ describe("OTP behaviour", () => {
     expect((await request(app).post("/api/auth/login").send({ email, password: PASSWORD })).status).toBe(200);
   });
 
-  it("does not send mail to an address that already has a verified account, but answers identically", async () => {
+  it("answers identically for an address that already has an account, and tells only its owner by email", async () => {
     await createUser(null, "OWNER", { email: "taken@example.com", emailVerified: true });
     const existing = await request(app).post("/api/auth/send-otp").send({ email: "taken@example.com" });
     const fresh = await request(app).post("/api/auth/send-otp").send({ email: "fresh@example.com" });
     expect(existing.status).toBe(200);
     expect(existing.body).toEqual(fresh.body);
-    expect(sentMail().some((m) => m.to === "taken@example.com")).toBe(false);
-    expect(sentMail().some((m) => m.to === "fresh@example.com")).toBe(true);
+
+    const toOwner = sentMail().filter((m) => m.to === "taken@example.com");
+    expect(toOwner).toHaveLength(1);
+    expect(toOwner[0].subject).toMatch(/already have/i);
+    expect(toOwner[0].html).toContain("http://localhost:3000/login");
+    expect(() => lastOtpFor("taken@example.com")).toThrow(/No 6 digit code/);
+
+    expect(sentMail().some((m) => m.to === "fresh@example.com" && /verification code/i.test(m.subject))).toBe(true);
+  });
+
+  it("no longer offers an endpoint that reveals whether an address has an account", async () => {
+    await createUser(null, "OWNER", { email: "registered@example.com", emailVerified: true });
+    const res = await request(app).post("/api/auth/check-email").send({ email: "registered@example.com" });
+    expect(res.status).toBe(404);
+    expect(JSON.stringify(res.body)).not.toMatch(/exists|signInMethod|orgSlug/);
   });
 
   it("rejects malformed addresses", async () => {

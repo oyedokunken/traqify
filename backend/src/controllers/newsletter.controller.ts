@@ -1,3 +1,5 @@
+import { logAndIgnore } from "../config/logger";
+import { respondWithError } from "../middleware/error.middleware";
 import { MAX_UNPAGED_ROWS } from "../utils/pagination";
 import { Request, Response } from "express";
 import prisma from "../config/database";
@@ -34,8 +36,8 @@ export const subscribe = async (req: Request, res: Response): Promise<void> => {
     await sendEmail(email, "You are subscribed to Traqify updates!", html);
 
     res.status(201).json({ message: "Successfully subscribed!" });
-  } catch {
-    res.status(500).json({ error: "Failed to subscribe. Please try again." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to subscribe. Please try again.");
   }
 };
 
@@ -53,11 +55,11 @@ export const deleteSubscriber = async (req: Request, res: Response): Promise<voi
     }
     await prisma.newsletterSubscriber.delete({ where: { id } });
     if (authReq.user?.id && orgId) {
-      createAuditLog(authReq.user.id, orgId, "DELETE", "Newsletter", id, `Removed newsletter subscriber: ${subscriber.email}`, req).catch(() => {});
+      createAuditLog(authReq.user.id, orgId, "DELETE", "Newsletter", id, `Removed newsletter subscriber: ${subscriber.email}`, req).catch(logAndIgnore("audit log"));
     }
     res.json({ message: "Subscriber removed." });
-  } catch {
-    res.status(500).json({ error: "Failed to remove subscriber." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to remove subscriber.");
   }
 };
 
@@ -70,10 +72,10 @@ export const getSubscribers = async (req: Request, res: Response): Promise<void>
       orderBy: { createdAt: "desc" },
     });
     if (authReq.user?.id && orgId) {
-      createAuditLog(authReq.user.id, orgId, "EXPORT", "Newsletter", undefined, `Viewed newsletter subscribers (${subscribers.length} total)`, req).catch(() => {});
+      createAuditLog(authReq.user.id, orgId, "EXPORT", "Newsletter", undefined, `Viewed newsletter subscribers (${subscribers.length} total)`, req).catch(logAndIgnore("audit log"));
     }
     res.json(subscribers);
-  } catch {
-    res.status(500).json({ error: "Failed to fetch subscribers." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to fetch subscribers.");
   }
 };

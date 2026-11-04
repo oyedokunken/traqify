@@ -11,7 +11,7 @@
 [![Recharts](https://img.shields.io/badge/Recharts-22B5BF?style=for-the-badge&logoColor=white)](https://recharts.org)
 [![Vercel](https://img.shields.io/badge/Deployed_on_Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com)
 
-Live: **[https://traqify.vercel.app](https://traqify.vercel.app)**
+Live: **[https://traqify.oyedokun.dev](https://traqify.oyedokun.dev)**
 
 </div>
 
@@ -322,7 +322,7 @@ sequenceDiagram
     API->>API: Create/update user in DB
     API->>API: Store tokens in OAuthSession (2 min TTL)
     API-->>FE: Redirect /auth-callback?code=<opaque>
-    FE->>API: GET /api/auth/oauth-exchange/:code
+    FE->>API: POST /api/auth/oauth-exchange {code}
     API-->>FE: tokens + user (code deleted)
     FE->>FE: setAuthTokens (localStorage)
     FE->>U: Redirect to /dashboard or /create-organization

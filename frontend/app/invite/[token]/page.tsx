@@ -47,7 +47,7 @@ export default function AcceptInvitePage({ params }: { params: { token: string }
   });
 
   useEffect(() => {
-    api.get(`/api/staff/invite/${params.token}`)
+    api.post("/api/staff/invite-details", { token: params.token })
       .then((res) => { setInvite(res.data); setLoading(false); })
       .catch(() => { setInvalid(true); setLoading(false); });
   }, [params.token]);

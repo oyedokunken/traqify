@@ -49,11 +49,11 @@ describe("invitation tokens are never exposed", () => {
     const { raw, email } = await inviteSomeone();
     const stored = (await prisma.staffInvite.findFirstOrThrow()).token;
 
-    expect((await request(app).get(`/api/staff/invite/${stored}`)).status).toBe(400);
+    expect((await request(app).post("/api/staff/invite-details").send({ token: stored })).status).toBe(400);
     expect((await request(app).post("/api/auth/accept-invite").send({ token: stored, name: "Mallory", password: "Str0ng!Passw0rd" })).status).toBe(400);
     expect(await prisma.user.count({ where: { email } })).toBe(0);
 
-    expect((await request(app).get(`/api/staff/invite/${raw}`)).status).toBe(200);
+    expect((await request(app).post("/api/staff/invite-details").send({ token: raw })).status).toBe(200);
     const accepted = await request(app).post("/api/auth/accept-invite").send({ token: raw, name: "New Hire", password: "Str0ng!Passw0rd" });
     expect(accepted.status).toBe(201);
     expect(await prisma.user.count({ where: { email } })).toBe(1);
@@ -67,12 +67,25 @@ describe("the migration that hashes existing invitations", () => {
     await prisma.staffInvite.create({
       data: { email: "legacy@example.com", role: "MANAGER", token: legacyToken, expiresAt: new Date(Date.now() + 86_400_000), organizationId: org.id, invitedById: owner.id },
     });
-    expect((await request(app).get(`/api/staff/invite/${legacyToken}`)).status).toBe(400);
+    expect((await request(app).post("/api/staff/invite-details").send({ token: legacyToken })).status).toBe(400);
 
     const sql = fs.readFileSync(path.join(__dirname, "../prisma/migrations/20261019000000_hash_staff_invite_tokens/migration.sql"), "utf8");
     await prisma.$executeRawUnsafe(sql.split("\n").filter((l) => !l.startsWith("--")).join("\n"));
 
     expect((await prisma.staffInvite.findFirstOrThrow()).token).toBe(hashToken(legacyToken));
-    expect((await request(app).get(`/api/staff/invite/${legacyToken}`)).status).toBe(200);
+    expect((await request(app).post("/api/staff/invite-details").send({ token: legacyToken })).status).toBe(200);
+  });
+});
+
+describe("invitation details are looked up with a body, not a path", () => {
+  it("answers a POST with the token in the body and has no GET form", async () => {
+    const { raw, email } = await inviteSomeone("path-free@example.com");
+
+    expect([401, 404]).toContain((await request(app).get(`/api/staff/invite/${raw}`)).status);
+    expect((await request(app).post("/api/staff/invite-details").send({})).status).toBe(400);
+    expect((await request(app).post("/api/staff/invite-details").send({ token: ["x"] })).status).toBe(400);
+    const ok = await request(app).post("/api/staff/invite-details").send({ token: raw });
+    expect(ok.status).toBe(200);
+    expect(ok.body.email).toBe(email);
   });
 });

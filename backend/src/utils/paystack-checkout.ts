@@ -1,10 +1,10 @@
+import { logAndIgnore, getLogger } from "../config/logger";
 import crypto from "crypto";
 import { CheckoutSession, OrderStatus, PaymentStatus } from "@prisma/client";
 import prisma from "../config/database";
 import { sendEmail } from "../config/email";
 import { AppError } from "../middleware/error.middleware";
 import { toMinor } from "./money";
-import { generateOrderNumber } from "./order-number";
 import { OrderLine, placeOrder, quoteOrder } from "./order-placement";
 import { initializePaystackTransaction, refundPaystackTransaction, verifyPaystackTransaction } from "./paystack";
 
@@ -78,7 +78,7 @@ async function refundFailedCheckout(session: CheckoutSession, org: StoreOrg, rea
   });
 
   if (!refunded) {
-    console.error(`[checkout] refund failed for ${session.reference} (${session.amountKobo} kobo): ${reason}`);
+    getLogger().error({ reference: session.reference, amountKobo: session.amountKobo, reason }, "refund failed, the store owner must refund manually");
     const owner = await prisma.user.findFirst({ where: { organizationId: org.id, role: "OWNER" }, select: { email: true } });
     if (owner) {
       sendEmail(
@@ -89,7 +89,7 @@ async function refundFailedCheckout(session: CheckoutSession, org: StoreOrg, rea
           `<ul><li>Reference: ${escapeHtml(session.reference)}</li>` +
           `<li>Amount: NGN ${(session.amountKobo / 100).toFixed(2)}</li>` +
           `<li>Customer: ${escapeHtml(session.customerName)} (${escapeHtml(session.customerEmail)})</li></ul>`
-      ).catch((e) => console.error("[Email] Refund failure notice failed:", e.message));
+      ).catch(logAndIgnore("Refund failure notice"));
     }
   }
   return refunded;
@@ -121,7 +121,8 @@ export async function completeCheckout(org: StoreOrg, reference: string, orgOwne
   if (session.status === "COMPLETED") {
     return { kind: "existing", order: await existingOrder(session) };
   }
-  if (session.status !== "PENDING") {
+  // An expired checkout is one nobody had paid when it was last checked; a payment that arrives later still counts.
+  if (session.status !== "PENDING" && session.status !== "EXPIRED") {
     throw new AppError("This checkout was cancelled and the payment refunded or is being refunded. Please contact the store.", 409);
   }
 
@@ -137,7 +138,7 @@ export async function completeCheckout(org: StoreOrg, reference: string, orgOwne
     const { order } = await placeOrder({
       organizationId: org.id,
       createdById: orgOwnerId,
-      orderNumber: generateOrderNumber("STR"),
+      orderNumberPrefix: "STR",
       lines: session.items as unknown as OrderLine[],
       customer: {
         kind: "find-or-create",
@@ -154,7 +155,7 @@ export async function completeCheckout(org: StoreOrg, reference: string, orgOwne
       verifiedAmountKobo: session.amountKobo,
       onPlaced: async (tx, placed) => {
         const claimed = await tx.checkoutSession.updateMany({
-          where: { id: session.id, status: "PENDING" },
+          where: { id: session.id, status: { in: ["PENDING", "EXPIRED"] } },
           data: { status: "COMPLETED", orderId: placed.id },
         });
         if (claimed.count === 0) throw new AppError("This checkout has already been processed.", 409);
