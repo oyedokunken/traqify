@@ -1,15 +1,15 @@
+import { logAndIgnore } from "../config/logger";
 import { MAX_UNPAGED_ROWS } from "../utils/pagination";
 import { Request, Response } from "express";
 import { OrderStatus, PaymentStatus } from "@prisma/client";
 import prisma from "../config/database";
 import { sendEmail } from "../config/email";
-import { wishlistReminderTemplate, newOrderEmailTemplate, storeOrderConfirmationEmailTemplate } from "../emails/templates";
+import { newOrderEmailTemplate, storeOrderConfirmationEmailTemplate } from "../emails/templates";
 import { createAuditLog } from "../utils/audit";
 import { AppError, respondWithError } from "../middleware/error.middleware";
 import { storeInitializeSchema, storePaystackCompleteSchema, storeTransferCheckoutSchema } from "../utils/validators";
 import { placeOrder } from "../utils/order-placement";
 import { completeCheckout, initializeCheckout } from "../utils/paystack-checkout";
-import { generateOrderNumber } from "../utils/order-number";
 
 export const getStoreProducts = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -69,8 +69,8 @@ export const getStoreProducts = async (req: Request, res: Response): Promise<voi
     });
 
     res.json({ org, products, categories: cats });
-  } catch {
-    res.status(500).json({ error: "Failed to load store." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to load store.");
   }
 };
 
@@ -93,7 +93,7 @@ async function notifyStoreOrder(args: {
   const { req, org, owner, order, customer, paymentLabel } = args;
   const totalAmount = order.totalAmount;
 
-  createAuditLog(owner.id, org.id, "CREATE", "Order", order.id, `Store order ${order.orderNumber} placed by ${customer.name} (${customer.email}) - NGN ${totalAmount.toLocaleString()}`, req).catch(() => {});
+  createAuditLog(owner.id, org.id, "CREATE", "Order", order.id, `Store order ${order.orderNumber} placed by ${customer.name} (${customer.email}) - NGN ${totalAmount.toLocaleString()}`, req).catch(logAndIgnore("audit log"));
 
   const emailItems = order.orderItems.map((i) => ({
     name: i.product.name,
@@ -105,7 +105,7 @@ async function notifyStoreOrder(args: {
     owner.email,
     `New store order received: ${org.name}`,
     newOrderEmailTemplate(org.name, order.id, customer.name, totalAmount, emailItems, `${process.env.FRONTEND_URL || "http://localhost:3000"}/dashboard/${org.slug}/orders`)
-  ).catch((e) => console.error("[Email] Store order notification failed:", e.message));
+  ).catch(logAndIgnore("Store order notification"));
 
   const orgContact = await prisma.organization.findUnique({
     where: { id: org.id },
@@ -125,7 +125,7 @@ async function notifyStoreOrder(args: {
       orgContact?.logoUrl || null,
       paymentLabel
     )
-  ).catch((emailErr) => console.error("Order confirmation email failed:", emailErr));
+  ).catch(logAndIgnore("Order confirmation email"));
 }
 
 async function loadPublishedStore(slug: string) {
@@ -145,7 +145,7 @@ export const storeInitializeCheckout = async (req: Request, res: Response): Prom
   try {
     const parsed = storeInitializeSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.errors[0].message });
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
     const { org } = await loadPublishedStore(req.params.slug);
@@ -169,7 +169,7 @@ export const storeCheckout = async (req: Request, res: Response): Promise<void> 
     if (method === "PAYSTACK") {
       const parsed = storePaystackCompleteSchema.safeParse(req.body);
       if (!parsed.success) {
-        res.status(400).json({ error: parsed.error.errors[0].message });
+        res.status(400).json({ error: parsed.error.issues[0].message });
         return;
       }
       const { org, owner } = await loadPublishedStore(slug);
@@ -193,7 +193,7 @@ export const storeCheckout = async (req: Request, res: Response): Promise<void> 
 
     const parsed = storeTransferCheckoutSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.errors[0].message });
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
     const { name, email, phone, address, notes, items } = parsed.data;
@@ -202,7 +202,7 @@ export const storeCheckout = async (req: Request, res: Response): Promise<void> 
     const { order } = await placeOrder({
       organizationId: org.id,
       createdById: owner.id,
-      orderNumber: generateOrderNumber("STR"),
+      orderNumberPrefix: "STR",
       lines: items,
       customer: { kind: "find-or-create", name, email, phone, address, source: "PURCHASE" },
       status: OrderStatus.PENDING,
@@ -244,57 +244,7 @@ export const saveWishlist = async (req: Request, res: Response): Promise<void> =
       update: { email: email || undefined, productIds, updatedAt: new Date() },
     });
     res.json({ id: wishlist.id });
-  } catch {
-    res.status(500).json({ error: "Failed to save wishlist." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to save wishlist.");
   }
-};
-
-export const processWishlistEmails = async (): Promise<void> => {
-  const now = new Date();
-  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
-
-  const schedules = [
-    { field: "sent30min" as const, label: "30 minutes ago", minMs: 30 * 60 * 1000, maxMs: 45 * 60 * 1000 },
-    { field: "sent2hr"   as const, label: "a couple of hours ago", minMs: 2 * 3600 * 1000, maxMs: 3 * 3600 * 1000 },
-    { field: "sentDay1"  as const, label: "yesterday", minMs: 24 * 3600 * 1000, maxMs: 26 * 3600 * 1000 },
-    { field: "sentDay3"  as const, label: "3 days ago", minMs: 72 * 3600 * 1000, maxMs: 80 * 3600 * 1000 },
-  ];
-
-  for (const schedule of schedules) {
-    const minDate = new Date(now.getTime() - schedule.maxMs);
-    const maxDate = new Date(now.getTime() - schedule.minMs);
-
-    const wishlists = await prisma.wishlist.findMany({
-      where: {
-        email: { not: null },
-        [schedule.field]: false,
-        createdAt: { gte: minDate, lte: maxDate },
-      },
-      include: { organization: { select: { name: true, logoUrl: true } } },
-    });
-
-    for (const wl of wishlists) {
-      try {
-        const products = await prisma.product.findMany({
-          where: { id: { in: wl.productIds }, organizationId: wl.organizationId },
-          select: { name: true },
-        });
-        if (products.length === 0) continue;
-        const storeUrl = `${frontendUrl}/store/${wl.slug}`;
-        const html = wishlistReminderTemplate(
-          wl.organization.name, wl.organization.logoUrl,
-          storeUrl, products.map((p) => p.name), schedule.label
-        );
-        await sendEmail(wl.email!, `Your wishlist at ${wl.organization.name} is waiting`, html);
-        await prisma.wishlist.update({ where: { id: wl.id }, data: { [schedule.field]: true } });
-      } catch (err) {
-        console.error(`Wishlist email failed for ${wl.id}:`, err);
-      }
-    }
-  }
-
-  // Delete wishlists older than 4 days
-  await prisma.wishlist.deleteMany({
-    where: { createdAt: { lt: new Date(now.getTime() - 4 * 24 * 3600 * 1000) } },
-  });
 };

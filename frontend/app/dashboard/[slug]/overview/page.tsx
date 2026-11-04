@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   TrendingUp,
@@ -23,6 +23,8 @@ import { Topbar } from "@/components/dashboard/topbar";
 import api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { formatCurrency } from "@/lib/utils";
+import { isOlderThan } from "@/lib/refetch";
+import { needsWelcome } from "@/lib/welcome";
 import { AnimatePresence } from "framer-motion";
 import {
   AreaChart, Area,
@@ -58,7 +60,7 @@ const fmtChartDate = (raw: string) => {
 };
 
 export default function OverviewPage({ params }: { params: { slug: string } }) {
-  const { user } = useAuth();
+  const { user, markWelcomeSeen } = useAuth();
   const [data, setData] = useState<OverviewData | null>(null);
   const [revChart, setRevChart] = useState<ChartPoint[]>([]);
   const [ordChart, setOrdChart] = useState<ChartPoint[]>([]);
@@ -81,30 +83,35 @@ export default function OverviewPage({ params }: { params: { slug: string } }) {
     return () => clearInterval(t);
   }, []);
 
-  // First-time welcome: shown once ever (localStorage)
+  // First-time welcome: shown once per user, remembered by the server so it follows them to any browser or device.
   // Welcome back: shown once per login session (sessionStorage)
   useEffect(() => {
     if (!user?.organizationId) return;
-    const firstKey = `traqify_welcomed_${params.slug}`;
     const sessionKey = `traqify_session_${params.slug}`;
-    if (!localStorage.getItem(firstKey)) {
+    if (needsWelcome(user)) {
       setShowWelcome(true);
-      localStorage.setItem(firstKey, "1");
+      markWelcomeSeen().catch(() => {});
     } else if (!sessionStorage.getItem(sessionKey)) {
       setShowWelcomeBack(true);
       sessionStorage.setItem(sessionKey, "1");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.slug, user?.organizationId]);
 
+  const lastLoadedAt = useRef(Date.now());
+
   useEffect(() => {
+    lastLoadedAt.current = Date.now();
     api.get("/api/reports/overview").then((r) => setData(r.data)).catch(() => {}).finally(() => setLoading(false));
     api.get("/api/reports/revenue-chart?period=30").then((r) => { setRevChart(r.data || []); setOrdChart(r.data || []); }).catch(() => {});
     api.get("/api/reports/customer-chart?period=30").then((r) => setCustomerChart(r.data || [])).catch(() => {});
   }, []);
 
-  // Refresh charts when user returns to the tab
+  // Refresh when the user comes back to the tab, but only if what is on screen is a minute old or more.
   useEffect(() => {
     const onFocus = () => {
+      if (!isOlderThan(lastLoadedAt.current, 60_000)) return;
+      lastLoadedAt.current = Date.now();
       api.get("/api/reports/overview").then((r) => setData(r.data)).catch(() => {});
       api.get(`/api/reports/revenue-chart?period=${revPeriod}`).then((r) => setRevChart(r.data || [])).catch(() => {});
       api.get(`/api/reports/revenue-chart?period=${ordPeriod}`).then((r) => setOrdChart(r.data || [])).catch(() => {});

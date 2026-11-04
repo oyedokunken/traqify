@@ -36,9 +36,9 @@ Traqify is a full-stack multi-tenant SaaS application.
 ### Email / Password (OTP-first flow)
 1. **Step 1  -  Email**: Enter email address; `POST /api/auth/send-otp` sends a 6-digit code (works even before an account exists)
 2. **Step 2  -  Verify**: Enter OTP on `/verify-email`; backend validates code and returns success; redirects to `/register?verifiedEmail=...`
-3. **Step 3  -  Account details**: Enter full name and password; `POST /api/auth/register` creates user with `emailVerified: true` and returns a JWT (stored in React state only)
-4. **Step 4  -  Org setup**: Enter org name, address, phone, industry; `POST /api/organizations` creates the org using the step-3 JWT; app then calls `POST /api/auth/login` to issue a fresh JWT that includes `organizationId`; redirects to `/dashboard/[slug]/overview`
-5. Token refresh happens automatically via Axios interceptor on 401
+3. **Step 3  -  Account details**: Enter full name and password; `POST /api/auth/register` creates user with `emailVerified: true` and returns an access token (kept in memory) and sets an httpOnly refresh cookie
+4. **Step 4  -  Org setup**: Enter org name, address, phone, industry; `POST /api/organizations` creates the org using the step-3 JWT; app then calls `POST /api/auth/login` to issue a fresh access token that includes `organizationId`; redirects to `/dashboard/[slug]/overview`
+5. Token refresh happens automatically via Axios interceptor on 401 using the httpOnly refresh cookie
 
 ### Google OAuth
 1. Click "Continue with Google"  -  redirects to `GET /api/auth/google-redirect`

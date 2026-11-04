@@ -1,3 +1,4 @@
+import { respondWithError } from "../middleware/error.middleware";
 import { MAX_UNPAGED_ROWS } from "../utils/pagination";
 import { Response } from "express";
 import prisma from "../config/database";
@@ -15,8 +16,8 @@ export const getCategories = async (req: AuthRequest, res: Response): Promise<vo
       orderBy: { name: "asc" },
     });
     res.json(cats);
-  } catch {
-    res.status(500).json({ error: "Failed to fetch categories." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to fetch categories.");
   }
 };
 
@@ -33,8 +34,8 @@ export const createCategory = async (req: AuthRequest, res: Response): Promise<v
     const cat = await prisma.productCategory.create({ data: { name, slug, description, organizationId: orgId } });
     await createAuditLog(req.user!.id, orgId, "CREATE", "ProductCategory", cat.id, `Created category: ${name}`, req);
     res.status(201).json(cat);
-  } catch {
-    res.status(500).json({ error: "Failed to create category." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to create category.");
   }
 };
 
@@ -53,8 +54,8 @@ export const updateCategory = async (req: AuthRequest, res: Response): Promise<v
     });
     await createAuditLog(req.user!.id, orgId, "UPDATE", "ProductCategory", id, `Updated category: ${updated.name}`, req);
     res.json(updated);
-  } catch {
-    res.status(500).json({ error: "Failed to update category." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to update category.");
   }
 };
 
@@ -69,7 +70,7 @@ export const deleteCategory = async (req: AuthRequest, res: Response): Promise<v
     await prisma.productCategory.delete({ where: { id } });
     await createAuditLog(req.user!.id, orgId, "DELETE", "ProductCategory", id, `Deleted category: ${cat.name}`, req);
     res.json({ message: "Category deleted." });
-  } catch {
-    res.status(500).json({ error: "Failed to delete category." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to delete category.");
   }
 };

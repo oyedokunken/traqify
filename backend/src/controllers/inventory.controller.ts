@@ -1,3 +1,5 @@
+import { logAndIgnore } from "../config/logger";
+import { respondWithError } from "../middleware/error.middleware";
 import { MAX_UNPAGED_ROWS } from "../utils/pagination";
 import { Response } from "express";
 import prisma from "../config/database";
@@ -22,8 +24,8 @@ export const getInventory = async (req: AuthRequest, res: Response): Promise<voi
     });
 
     res.json(inventory);
-  } catch {
-    res.status(500).json({ error: "Failed to fetch inventory." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to fetch inventory.");
   }
 };
 
@@ -41,8 +43,8 @@ export const getLowStock = async (req: AuthRequest, res: Response): Promise<void
     `;
 
     res.json(results);
-  } catch {
-    res.status(500).json({ error: "Failed to fetch low stock items." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to fetch low stock items.");
   }
 };
 
@@ -53,7 +55,7 @@ export const updateStock = async (req: AuthRequest, res: Response): Promise<void
 
     const parsed = inventoryUpdateSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.errors[0].message });
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
 
@@ -95,12 +97,12 @@ export const updateStock = async (req: AuthRequest, res: Response): Promise<void
           owner.email,
           `Low stock alert: ${product.name} (${org.name})`,
           lowStockAlertEmailTemplate(org.name, [{ name: product.name, sku: product.sku, quantity: parsed.data.quantity, threshold: alertThreshold }], `${frontendUrl}/dashboard/${org.slug}/inventory`)
-        ).catch((e) => console.error("[Email] Low stock alert failed:", e.message));
+        ).catch(logAndIgnore("Low stock alert"));
       }
     }
 
     res.json(inventory);
-  } catch {
-    res.status(500).json({ error: "Failed to update stock." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to update stock.");
   }
 };

@@ -1,3 +1,5 @@
+import { logAndIgnore } from "../config/logger";
+import { respondWithError } from "../middleware/error.middleware";
 import { parsePagination } from "../utils/pagination";
 import { Request, Response } from "express";
 import prisma from "../config/database";
@@ -58,12 +60,12 @@ export const submitReview = async (req: Request, res: Response): Promise<void> =
 
     const orgOwner = await prisma.user.findFirst({ where: { organizationId: order.organizationId, role: "OWNER" } });
     if (orgOwner) {
-      createAuditLog(orgOwner.id, order.organizationId, "CREATE", "Review", review.id, `New ${rating}-star review for "${product?.name || productId}" by ${customerName}`, req).catch(() => {});
+      createAuditLog(orgOwner.id, order.organizationId, "CREATE", "Review", review.id, `New ${rating}-star review for "${product?.name || productId}" by ${customerName}`, req).catch(logAndIgnore("audit log"));
     }
 
     res.status(201).json(review);
-  } catch {
-    res.status(500).json({ error: "Failed to submit review." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to submit review.");
   }
 };
 
@@ -79,8 +81,8 @@ export const getProductReviews = async (req: Request, res: Response): Promise<vo
       },
     });
     res.json(reviews);
-  } catch {
-    res.status(500).json({ error: "Failed to fetch reviews." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to fetch reviews.");
   }
 };
 
@@ -109,8 +111,7 @@ export const getDashboardReviews = async (req: AuthRequest, res: Response): Prom
 
     res.json({ reviews, total, page, limit });
   } catch (err) {
-    console.error("[getDashboardReviews]", err);
-    res.status(500).json({ error: "Failed to fetch reviews." });
+    respondWithError(res, err, "Failed to fetch reviews.");
   }
 };
 
@@ -137,11 +138,11 @@ export const moderateReview = async (req: AuthRequest, res: Response): Promise<v
       data: { status: action === "approve" ? "APPROVED" : "REJECTED" },
     });
 
-    createAuditLog(req.user!.id, orgId, "UPDATE", "Review", id, `${action === "approve" ? "Approved" : "Rejected"} review for "${product?.name || review.productId}" by ${review.customerName}`, req).catch(() => {});
+    createAuditLog(req.user!.id, orgId, "UPDATE", "Review", id, `${action === "approve" ? "Approved" : "Rejected"} review for "${product?.name || review.productId}" by ${review.customerName}`, req).catch(logAndIgnore("audit log"));
 
     res.json(updated);
-  } catch {
-    res.status(500).json({ error: "Failed to moderate review." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to moderate review.");
   }
 };
 
@@ -158,9 +159,9 @@ export const deleteReview = async (req: AuthRequest, res: Response): Promise<voi
 
     const product = await prisma.product.findUnique({ where: { id: review.productId }, select: { name: true } });
     await prisma.review.delete({ where: { id } });
-    createAuditLog(req.user!.id, orgId, "DELETE", "Review", id, `Deleted review for "${product?.name || review.productId}" by ${review.customerName}`, req).catch(() => {});
+    createAuditLog(req.user!.id, orgId, "DELETE", "Review", id, `Deleted review for "${product?.name || review.productId}" by ${review.customerName}`, req).catch(logAndIgnore("audit log"));
     res.json({ message: "Review deleted." });
-  } catch {
-    res.status(500).json({ error: "Failed to delete review." });
+  } catch (err) {
+    respondWithError(res, err, "Failed to delete review.");
   }
 };

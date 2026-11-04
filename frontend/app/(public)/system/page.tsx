@@ -38,7 +38,7 @@ export default function SystemPage() {
             Traqify is a full-stack TypeScript monorepo (a Next.js 14 App Router frontend + RESTful Express.js backend covering the complete retail lifecycle: product catalogue, POS order creation, inventory control, customer records, payment tracking, staff access management, public storefronts with Paystack checkout, financial reports, and a real-time analytics dashboard.
           </p>
           <p className="text-gray-600 leading-relaxed">
-            The system is live at <a href="https://traqify.vercel.app" target="_blank" rel="noopener noreferrer" className="text-[#DE1010] hover:underline">https://traqify.vercel.app</a> and its API at <a href="https://traqify-api.vercel.app" target="_blank" rel="noopener noreferrer" className="text-[#DE1010] hover:underline">https://traqify-api.vercel.app</a>.
+            The system is live at <a href="https://traqify.oyedokun.dev" target="_blank" rel="noopener noreferrer" className="text-[#DE1010] hover:underline">https://traqify.oyedokun.dev</a> and its API at <a href="https://traqify-api.vercel.app" target="_blank" rel="noopener noreferrer" className="text-[#DE1010] hover:underline">https://traqify-api.vercel.app</a>.
           </p>
         </motion.section>
 
@@ -63,6 +63,15 @@ export default function SystemPage() {
               |  TypeScript + Prisma ORM              |
               |  JWT middleware + RBAC middleware      |
               +------+----------+--------------------+
+                     |          |
+         +-----------+          +-----------+
+         |                                  |
++--------v-----------+          +-----------v-----------+
+||  PostgreSQL (via   |          |  Supabase Storage      |
+||  Supabase)         |          |  (products, avatars,   |
+||                    |          |   downloadables)        |
+||  Prisma ORM        |          |  Signed direct uploads  |
++--------------------+          +-----------------------+
                      |          |
          +-----------+          +-----------+
          |                                  |
@@ -94,7 +103,7 @@ export default function SystemPage() {
     -> GET /google-callback?code= -> exchange code -> userinfo
     -> upsert user -> store tokens in OAuthSession (2 min TTL)
     -> redirect /auth-callback?code=<opaque>
-    -> GET /oauth-exchange/:code -> tokens returned, code deleted
+    -> POST /oauth-exchange {code} -> tokens returned, code deleted
 
   Token Refresh:
     Axios 401 interceptor -> POST /auth/refresh -> new access token

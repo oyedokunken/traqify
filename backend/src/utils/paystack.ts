@@ -1,3 +1,4 @@
+import { getLogger } from "../config/logger";
 import { AppError } from "../middleware/error.middleware";
 
 const API = "https://api.paystack.co";
@@ -39,7 +40,7 @@ function logFailure(operation: Operation, details: { http?: number; message?: un
   if (details.reason) parts.push(details.reason);
   if (details.http !== undefined) parts.push(`HTTP ${details.http}`);
   if (details.message !== undefined) parts.push(`message "${safeMessage(details.message)}"`);
-  console.error(parts.join(", "));
+  getLogger().error(parts.join(", "));
 }
 
 interface PaystackResult<T> {

@@ -187,7 +187,7 @@ export const orderItemsSchema = z
     z.object({
       productId: z.string().min(1),
       quantity: z
-        .number({ invalid_type_error: "Quantity must be a number." })
+        .number({ error: "Quantity must be a number." })
         .int("Quantity must be a whole number.")
         .min(1, "Quantity must be at least 1.")
         .max(MAX_ITEM_QUANTITY, `Quantity cannot exceed ${MAX_ITEM_QUANTITY} per item.`),
@@ -269,7 +269,7 @@ export const updatePaymentSchema = z.object({
 });
 
 export const orderStatusSchema = z.object({
-  status: z.enum(["PENDING", "APPROVED", "COMPLETED", "CANCELLED"], { errorMap: () => ({ message: "Invalid order status." }) }),
+  status: z.enum(["PENDING", "APPROVED", "COMPLETED", "CANCELLED"], { error: "Invalid order status." }),
 });
 
 const isoDateString = z.string().refine((value) => !Number.isNaN(new Date(value).getTime()), "Invalid date.");
